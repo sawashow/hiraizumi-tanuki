@@ -1,0 +1,13 @@
+# Python
+__pycache__/
+*.pyc
+
+# ブラウザ版の作業用フォルダ（公開用は docs/ に置く）
+web/
+
+# 元絵・試作・比較画像（リポジトリには含めない）
+assets/concept/
+
+# 古くなったメモ（現在の基準は assets/ドット絵基準.md）
+assets/必要データ一覧.md
+assets/イメージ画像プロンプト.md
