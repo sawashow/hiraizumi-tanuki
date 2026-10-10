@@ -26,7 +26,7 @@ python main.py
 
 ## 構成
 
-- `main.py` / `config.py` / `sprites.py`: ゲーム本体。操作感の数値は `config.py` にまとめています
+- `main.py` / `config.py` / `sprites.py` / `stage.py`: ゲーム本体（`stage.py` は地形とアイテムの配置）。操作感の数値は `config.py` にまとめています
 - `assets/images/`: ゲームで使う絵
 - `tools/`: 絵の変換ツールと、画面なしの動作テスト（`python tools/smoke_test.py`）
 - `docs/`: ブラウザ版の公開用ファイル（pygbag で作成）
@@ -35,4 +35,8 @@ python main.py
 ## 素材について
 
 絵は、生成AI（Gemini）で作ったものを、`tools/` で、ゲーム用に変換しています。
-敵は、まだ仮の四角です。
+敵・アイテム・鳥居も同じ方法で作っています。
+
+「無念…」などの文字の絵は、ドット風フォント DotGothic16（SIL Open Font License 1.1）で書き出したものです。
+フォントのファイル自体は、ゲームにもリポジトリにも含めていません。
+https://github.com/fontworks-fonts/DotGothic16

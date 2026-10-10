@@ -34,7 +34,7 @@ FOOT_WHITE = 0.22     # 本体の下からこの割合の範囲に残った白�
 DARK_TEXT = 70        # 平均の明るさがこれ未満の小さな塊は文字として捨てる
 
 
-def remove_white_bg(img):
+def remove_white_bg(img, erode=True):
     """画像の外周から、白に近い画素を塗りつぶして透過にする（内側の白い鼻や帯は残る）"""
     img = img.convert("RGBA")
     w, h = img.size
@@ -58,7 +58,8 @@ def remove_white_bg(img):
         px[x, y] = (0, 0, 0, 0)
         dq.extend(((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)))
     # 縁に残る白とのにじみを1px削る
-    img.putalpha(img.getchannel("A").filter(ImageFilter.MinFilter(3)))
+    if erode:
+        img.putalpha(img.getchannel("A").filter(ImageFilter.MinFilter(3)))
     return img
 
 

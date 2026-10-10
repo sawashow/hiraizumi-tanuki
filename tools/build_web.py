@@ -17,11 +17,16 @@ OUT = os.path.join(ROOT, "web")
 
 shutil.rmtree(OUT, ignore_errors=True)
 os.makedirs(os.path.join(OUT, "assets", "images"))
-for name in ("main.py", "config.py", "sprites.py"):
+for name in ("main.py", "config.py", "sprites.py", "stage.py"):
     shutil.copy(os.path.join(ROOT, name), OUT)
-for f in os.listdir(os.path.join(ROOT, "assets", "images")):
-    if f.endswith(".png") and "sheet" not in f:   # 確認用の一覧画像は入れない
-        shutil.copy(os.path.join(ROOT, "assets", "images", f), os.path.join(OUT, "assets", "images"))
-n = len(os.listdir(os.path.join(OUT, "assets", "images")))
+src_images = os.path.join(ROOT, "assets", "images")
+for dirpath, _, files in os.walk(src_images):
+    for f in files:
+        if f.endswith(".png") and "sheet" not in f:   # 確認用の一覧画像は入れない
+            rel = os.path.relpath(dirpath, src_images)
+            dst = os.path.join(OUT, "assets", "images", rel)
+            os.makedirs(dst, exist_ok=True)
+            shutil.copy(os.path.join(dirpath, f), dst)
+n = sum(len(fs) for _, _, fs in os.walk(os.path.join(OUT, "assets", "images")))
 size = sum(os.path.getsize(os.path.join(dp, f)) for dp, _, fs in os.walk(OUT) for f in fs)
 print("画像 %d 枚、合計 %.0f KB" % (n, size / 1024))

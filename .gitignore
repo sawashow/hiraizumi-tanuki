@@ -17,3 +17,6 @@ assets/イメージ画像プロンプト.md
 
 # 手でドットを打つ試作（採用しなかった方法）
 tools/draw_player.py
+
+# AI用の引き継ぎメモ（リポジトリには含めない）
+AI_CONTEXT.md
