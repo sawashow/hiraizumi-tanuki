@@ -110,6 +110,12 @@ HEAL_ONIGIRI = 1
 SLASH = dict(w=8, h=26, speed=3.0, range=220, damage=1, ticks=5)   # 強化中の、刀の光波
 SLASH_FRAMES = 3
 
+# 音
+BGM_STAGE1 = "bgm_stage1.ogg"
+BGM_BOSS = "bgm_boss.ogg"      # ボスができたら使う（まだ、鳴らす場面がない）
+BGM_VOLUME = 0.5
+BGM_FADE_MS = 1200      # やられたとき、曲が消えていくまでの時間
+
 # 残機・中間地点
 LIVES = 3
 RESPAWN_AT = 215        # 倒れてから、中間地点で再開するまでのフレーム数（残機が残っているとき）

@@ -8,6 +8,7 @@ import pygame
 
 import config as C
 from stage import CHECKPOINT, ITEMS, Terrain
+from audio import Audio
 from sprites import Assets, Checkpoint, HitEffect, Item, Player, Shuriken, SlashWave, Wave, make_enemy
 
 # 敵の配置（種類, x）。序盤は落ち武者だけ→中盤に狐火→後半に烏→終盤は混ぜる
@@ -305,6 +306,7 @@ async def main():
     clock = pygame.time.Clock()
     font = pygame.font.Font(None, 20)
     game = Game()
+    audio = Audio()
 
     while True:
         pressed = set()
@@ -317,6 +319,10 @@ async def main():
             if event.type == pygame.KEYUP and event.key in (pygame.K_SPACE, pygame.K_UP):
                 pressed.add("jump_release")
         game.step(keys_to_input(pygame.key.get_pressed()), pressed)
+        if game.player.hp > 0:
+            audio.play_bgm(C.BGM_STAGE1)
+        else:
+            audio.fade_out(C.BGM_FADE_MS)   # やられたら、曲を消していく。再開すると、また始まる
         game.draw(screen, font)
         pygame.transform.scale(screen, window.get_size(), window)
         pygame.display.flip()

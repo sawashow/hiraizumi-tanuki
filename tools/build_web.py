@@ -17,7 +17,7 @@ OUT = os.path.join(ROOT, "web")
 
 shutil.rmtree(OUT, ignore_errors=True)
 os.makedirs(os.path.join(OUT, "assets", "images"))
-for name in ("main.py", "config.py", "sprites.py", "stage.py"):
+for name in ("main.py", "config.py", "sprites.py", "stage.py", "audio.py"):
     shutil.copy(os.path.join(ROOT, name), OUT)
 src_images = os.path.join(ROOT, "assets", "images")
 for dirpath, _, files in os.walk(src_images):
@@ -27,6 +27,7 @@ for dirpath, _, files in os.walk(src_images):
             dst = os.path.join(OUT, "assets", "images", rel)
             os.makedirs(dst, exist_ok=True)
             shutil.copy(os.path.join(dirpath, f), dst)
+shutil.copytree(os.path.join(ROOT, "assets", "audio"), os.path.join(OUT, "assets", "audio"))   # BGM（ogg）
 n = sum(len(fs) for _, _, fs in os.walk(os.path.join(OUT, "assets", "images")))
 size = sum(os.path.getsize(os.path.join(dp, f)) for dp, _, fs in os.walk(OUT) for f in fs)
 print("画像 %d 枚、合計 %.0f KB" % (n, size / 1024))
