@@ -11,3 +11,9 @@ assets/concept/
 # 古くなったメモ（現在の基準は assets/ドット絵基準.md）
 assets/必要データ一覧.md
 assets/イメージ画像プロンプト.md
+
+# ブラウザ確認ツール（gstack）の作業フォルダ。内部トークンを含むので、絶対に上げない
+.gstack/
+
+# 手でドットを打つ試作（採用しなかった方法）
+tools/draw_player.py
