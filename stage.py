@@ -135,3 +135,148 @@ class Terrain:
 
 # 中間地点（鳥居）: (x, 足元の高さ)。ここを通ると、やられたとき、ここから再開する
 CHECKPOINT = (1230, T - 16)
+
+
+# 敵の配置（種類, x）。序盤は落ち武者だけ→中盤に狐火→後半に烏→終盤は混ぜる
+SPAWNS1 = (
+    ("ochimusha", 520), ("ochimusha", 900),
+    ("kitsunebi_low", 1250), ("kitsunebi_high", 1420), ("ochimusha", 1455),
+    ("karasu", 1850), ("karasu", 2000),
+    ("ochimusha", 2100), ("kitsunebi_high", 2200), ("karasu", 2300),
+    ("ochimusha", 2460), ("karasu", 2620),
+    ("ochimusha", 2880), ("kitsunebi_high", 3000), ("karasu", 3120),
+    ("ochimusha", 3260), ("kitsunebi_low", 3400), ("ochimusha", 3480), ("karasu", 3540),
+    # 月見坂は、敵が多い（参道の戦い）。坂を登るほど、押し寄せてくる
+    ("ochimusha", 1010), ("karasu", 2420), ("kitsunebi_low", 2500), ("ochimusha", 2800), ("ochimusha", 3250),
+)
+
+
+class StageDef:
+    """1つの面のデータ。地形・アイテム・敵・ボス・背景・曲を、1つにまとめる。
+    絵は assets/images 以下の相対パス。面ごとの絵が無ければ、1面の絵で代わりにする"""
+
+    def __init__(self, name, width, ground, platforms, items, checkpoint, spawns, bgm, bgm_boss,
+                 sky="bg_sky.png", mid="bg_mid.png", tiles="", boss_x=None,
+                 boss_title=C.BOSS_TITLE, boss_name=C.BOSS_NAME, boss_pattern=C.BOSS_PATTERN,
+                 talk_boss=C.TALK_BOSS, talk_tanuki=C.TALK_TANUKI, number=1, stele_x=150, boss_kind="boss"):
+        self.name, self.width = name, width
+        self.ground, self.platforms, self.items = ground, platforms, items
+        self.checkpoint, self.spawns = checkpoint, spawns
+        self.bgm, self.bgm_boss = bgm, bgm_boss
+        self.sky, self.mid, self.tiles = sky, mid, tiles   # tiles は、タイルの入ったフォルダ（空なら、直下）
+        self.boss_x = boss_x if boss_x is not None else width - 110   # ボスが降ってくる場所
+        self.boss_title, self.boss_name, self.boss_pattern = boss_title, boss_name, boss_pattern
+        self.talk_boss, self.talk_tanuki = talk_boss, talk_tanuki
+        self.boss_kind = boss_kind   # boss=泰衡（落ち武者） / boss2=基衡
+        self.number = number    # 第N面（面の名前・石碑の絵の番号）
+        self.stele_x = stele_x  # 石碑を置く場所
+
+    @property
+    def arena_x0(self):
+        """ボスの場所の左端（ここで画面が止まる）"""
+        return self.width - C.BASE_W
+
+    @property
+    def end_boss_x(self):
+        """倒したボスが、吹っ飛んで倒れる場所"""
+        return self.boss_x
+
+    @property
+    def end_tanuki_x(self):
+        """寸劇で、タヌキ侍が話すときに立つ場所"""
+        return self.arena_x0 + C.BOSS_TRIGGER + 20
+
+    @property
+    def dango_total(self):
+        return sum(1 for k, _, _ in self.items if k == "dango")
+
+    def terrain(self):
+        return Terrain(self.ground, self.platforms)
+
+
+STAGE1 = StageDef("月見坂", C.STAGE_W, GROUND, PLATFORMS, ITEMS, CHECKPOINT, SPAWNS1, C.BGM_STAGE1, C.BGM_BOSS,
+                  boss_x=C.BOSS_X, number=1, stele_x=140)
+
+# ---------------------------------------------------------------- 2面（毛越寺）
+# 浄土庭園。池（広い穴）を、飛び石（足場）で渡る。反橋（太鼓橋）の階段、庭の塔（石灯籠の高台）、石橋
+GROUND2 = (
+    (0, 420, T),
+    (420, 520, T - 16),
+    (520, 700, T),
+    # 池1: 700〜860（幅160）。飛び石で渡る
+    (860, 1060, T - 16),
+    (1060, 1180, T),
+    (1180, 1240, T - 16),      # 反橋（登って、降りる）
+    (1240, 1300, T - 32),
+    (1300, 1360, T - 48),
+    (1360, 1420, T - 32),
+    (1420, 1480, T - 16),
+    (1480, 1760, T),
+    # 池2: 1760〜1900（幅140）。飛び石で渡る
+    (1900, 2100, T - 16),
+    (2100, 2240, T - 32),      # 中間地点
+    (2240, 2380, T - 32),
+    (2380, 2520, T),           # 谷。庭の塔の足もと
+    (2520, 2600, T - 140),     # 庭の塔
+    (2600, 2700, T - 32),      # 塔から、飛び降りる先
+    (2700, 2900, T - 16),
+    (2900, 3100, T),
+    # 池3: 3100〜3290（幅190）。長い飛び石
+    (3290, 3500, T - 16),
+    (3500, 3560, T - 32),      # 2つ目の反橋（高い）
+    (3560, 3620, T - 48),
+    (3620, 3700, T - 64),
+    (3700, 3760, T - 48),
+    (3760, 3820, T - 32),
+    (3820, 3880, T - 16),
+    (3880, 4200, T),
+    # 池4: 4200〜4330（幅130）。ボスの前の飛び石
+    (4330, 5120, T),           # ボスの場所（面の端の先は、クリアのときに走り抜ける分）
+)
+PLATFORMS2 = (
+    (560, 600, T - 70),
+    (725, 760, T - 40), (785, 820, T - 52),                    # 池1の飛び石
+    (1500, 1540, T - 74), (1560, 1600, T - 98),                # 上の道
+    (1785, 1820, T - 42), (1835, 1870, T - 52),                # 池2の飛び石
+    (1960, 2000, T - 60),
+    (2400, 2440, T - 56), (2450, 2490, T - 108),               # 庭の塔を登る足場
+    (2620, 2660, T - 90), (2800, 2860, T - 72),
+    (3115, 3150, T - 40), (3170, 3205, T - 52), (3225, 3260, T - 40),   # 池3の飛び石（長い）
+    (3330, 3370, T - 60), (3400, 3440, T - 84),
+    (3980, 4040, T - 70), (4100, 4140, T - 96),
+    (4222, 4255, T - 44), (4278, 4311, T - 44),                # 池4の飛び石
+)
+ITEMS2 = (
+    ("dango", 150, T - 14), ("dango", 180, T - 14), ("dango", 210, T - 14),
+    ("dango", 580, T - 88), ("onigiri", 660, T - 14),
+    ("dango", 742, T - 58), ("dango", 802, T - 70),
+    ("dango", 940, T - 32), ("dango", 970, T - 32),
+    ("dango", 1270, T - 50), ("dango", 1330, T - 66),
+    ("dango", 1520, T - 92), ("onigiri", 1580, T - 116),
+    ("dango", 1802, T - 60), ("dango", 1852, T - 70),
+    ("dango", 1980, T - 78),
+    ("onigiri", 2180, T - 50),
+    ("dango", 2420, T - 74), ("dango", 2470, T - 126),
+    ("dango", 2535, T - 158), ("leaf", 2560, T - 160), ("dango", 2585, T - 158),
+    ("dango", 2640, T - 108), ("dango", 2830, T - 90),
+    ("dango", 3132, T - 58), ("dango", 3187, T - 70), ("dango", 3242, T - 58),
+    ("dango", 3350, T - 78), ("dango", 3420, T - 102),
+    ("onigiri", 3590, T - 70),
+    ("dango", 3660, T - 82),
+    ("dango", 4010, T - 88), ("triple", 4120, T - 114),
+    ("dango", 4238, T - 62), ("dango", 4295, T - 62),
+    ("onigiri", 4400, T - 14),
+)
+SPAWNS2 = (   # 毛越寺は、敵が少なめ。池と飛び石（ジャンプ）が主役。飛ぶ敵が中心
+    ("ochimusha", 600), ("kitsunebi_low", 1000),
+    ("karasu", 1600), ("kitsunebi_high", 1800), ("karasu", 2000),
+    ("ochimusha", 2440), ("kitsunebi_high", 2650), ("karasu", 2950),
+    ("kitsunebi_low", 3420), ("karasu", 3650),
+    ("ochimusha", 3950), ("kitsunebi_high", 4150), ("karasu", 4400),
+)
+STAGE2 = StageDef("毛越寺", 5000, GROUND2, PLATFORMS2, ITEMS2, (2170, T - 32), SPAWNS2, C.BGM_STAGE1, C.BGM_BOSS,
+                  sky="stage2/bg_sky.png", mid="stage2/bg_mid.png", tiles="stage2/",
+                  boss_title="enemies/boss2_title.png", boss_name="enemies/boss2_name.png",
+                  talk_boss="talk_boss2.png", talk_tanuki="talk_tanuki2.png", number=2, stele_x=130,
+                  boss_kind="boss2", boss_pattern=C.BOSS2_PATTERN)   # 絵が無いあいだは、1面の絵で代わりにする
+STAGES = [STAGE1, STAGE2]   # 遊ぶ順番

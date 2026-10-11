@@ -5,6 +5,7 @@ import os
 import pygame
 
 import config as C
+from stage import STAGE1
 
 IMG = os.path.join(os.path.dirname(__file__), "assets", "images")
 
@@ -66,7 +67,7 @@ def _sword_trail():
 class Assets:
     """絵をまとめて読み込む。左向き用は反転して持つ"""
 
-    def __init__(self):
+    def __init__(self, stage=None):
         n = 37
         self.player = {True: [_load(f"player_{i:02d}.png") for i in range(n)]}  # True=右向き
         self.player[False] = [pygame.transform.flip(s, True, False) for s in self.player[True]]
@@ -84,8 +85,14 @@ class Assets:
         # ボスの絵（仮）: 落ち武者を2倍にして、赤みを足したもの。絵ができたら、差し替える
         self.enemy["boss"] = {anim: {d: [_boss_frame(f) for f in fs] for d, fs in dirs.items()}
                               for anim, dirs in self.enemy["ochimusha"].items()}
-        self.boss_title = _load(C.BOSS_TITLE)
-        self.boss_name = _load(C.BOSS_NAME)
+        # 基衡の絵は、左向きで描いてある（True=右向きは、反転して持つ）。絵が無ければ、持たない
+        self.boss2 = {}
+        try:
+            for name in C.BOSS2_FRAMES:
+                left = _load(f"enemies/boss2_{name}.png")
+                self.boss2[name] = {False: left, True: pygame.transform.flip(left, True, False)}
+        except (FileNotFoundError, pygame.error):
+            self.boss2 = {}
         wave = [_load(f"enemies/wave_{i}.png") for i in range(C.WAVE_FRAMES)]
         self.wave = {True: wave, False: [pygame.transform.flip(f, True, False) for f in wave]}   # True=右向き
         slash = [_load(f"slash_{i}.png") for i in range(C.SLASH_FRAMES)]
@@ -95,8 +102,6 @@ class Assets:
         self.item["triple"] = _triple_icon(self.shuriken[0])
         self.item["super"] = _star_icon()
         self.cp_text = _load("checkpoint_text.png")   # 「中間地点」
-        self.talk_boss = _load(C.TALK_BOSS)       # 寸劇のせりふ（吹き出しの中の字）
-        self.talk_tanuki = _load(C.TALK_TANUKI)
         self.life_text = {n: _load(f"life_{n}.png") for n in (1, 2, 3, 4)}   # 「のこり 2」など
         self.oneup = _load("oneup.png")
         self.torii = {False: _load("items/torii_off.png"), True: _load("items/torii_on.png")}   # 中間地点（通る前・通った後）
@@ -111,9 +116,31 @@ class Assets:
         self.story_tanuki_left = [pygame.transform.flip(f, True, False) for f in self.story_tanuki]
         self.gameover = _load("gameover.png")             # 「無念…」（ドット風フォントで書き出した絵）
         self.gameover_prompt = _load("gameover_prompt.png")  # 「Enterキーで再開」
-        self.sky = _load("bg_sky.png")
-        self.mid = _load("bg_mid.png")
-        self.tiles = [_load(f"tile_{i:02d}.png") for i in range(6)]
+        self.stage = None
+        self.load_stage(stage or STAGE1)
+
+    def load_stage(self, stage):
+        """面ごとの絵（背景・タイル・ボスの名前・寸劇のせりふ）を読み込む。無ければ、1面の絵で代わりにする"""
+        if self.stage is stage:
+            return
+        self.stage = stage
+        def pick(name, fallback):
+            return _load(name) if os.path.exists(os.path.join(IMG, name)) else _load(fallback)
+        self.sky = pick(stage.sky, STAGE1.sky)
+        self.mid = pick(stage.mid, STAGE1.mid)
+        d = stage.tiles
+        self.tiles = [pick(f"{d}tile_{i:02d}.png", f"tile_{i:02d}.png") for i in range(6)]
+        self.stage_title = _load(f"stage_title_{stage.number}.png") if os.path.exists(os.path.join(IMG, f"stage_title_{stage.number}.png")) else None
+        self.stele = _load(f"stele_{stage.number}.png") if os.path.exists(os.path.join(IMG, f"stele_{stage.number}.png")) else None
+        stones = [f"{d}stone_{i}.png" for i in range(3)]   # 足場の絵（礎石など）。無ければ、タイルの上端で代わりにする
+        self.stones = [_load(n) for n in stones] if all(os.path.exists(os.path.join(IMG, n)) for n in stones) else None
+        names = [f"{d}water_top_0.png", f"{d}water_top_1.png", f"{d}water_fill.png"]   # 池の水面（2コマ）と、水の中
+        have = all(os.path.exists(os.path.join(IMG, n)) for n in names)
+        self.water = [_load(n) for n in names] if have else None   # 無ければ、穴は暗い四角のまま
+        self.boss_title = pick(stage.boss_title, STAGE1.boss_title)
+        self.boss_name = pick(stage.boss_name, STAGE1.boss_name)
+        self.talk_boss = pick(stage.talk_boss, STAGE1.talk_boss)       # 寸劇のせりふ（吹き出しの中の字）
+        self.talk_tanuki = pick(stage.talk_tanuki, STAGE1.talk_tanuki)
 
 
 def _approach(value, target, step):
@@ -763,9 +790,11 @@ class Boss(Enemy):
 
     INTRO = ("wait", "drop", "land", "pose")   # 出てくる場面の動き（この間は、攻撃を受けない）
 
-    def __init__(self, x, assets=None, floor=None, x_min=0.0, x_max=None, quick=False):
+    def __init__(self, x, assets=None, floor=None, x_min=0.0, x_max=None, quick=False, end_x=None, pattern=None):
         self.floor = float(floor if floor is not None else C.FLOOR_Y)
         super().__init__(x, y=-C.BOSS["h"], assets=assets)   # 画面の上から降ってくる
+        self.end_x = float(end_x if end_x is not None else C.END_BOSS_X)   # 倒されて、吹っ飛んで落ちる場所
+        self.pattern = pattern or C.BOSS_PATTERN                            # 光波の順番（L=低い / H=高い）
         half = self.w / 2
         self.x_min = x_min + half
         self.x_max = (x_max if x_max is not None else C.STAGE_W) - half
@@ -789,7 +818,7 @@ class Boss(Enemy):
             B = C.END_BLOW
             self.flash = max(0, self.flash - 1)
             if self.dead_t == 0:
-                self.vx, self.vy = (C.END_BOSS_X - self.cx) / B["frames"], B["vy"]
+                self.vx, self.vy = (self.end_x - self.cx) / B["frames"], B["vy"]
                 if self.vx:
                     self.facing = -1 if self.vx > 0 else 1    # 後ろ向きに飛ぶ
             self.dead_t += 1
@@ -804,7 +833,7 @@ class Boss(Enemy):
             self.cy += self.vy
             if self.cy >= self.floor - self.h / 2 and self.dead_t >= B["frames"]:
                 self.cy = self.floor - self.h / 2
-                self.cx = float(C.END_BOSS_X)
+                self.cx = self.end_x
                 self.down_t = 1
                 self.landed = True
             elif self.cy > self.floor - self.h / 2:
@@ -835,7 +864,7 @@ class Boss(Enemy):
     @property
     def high(self):
         """次の光波が、高いか（構えの絵も、これで変える）"""
-        return C.BOSS_PATTERN[self.shots % len(C.BOSS_PATTERN)] == "H"
+        return self.pattern[self.shots % len(self.pattern)] == "H"
 
     def _wave(self, direction, tall=False):
         P = self.P
@@ -919,6 +948,222 @@ class Boss(Enemy):
             return self._frames("swing")[1]   # 振り下ろしたまま（隙）
         f = self._frames("walk")
         return f[(self.t // 12) % len(f)]
+
+
+class Boss2(Boss):
+    """2面のボス（二代・基衡）。上から降りてきて、「歩く → 構える → 扇の風 / 扇を投げる / 花びらの雨 → 隙」を繰り返す。
+    攻撃を受けても、ひるまない。体力が半分になると、歩く時間と隙が短くなり、花びらの雨が入る"""
+    P = C.BOSS2
+    KIND = "boss2"
+
+    def __init__(self, *args, **kw):
+        super().__init__(*args, **kw)
+        self.pattern = kw.get("pattern") or C.BOSS2_PATTERN
+
+    @property
+    def move(self):
+        """次の攻撃（W=風 / T=扇 / P=花びら）"""
+        seq = C.BOSS2_RAGE_PATTERN if self.rage else self.pattern
+        return seq[self.count % len(seq)]
+
+    def think(self, pr, stage_w, terrain=None):
+        P = self.P
+        s = self.state
+        if s in self.INTRO or s == "drop":     # 出てくる場面は、1面のボスと同じ
+            return Boss.think(self, pr, stage_w, terrain)
+        self.st += 1
+        if s in ("walk", "recover"):
+            self.facing = 1 if pr.centerx > self.cx else -1
+        if s == "walk":
+            if abs(pr.centerx - self.cx) > P["near"]:
+                self.cx = max(self.x_min, min(self.cx + self.facing * P["speed"], self.x_max))
+            if self.st >= P["rage_walk_frames" if self.rage else "walk_frames"]:
+                self._set({"W": "wind_ready", "T": "throw_ready", "P": "petal_ready"}[self.move])
+                self.count += 1
+        elif s == "wind_ready":
+            if self.st >= P["wind_ready"]:
+                self._set("wind")
+        elif s == "wind":
+            if self.st == P["wind_at"]:
+                self.spawned.append(Gust(self.cx + self.facing * (self.w / 2 + 12), self.floor - C.GUST["h"] / 2,
+                                         self.facing, self.a))
+            if self.st >= P["wind_frames"]:
+                self._set("recover")
+        elif s == "throw_ready":
+            if self.st >= P["throw_ready"]:
+                self._set("throw")
+        elif s == "throw":
+            if self.st == P["throw_at"]:
+                self.spawned.append(Fan(self.cx + self.facing * (self.w / 2 + 6), self.floor - C.FAN["y"],
+                                        self.facing, self.a, self))
+            if self.st >= P["throw_frames"]:
+                self._set("recover")
+        elif s == "petal_ready":
+            if self.st >= P["petal_ready"]:
+                self._set("petal")
+        elif s == "petal":
+            if self.st == 1:
+                self._rain(pr)
+            if self.st >= P["petal_frames"]:
+                self._set("recover")
+        elif s == "recover":
+            if self.st >= P["rage_recover_frames" if self.rage else "recover_frames"]:
+                self._set("walk")
+
+    def _rain(self, pr):
+        """花びらの雨: 主人公の前後に、ずらして落とす（立ち止まっていると、当たる）"""
+        K = C.PETAL
+        for i in range(K["count"]):
+            off = (i - (K["count"] - 1) / 2) * K["spread"]
+            x = max(self.x_min - self.w / 2, min(pr.centerx + off, self.x_max + self.w / 2))
+            self.spawned.append(Petal(x, self.floor, self.a, K["stagger"] * i))
+
+    def image(self):
+        f = self.a.boss2
+        d = self.facing > 0
+        if self.dying:
+            return f["down" if self.down_t else "hurt"][d]
+        s = self.state
+        if s in ("drop", "wind_ready"):
+            name = "fan_up"
+        elif s == "wind":
+            name = "fan_up" if self.st < self.P["wind_at"] else "fan_swing"
+        elif s == "throw_ready":
+            name = "throw_0"
+        elif s == "throw":
+            name = "throw_1"
+        elif s in ("petal_ready", "petal", "pose"):
+            name = "petal"
+        elif s == "walk":
+            name = "walk_%d" % ((self.t // 14) % 2)
+        else:   # wait / land / recover
+            name = "idle_%d" % (0, 1, 2, 1)[(self.t // 12) % 4]
+        if self.flash and s in ("walk", "recover"):
+            name = "hurt"
+        return f[name][d]
+
+
+class Gust:
+    """扇の風: 地面ぞいに、ゆっくり進む。ダメージはないが、当たると押し戻される。刀では消せない（ジャンプで越える）"""
+    push = C.GUST["push"]
+    cuttable = False
+
+    def __init__(self, x, y, direction, assets):
+        self.a = assets
+        self.px, self.py = float(x), float(y)
+        self.dir = direction
+        self.travel = 0.0
+        self.t = 0
+        self.alive = True
+
+    @property
+    def rect(self):
+        w, h = C.GUST["w"], C.GUST["h"]
+        return pygame.Rect(round(self.px - w / 2), round(self.py - h / 2), w, h)
+
+    def update(self, stage_w):
+        self.px += self.dir * C.GUST["speed"]
+        self.travel += C.GUST["speed"]
+        self.t += 1
+        if self.travel > C.GUST["range"] or not (0 <= self.px <= stage_w):
+            self.alive = False
+
+    def draw(self, surface, cam_x):
+        r = self.rect.move(-cam_x, 0)
+        col = (232, 244, 240) if self.travel < C.GUST["range"] * 0.6 else (170, 196, 196)   # 終わりに近づくと、薄くなる
+        for i, (dy, ln) in enumerate(((4, 20), (14, 26), (24, 18), (31, 12))):   # 風の線（4本が、ずれながら流れる）
+            ph = (self.t // C.GUST["ticks"] + i) % 3
+            x0 = r.right - ln - ph * 3 if self.dir > 0 else r.left + ph * 3
+            pygame.draw.rect(surface, (96, 126, 160), (x0, r.top + dy + 2, ln, 1))   # 薄い景色でも見えるよう、下に影を付ける
+            pygame.draw.rect(surface, col, (x0, r.top + dy, ln, 2))
+
+
+class Fan:
+    """投げた扇: ボスの向きに飛んで、距離まで行くと、ボスのところへ戻る。刀で消せる。当たるとダメージ"""
+    cuttable = True
+    damage = C.FAN["damage"]
+
+    def __init__(self, x, y, direction, assets, owner):
+        self.a = assets
+        self.px, self.py = float(x), float(y)
+        self.dir = direction
+        self.owner = owner
+        self.travel = 0.0
+        self.back = False
+        self.t = 0
+        self.alive = True
+
+    @property
+    def rect(self):
+        w, h = C.FAN["w"], C.FAN["h"]
+        return pygame.Rect(round(self.px - w / 2), round(self.py - h / 2), w, h)
+
+    def update(self, stage_w):
+        K = C.FAN
+        self.t += 1
+        if not self.back:
+            self.px += self.dir * K["speed"]
+            self.travel += K["speed"]
+            if self.travel >= K["range"] or not (0 <= self.px <= stage_w):
+                self.back = True
+        else:
+            d = self.owner.cx - self.px
+            if abs(d) <= K["speed"] + 4 or not self.owner.active:
+                self.alive = False
+                return
+            self.px += K["speed"] if d > 0 else -K["speed"]
+
+    def draw(self, surface, cam_x):
+        if not (self.a and self.a.boss2):
+            pygame.draw.rect(surface, C.WHITE, self.rect.move(-cam_x, 0))
+            return
+        spun = pygame.transform.rotate(self.a.boss2["fan"][True], -(self.t * C.FAN["spin"]) * self.dir % 360)
+        surface.blit(spun, (round(self.px) - spun.get_width() // 2 - cam_x, round(self.py) - spun.get_height() // 2))
+
+
+class Petal:
+    """花びら: 落ちる場所に、先に目印（地面の小さな楕円）が出る。そのあと、上から落ちてくる。刀で消せる。当たるとダメージ"""
+    cuttable = True
+    damage = C.PETAL["damage"]
+
+    def __init__(self, x, floor, assets, delay=0):
+        self.a = assets
+        self.px, self.floor = float(x), float(floor)
+        self.py = float(C.PETAL["top"])
+        self.t = -delay       # 0になるまで、まだ出ない
+        self.alive = True
+
+    @property
+    def falling(self):
+        return self.t >= C.PETAL["warn"]
+
+    @property
+    def rect(self):
+        if not self.falling:
+            return pygame.Rect(-100, -100, 0, 0)      # 落ちる前は、当たらない
+        w, h = C.PETAL["w"], C.PETAL["h"]
+        return pygame.Rect(round(self.px - w / 2), round(self.py - h / 2), w, h)
+
+    def update(self, stage_w):
+        self.t += 1
+        if self.falling:
+            self.py += C.PETAL["speed"]
+            if self.py >= self.floor - C.PETAL["h"] / 2:
+                self.alive = False
+
+    def draw(self, surface, cam_x):
+        if self.t < 0:
+            return
+        x = round(self.px) - cam_x
+        if not self.falling:    # 目印: だんだん大きくなる楕円（点滅）
+            w = 6 + 8 * self.t // C.PETAL["warn"]
+            col = (255, 170, 190) if (self.t // 4) % 2 else (210, 120, 150)
+            pygame.draw.ellipse(surface, col, (x - w // 2, round(self.floor) - 2, w, 3))
+            return
+        y = round(self.py)
+        pygame.draw.rect(surface, (235, 140, 170), (x - 3, y - 1, 6, 4))      # 花びら（ふちを濃く、中を薄く）
+        pygame.draw.rect(surface, (255, 200, 214), (x - 2, y - 2, 4, 4))
+        pygame.draw.rect(surface, (255, 232, 238), (x - 1, y - 1, 2, 2))
 
 
 def make_enemy(kind, x, assets=None, terrain=None):

@@ -18,6 +18,16 @@
 | Enter | 再開（ゲームオーバー・クリア時） |
 | Esc | 終了（パソコン版のみ） |
 
+コントローラ（Xbox・PlayStation・Switch Pro・8BitDoなど）を挿すと、そのまま使えます（起動したあとに挿しても大丈夫です）。
+
+| コントローラ | 操作 |
+|---|---|
+| 十字キー・左スティック | 移動（下でしゃがむ） |
+| A（PlayStationは×） | ジャンプ（押し続けるほど高く）・決定 |
+| X（□） | 刀 |
+| B・Y（○・△） | 木の葉手裏剣 |
+| Start | 再開（ゲームオーバー・クリア時） |
+
 ## アイテム
 
 | アイテム | 効果 |
@@ -37,7 +47,7 @@ pip install pygame
 python main.py
 ```
 
-`python main.py boss` で、ボスの場所の手前から、`python main.py cp` で、中間地点の手前から始められます（確認用）。
+`python main.py s2` で2面から、`python main.py boss` で、ボスの場所の手前から、`python main.py cp` で、中間地点の手前から始められます（確認用）。
 
 ## 構成
 
@@ -47,13 +57,16 @@ python main.py
 - `docs/`: ブラウザ版の公開用ファイル（pygbag で作成）
 - `assets/ドット絵基準.md`: 絵の基準
 - `assets/ストーリー設定.md`: 筋書きと、ボスの設定
+- `assets/ステージコンセプト.md`: 面ごとのコンセプトと、面を作る手順
 
 ## 素材について
 
-絵は、生成AI（Gemini）で作ったものを、`tools/` で、ゲーム用に変換しています。
+絵は、生成AIで作ったものを、`tools/` で、ゲーム用に変換しています。
+1面と、キャラクター・アイテム・ボスは Gemini、2面の背景（空・中景）と地面タイルは ChatGPT で作りました。
+変換のとき、ドットの粗さと色数を、1面にそろえています。
 敵・アイテム・鳥居も同じ方法で作っています。
 
-曲名は、次のとおりです。
+曲は、生成AI（Gemini）で作りました。曲名は、次のとおりです。
 
 - 始まりの語りの曲: 「Evening at the Border Post」（`assets/audio/bgm_story.ogg`）
 - 1面の曲: 「Clash of the Iron Fan」（`assets/audio/bgm_stage1.ogg`）
