@@ -16,7 +16,23 @@ import pygame  # noqa: E402
 import config as C  # noqa: E402
 from main import ENEMY_SPAWNS, Game, drop_kind  # noqa: E402
 from sprites import Item, Karasu, Kitsunebi, Ochimusha, Shuriken, Wave  # noqa: E402
-from stage import GROUND, ITEMS, PLATFORMS, STAGES, Terrain  # noqa: E402
+import copy  # noqa: E402
+
+from stage import GROUND, ITEMS, PLATFORMS, STAGE1_LEGACY, STAGE2, STAGES, Terrain  # noqa: E402
+
+# 本番の面の順は、毛越寺 → 月見坂（ボスは遊ぶ順で決まる）。ただし、以下の動きのテスト（地形・敵・ボス）は、
+# 「月見坂＝1面（泰衡）、毛越寺＝2面（基衡）」で書かれているので、写しを作って、その形にそろえて動かす。
+# 本番の順そのものは、最後の「面の順」の節で確かめる
+PROD_STAGES = list(STAGES)
+_L1 = copy.copy(STAGE1_LEGACY)
+_L1.number, _L1.boss_kind = 1, "boss"
+_L1.boss_title, _L1.boss_name, _L1.boss_pattern = C.BOSS_TITLE, C.BOSS_NAME, C.BOSS_PATTERN
+_L1.talk_boss, _L1.talk_tanuki = C.TALK_BOSS, C.TALK_TANUKI
+_L2 = copy.copy(STAGE2)
+_L2.number, _L2.boss_kind, _L2.boss_pattern = 2, "boss2", C.BOSS2_PATTERN
+_L2.boss_title, _L2.boss_name = "enemies/boss2_title.png", "enemies/boss2_name.png"
+_L2.talk_boss, _L2.talk_tanuki = "talk_boss2.png", "talk_tanuki2.png"
+STAGES[:] = [_L1, _L2]
 
 # 古い（平らな）地形。穴と足場の動きのテスト用
 _T = C.FLOOR_Y
@@ -849,7 +865,7 @@ check("やり直すと、スコアと強化がもとに戻る", g.score == 0 and
 snap(item_game("dango"), "items")
 
 # ---------------------------------------------------------------- 14. 残機・中間地点・団子の数
-from main import DANGO_TOTAL  # noqa: E402
+DANGO_TOTAL = STAGE1_LEGACY.dango_total   # 古い短い版の月見坂の団子の数
 from stage import CHECKPOINT  # noqa: E402
 
 
@@ -1267,8 +1283,19 @@ check("飛び起きる間は、その場にいる", g.story_x == x1)
 run(g, T_["wake"] // 2 + 12)
 snap(g, "story run")
 check("起きたら、右へ素早く駆けていく", g.story and g.story_x > x1 + 60, "%.0f → %.0f" % (x1, g.story_x))
-run(g, 120)
-check("画面の右へ駆け抜けると、ゲームが始まる", not g.story and not g.title and g.bgm == C.BGM_STAGE1)
+for _ in range(400):
+    if not g.story:
+        break
+    run(g, 1)
+check("画面の右へ駆け抜けると、地図が出る（歩かず、1面の場所に立つ）", not g.story and not g.title and g.map_on and g.map_len == 0
+      and g.map_to == g.stage.number and g.bgm != C.BGM_STAGE1)
+run(g, 5, (), {"restart"})
+check("地図は、出してすぐはキーを受け付けない", g.map_on)
+run(g, 30, {"right"})
+check("地図の間は、ゲームは進まない（動かない・時間も数えない）", g.map_on and g.player.px == x0 and g.frames == 0)
+run(g, C.MAP_SKIP_WAIT)
+run(g, 1, (), {"restart"})
+check("Enterで地図を飛ばすと、ゲームが始まる", not g.map_on and not g.title and g.bgm == C.BGM_STAGE1)
 run(g, 30, {"right"})
 check("始まると、動かせる", g.player.px > x0)
 g = Game(title=True)
@@ -1282,6 +1309,8 @@ run(g, 1, (), {"attack"})
 check("起きているときに押すと、すぐ気づいて走り出す（飛び起きない）", g.story_run > 0 and not g.story_woke and g.story_wake == T_["notice"] < T_["wake"])
 run(g, 150)
 check("語りからも、刀のキーで始められる", not g.story and not g.title)
+while g.map_on:
+    run(g, 1, (), {"restart"} if g.map_t >= C.MAP_SKIP_WAIT else ())
 g.player.px, g.player.py = float(C.ARENA_X0 + C.BASE_W // 2 - 1), float(C.FLOOR_Y)
 run(g, 30, {"right"})
 boss_until(g, lambda gg: gg.boss.state == "recover")
@@ -1292,8 +1321,14 @@ _saved = list(STAGES)
 STAGES[:] = [STAGES[0]]   # 最後の面をクリアしたときの動き（1面だけの設定にする）
 run(g, 1, (), {"restart"})
 STAGES[:] = _saved
-check("最後の面のクリアのあと、Enterで、スタート画面へ戻る（雷も、最初から数え直す）", g.title and not g.story and not g.cleared and g.player.px == 60 and g.score == 0
-      and g.title_t == 0 and g.thunder_n == 0)
+check("最後の面のクリアのあと、Enterで、エンディング画面が出る", g.ending_screen and not g.title and g.a.ending_image is not None)
+run(g, 5, (), {"restart"})
+check("エンディングは、しばらくはEnterを受け付けない", g.ending_screen)
+snap(g, "ending screen")
+run(g, C.ENDING_SCREEN["wait"])
+run(g, 1, (), {"restart"})
+check("エンディングのあと、Enterで、スタート画面へ戻る（雷も、最初から数え直す）", g.title and not g.story and not g.cleared and not g.ending_screen
+      and g.player.px == 60 and g.score == 0 and g.title_t == 0 and g.thunder_n == 0)
 
 # ---------------------------------------------------------------- 17. 回復・落とし物・強化3種類・中間地点の演出
 class FixedRng:
@@ -1651,6 +1686,235 @@ gg.boss.hit(gg.boss.hp)
 run(gg, 200)
 check("基衡を倒すと、倒れた絵になる", gg.boss.dying and gg.boss.image() is gg.a.boss2["down"][gg.boss.facing > 0])
 snap(gg, "boss2 down")
+
+# ---------------------------------------------------------------- 21. 面の順（本番）
+# 実際の地理に合わせて、毛越寺 → 月見坂（月見坂の上が金色堂）。ボスは場所ではなく、遊ぶ順で決まる
+STAGES[:] = PROD_STAGES
+check("面の順は、毛越寺 → 高館 → 月見坂 → 金色堂", [st.name for st in STAGES] == ["毛越寺", "高館", "月見坂", "金色堂"] and Game().stage.name == "毛越寺")
+check("面の番号が、遊ぶ順（面の名前・石碑の絵の番号）", [st.number for st in STAGES] == [1, 2, 3, 4])
+import sprites  # noqa: E402
+check("面の名前と石碑の絵が、1〜4番とも、ある", all(os.path.exists(os.path.join(sprites.IMG, f"{n}_{k}.png")) for k in range(1, 5) for n in ("stage_title", "stele")))
+gp = Game()
+gp.reset(0)
+gp.title = False
+gp.intro_t = 999
+gp.player.px = gp.stage.arena_x0 + C.BOSS_TRIGGER + 10
+gp.player.py = gp.terrain.height_at(gp.player.px)
+run(gp, 2)
+check("1面（毛越寺）のボスは、泰衡", gp.boss is not None and type(gp.boss).__name__ == "Boss" and gp.stage.name == "毛越寺")
+gp = Game()
+gp.reset(2)
+gp.title = False
+gp.intro_t = 999
+gp.player.px = gp.stage.arena_x0 + C.BOSS_TRIGGER + 10
+gp.player.py = gp.terrain.height_at(gp.player.px)
+run(gp, 2)
+check("3面（月見坂）のボスは、秀衡", gp.boss is not None and type(gp.boss).__name__ == "Boss3" and gp.stage.name == "月見坂" and gp.boss.max_hp == C.BOSS3["hp"])
+gp = Game()
+gp.reset(1)
+check("2面（高館）のボスは、基衡", gp.stage.name == "高館" and gp.stage.boss_kind == "boss2")
+
+# 地図: 面をクリアすると、前の場所から次の場所へ、道を歩く。高館が無い間は、寄らずに、分かれ道を通って月見坂へ
+gm = Game(title=True)
+gm.title = False
+gm.reset(0)
+gm.cleared = True
+gm.advance()
+check("クリアのあと、地図が出る（毛越寺から高館へ、歩く）", gm.map_on and gm.map_to == 2 and gm.map_len > 0 and gm.map_path[0] == C.MAP_PADS[1]
+      and gm.map_path[-1] == C.MAP_PADS[2] and C.MAP_JUNCTION in gm.map_path)
+pos0, _, arr0 = gm._map_pos()
+run(gm, C.MAP_WAIT + 40)
+pos1, _, arr1 = gm._map_pos()
+check("駒は、待ってから、道を歩いていく", pos0 == C.MAP_PADS[1] and not arr0 and pos1 != pos0 and not arr1 and gm.map_on)
+run(gm, int(gm.map_len / C.MAP_WALK_SPEED) + 5)
+pos2, _, arr2 = gm._map_pos()
+check("歩ききると、高館に着く", arr2 and pos2 == C.MAP_PADS[2] and gm.map_on, "%s on=%s t=%d len=%.0f" % (pos2, gm.map_on, gm.map_t, gm.map_len))
+run(gm, C.MAP_HOLD + 5)
+check("着いて少し待つと、ひとりでに、ゲームが始まる", not gm.map_on and gm.stage.name == "高館" and 0 < gm.frames < C.MAP_HOLD)
+gm.player.hp, gm.lives = 0, 3
+run(gm, C.RESPAWN_AT + 5)
+check("やられて再開するときは、地図を出さない", not gm.map_on and gm.player.hp > 0)
+gm.player.hp, gm.lives = 0, 1
+run(gm, C.GAMEOVER_WAIT + 5)
+run(gm, 1, (), {"restart"})
+check("ゲームオーバーのやり直しも、地図を出さない", not gm.map_on and gm.stage.name == "高館")
+# 高館がまだ無い間は、寄らずに、分かれ道を通って月見坂へ（高館を一時的に外して確かめる）
+_keep = list(STAGES)
+STAGES[:] = [STAGES[0], STAGES[2]]
+gk = Game(title=True)
+gk.title = False
+gk.reset(0)
+gk.cleared = True
+gk.advance()
+check("まだ無い面（高館）には寄らずに、分かれ道を通って、月見坂へ歩く", gk.map_to == 3 and C.MAP_PADS[2] not in gk.map_path and C.MAP_JUNCTION in gk.map_path)
+STAGES[:] = _keep
+
+# 難易度: 配置表のどの敵にも、討伐難易度が決まっている。面の敵の密度が、目標の幅に収まっている
+sys.path.insert(0, os.path.join(os.path.dirname(__file__)))
+import difficulty  # noqa: E402
+from collections import Counter  # noqa: E402
+
+check("配置表の敵には、すべて討伐難易度が決まっている", all(difficulty.difficulty_of(k) for st in STAGES for k, _ in st.spawns))
+for st in STAGES:
+    cnt = Counter(k for k, _ in st.spawns)
+    dens = sum(difficulty.difficulty_of(k) * n for k, n in cnt.items()) / (st.width / 1000)
+    tgt = C.STAGE_TARGET[st.number][0]
+    check("第%d面の敵の密度が、目標の幅に収まっている" % st.number, tgt * (1 - C.DENSITY_TOLERANCE) <= dens <= tgt * (1 + C.DENSITY_TOLERANCE), "%.1f / %g" % (dens, tgt))
+
+# ---------------------------------------------------------------- 22. 4面のボス（清衡）
+from sprites import Bead  # noqa: E402
+
+
+def boss4_game():
+    gg = Game()
+    gg.reset(3)
+    gg.title = False
+    gg.intro_t = 999
+    gg.player.hp = 6
+    gg.player.px = gg.stage.arena_x0 + C.BOSS_TRIGGER + 10
+    gg.player.py = gg.terrain.height_at(gg.player.px)
+    run(gg, 2)
+    return gg
+
+
+gg = boss4_game()
+check("4面は、清衡が出てくる（地面から浮いている）", type(gg.boss).__name__ == "Boss4" and gg.stage.name == "金色堂" and gg.boss.max_hp == C.BOSS4["hp"]
+      and gg.boss.floor == gg.terrain.height_at(gg.stage.boss_x) - C.BOSS4["hover"])
+seen, beads, ys = [], 0, set()
+for _ in range(1500):
+    gg.step(set(), set())
+    gg.player.hp, gg.player.invincible = 6, 0
+    if gg.boss.state not in seen:
+        seen.append(gg.boss.state)
+    for w in gg.waves:
+        if isinstance(w, Bead) and w.t == 1:
+            beads += 1
+            ys.add(round(w.py))
+check("清衡は、手を合わせてから、数珠の玉を飛ばす", all(x in seen for x in ("ready", "cast", "recover")) and beads >= 3, "%s %d" % (seen, beads))
+check("玉は、低い・真ん中・高いの、3つの高さを飛ぶ", len(ys) >= 3, str(sorted(ys)))
+gg.waves = [Bead(gg.player.px + 20, gg.player.py - 10, -1, gg.a)]
+gg.player.hp, gg.player.invincible = 6, 0
+run(gg, 12)
+check("玉に当たると、ダメージ", gg.player.hp == 6 - C.BEAD["damage"])
+gg = boss4_game()
+b = gg.boss
+b.state, b.st = "walk", 0
+gg.player.facing = 1
+gg.waves = []
+gg.player.attack()
+for _ in range(30):      # 刀が出る（振っている間の）フレームまで進めて、そこに玉を置く
+    gg.step(set(), set())
+    if gg.player.sword_rect():
+        break
+cx, cy = gg.player.sword_rect().center
+gg.waves = [Bead(cx, cy, -1, gg.a)]
+gg.step(set(), set())
+check("玉は、刀で消せる（ダメージを受けずに）", not any(isinstance(w, Bead) and w.alive for w in gg.waves) and gg.player.hp == 6)
+gg2 = boss4_game()
+gg2.boss.hp = gg2.boss.max_hp // 2
+check("体力が半分になると、玉が増える（構えの長さも変わる）", gg2.boss.rage and len(gg2.boss._volley()) > len(C.BOSS4_VOLLEYS[0]))
+gg3 = boss4_game()
+run(gg3, 400)
+gg3.boss.hit(gg3.boss.hp)
+run(gg3, 200)
+check("清衡を倒すと、倒れた絵になる", gg3.boss.dying and gg3.boss.image() is gg3.a.enemy["boss4"]["death"][gg3.boss.facing > 0][1])
+
+# ---------------------------------------------------------------- 23. 3面のボス（秀衡）
+gb = Game()
+gb.reset(2)
+gb.title = False
+gb.intro_t = 999
+gb.player.hp = 6
+gb.player.px = gb.stage.arena_x0 + C.BOSS_TRIGGER + 10
+gb.player.py = gb.terrain.height_at(gb.player.px)
+gb.enemies = []
+run(gb, 2)
+check("3面は、秀衡が出てくる（体が大きく、体力が多い）", type(gb.boss).__name__ == "Boss3" and gb.boss.h == C.BOSS3["h"] and gb.boss.max_hp > C.BOSS["hp"])
+heights = ""
+for _ in range(2400):
+    gb.step(set(), set())
+    gb.player.hp, gb.player.invincible = 6, 0
+    gb.player.px = float(gb.stage.arena_x0 + 200)     # 跳びかかりで壁ぎわへ押されると、いつも跳びかかるので、真ん中に戻す
+    for w in gb.waves:
+        if isinstance(w, Wave) and w.t == 1:
+            heights += "H" if w.tall else "L"
+    if len(heights) >= 6:
+        break
+check("秀衡は、光波を、低・高と薙ぎ分ける（順番どおり）", heights == C.BOSS3_PATTERN[:len(heights)] and len(heights) >= 6, heights)
+gb.boss.hit(gb.boss.hp)
+run(gb, 200)
+check("秀衡を倒すと、倒れた絵になる", gb.boss.dying and gb.boss.image() is gb.a.enemy["boss3"]["death"][gb.boss.facing > 0][1])
+
+# ---------------------------------------------------------------- 24. 面の途中のボスの間（影のボス）
+st4 = STAGES[3]
+arenas = st4.arenas
+check("4面には、ボスの間が4つ（影3つ＋清衡）", [a["kind"] for a in arenas] == ["boss", "boss2", "boss3", "boss4"] and [a["shadow"] for a in arenas] == [True, True, True, False])
+check("ボスの間の地面は、平ら（幅480）", all(any(a0 <= a["x0"] and a["x1"] <= b0 and len({t for x0, x1, t in st4.ground if x0 < a["x1"] and a["x0"] < x1}) == 1 for a0, b0, _ in st4.ground) for a in arenas[:3]))
+
+
+def gate_game(i=0):
+    gg = Game()
+    gg.reset(3)
+    gg.title = False
+    gg.intro_t = 999
+    gg.player.hp = 6
+    gg.enemies = []
+    ar = st4.arenas[i]
+    gg.player.px = float(ar["x0"] + C.BOSS_TRIGGER + 10)
+    gg.player.py = float(gg.terrain.height_at(gg.player.px))
+    run(gg, 2)
+    return gg, ar
+
+
+gg, ar = gate_game(0)
+check("1つ目の間で、影の泰衡が出る（体力は半分、暗い）", type(gg.boss).__name__ == "Boss" and gg.boss.shadow and gg.boss.max_hp == max(C.SHADOW_MIN_HP, C.BOSS["hp"] // 2)
+      and gg.boss_on and gg.arena_i == 0)
+gg.player.hp = 6
+for _ in range(400):
+    gg.step(set(), set())
+    gg.player.hp, gg.player.invincible = 6, 0
+    gg.player.px = min(gg.player.px, ar["x1"] - 20)
+    if gg.boss and gg.boss.intro_done:
+        break
+gg.player.px = float(ar["x1"] + 200)       # 右へ出ようとしても、影の間の右には出られない
+gg.step(set(), set())
+check("影の間の右へは出られない", gg.player.px <= ar["x1"] - C.PLAYER_W / 2 + 0.01 and gg.boss_on, "%.0f" % gg.player.px)
+score0 = gg.score
+gg.boss.hit(gg.boss.hp)
+for _ in range(400):
+    gg.step(set(), set())
+    gg.player.hp = 6
+    if gg.boss is None:
+        break
+check("影を倒すと、寸劇には入らず、先へ進める（ボスの間が開く）", gg.boss is None and not gg.boss_on and not gg.ending and not gg.cleared and gg.arena_i == 1)
+check("影を倒すと、点が入り、おにぎりが出る", gg.score == score0 + C.SCORE_SHADOW and any(it.kind == "onigiri" and it.alive for it in gg.items[-3:]))
+check("影を倒した所が、再開の場所になる", gg.gate_cp is not None and gg.gate_cp[3] == ar["x1"] + 60)
+gg.player.px = float(ar["x1"] + 100)
+gg.player.py = float(gg.terrain.height_at(gg.player.px))
+cam0 = gg.cam_x
+run(gg, 10)
+cam1 = gg.cam_x
+run(gg, 200)
+check("影を倒したあとは、画面が、ゆっくり主役に戻る（急に飛ばない）", cam0 < cam1 < gg.player.px - 100 and abs(cam1 - cam0) <= 10 * C.BOSS_CAM_SPEED + 1
+      and gg.cam_x >= gg.player.rect.centerx - C.BASE_W // 2 - 1, "%.0f %.0f %.0f" % (cam0, cam1, gg.cam_x))
+gg.player.hp, gg.lives = 0, 3
+run(gg, C.RESPAWN_AT + 5)
+check("影を倒したあとにやられると、その所から再開する", gg.player.px == ar["x1"] + 60 and gg.player.hp > 0 and gg.boss is None)
+gg2, ar2 = gate_game(1)
+check("2つ目の間で、影の基衡が出る", type(gg2.boss).__name__ == "Boss2" and gg2.boss.shadow and gg2.arena_i == 1)
+gg2.player.hp, gg2.lives = 0, 3
+run(gg2, C.RESPAWN_AT + 5)
+check("影の間でやられると、その間の入口から再開する", abs(gg2.player.px - (ar2["x0"] + 100)) < 1 and gg2.boss is None and not gg2.boss_on)
+gg3, ar3 = gate_game(2)
+check("3つ目の間で、影の秀衡が出る", type(gg3.boss).__name__ == "Boss3" and gg3.boss.shadow)
+gg4 = Game()
+gg4.reset(3)
+gg4.title = False
+gg4.intro_t = 999
+gg4.player.px = float(st4.arena_x0 + C.BOSS_TRIGGER + 10)
+gg4.player.py = float(gg4.terrain.height_at(gg4.player.px))
+run(gg4, 2)
+check("最後の間（清衡）は、本家（影ではない）", type(gg4.boss).__name__ == "Boss4" and not getattr(gg4.boss, "shadow", False) and gg4.arena_i == 3)
 
 # ---------------------------------------------------------------- 出力
 cols = 3

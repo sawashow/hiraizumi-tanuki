@@ -96,17 +96,35 @@ KITSUNEBI = dict(w=14, h=14, hp=1, touch=1, speed=0.9, active=380, bob=12, perio
 # 烏（カラス）: 横長で速い。近づくと羽ばたいて予告し、そのときの主人公の位置へ急降下する
 KARASU = dict(w=22, h=12, hp=1, touch=1, speed=3.5, active=240, telegraph=30, height=FLOOR_Y - 110)
 
+# 討伐難易度（仮。1〜10）: 体力・予告の短さ・攻撃のよけにくさ・倒す手間から、見積もる。遊んで直す。
+# 面の難易度（敵の密度＝敵の難易度の合計 ÷ 面の長さ(1000px)）を測るのに使う。tools/difficulty.py で、面ごとに表にする。
+# 配置表の種類名（kitsunebi_low など）は、「_」より前で引く。まだ無い敵も、先に決めておく（assets/敵コンセプト.md）
+ENEMY_DIFFICULTY = {
+    "kitsunebi": 2, "karakasa": 2, "kocho": 2,          # 狐火・唐傘小僧・金の蝶
+    "karasu": 3, "koi": 3, "natsukusa": 3,              # 烏・鯉の怨霊・夏草の亡者
+    "tachiojo": 4, "oboro": 4,                          # 立ち往生・朧
+    "ochimusha": 5, "yumihei": 5,                       # 落ち武者・弓兵
+}
+BOSS_DIFFICULTY = {"boss": 6, "boss2": 7, "boss3": 8, "boss4": 9}   # 泰衡・基衡・秀衡・清衡
+# 面ごとの目標（面の番号 → 敵の密度, ボスの難易度）。許す幅は、密度の ±DENSITY_TOLERANCE
+STAGE_TARGET = {1: (8, 6), 2: (14, 7), 3: (20, 8), 4: (10, 9)}
+DENSITY_TOLERANCE = 0.25
+
 # 敵の絵（assets/images/enemies/種類_動き_番号.png）。コマ数と、枠の中の基準位置（変換ツールが表示する値）
 ENEMY_FRAMES = {
     "ochimusha": {"walk": 4, "stance": 3, "swing": 2, "death": 3},
     "kitsunebi": {"flicker": 4, "death": 4},
     "karasu": {"flap": 4, "dive": 2, "death": 2},
+    "boss3": {"walk": 3, "stance": 3, "swing": 2, "death": 3},   # 秀衡（tools/make_boss3.py）
+    "boss4": {"idle": 3, "cast": 3, "death": 3},   # 清衡: 浮いて座る・数珠を飛ばす・光になって消える（tools/make_boss4.py）
 }
 # w,h = 枠の大きさ / ax = 枠の中の、体の中心の左右位置 / ay = 足元（bottom）か中心（center）の上下位置
 ENEMY_ART = {
     "ochimusha": dict(w=62, h=51, ax=31, ay=51, mode="bottom"),
     "kitsunebi": dict(w=16, h=18, ax=8, ay=9, mode="center"),
     "karasu": dict(w=42, h=25, ax=21, ay=12, mode="center"),
+    "boss3": dict(w=108, h=107, ax=54, ay=107, mode="bottom"),   # 秀衡（足元が、枠の下端）
+    "boss4": dict(w=79, h=64, ax=39, ay=32, mode="center"),     # 清衡（絵の中心が、体の中心）
     "boss": dict(w=124, h=102, ax=62, ay=102, mode="bottom"),   # 仮の絵: 落ち武者を2倍にしたもの
     "boss2": dict(w=120, h=77, ax=60, ay=77, mode="bottom"),    # 基衡: 霧の下端が、地面より3ドット下に来る
 }
@@ -150,6 +168,10 @@ CLEAR_WAIT = 120                # クリアしてから、Enter を受け付け�
 #   skip: せりふを、キーで送れるようになるまでのフレーム数（字が出ている途中なら、まず全部出す）。type: 字を1文字出すフレーム数。exit: 画面の外へ、どこまで走るか
 ENDING = dict(wait=30, boss=270, fade=70, reply=280, skip=20, type=8, exit=40)
 BOSS_TRIGGER = 110              # ボスの場所の左端から、ここまで入ると、ボスが出る（画面は、そこから右端まで流れて止まる）
+SHADOW_MULT = (96, 100, 150)    # 影のボス: 色に掛ける値（暗く、青く）
+SHADOW_ADD = (6, 8, 26)         # 影のボス: 足す値（真っ黒につぶれないように）
+SHADOW_MIN_HP = 8               # 影のボスの体力の下限
+SCORE_SHADOW = SCORE_BOSS // 2  # 影を倒したときの点
 BOSS_CAM_SPEED = 3              # そのときに、画面が流れる速さ
 END_BOSS_X = BOSS_X             # 倒したボスが、吹っ飛んで倒れる場所（降ってきた場所と同じ）
 END_TANUKI_X = ARENA_X0 + BOSS_TRIGGER + 20   # タヌキ侍が、話すときに立つ場所（ボスが出てきたときに、立っていたあたり）
@@ -205,6 +227,9 @@ TITLE_BG = "title.png"
 TITLE_DIM = 70          # 絵が無いとき、景色を暗くする度合い（0〜255）
 TITLE_LOGO = (150, 14)    # 題名の、左右の中心と上端
 TITLE_PROMPT = (150, 232)  # 「PUSH ENTER KEY」の、左右の中心と上端
+# 題名は、画面の上の外から、ゆっくり下りてきて止まる（最後に減速）。着いてから、案内が出る
+TITLE_DROP_WAIT = 30    # 開いてから、下り始めるまでのフレーム数
+TITLE_DROP = 120        # 下りるフレーム数
 # 放っておくと、ときどき稲光が走り、少し遅れて雷鳴が鳴る（間隔は、この順のくり返し。フレーム数）
 TITLE_THUNDER = (240, 600, 420, 780)
 TITLE_FLASH = 26        # 稲光のフレーム数（2回光る）。空に稲妻が走り、画面も少しだけ明るくなる
@@ -213,6 +238,31 @@ BOLT = dict(x0=256, x1=284, top=0, bottom=128, step=9, jitter=7,
             core=(255, 255, 255), glow=(150, 180, 255), sky=(200, 215, 255), sky_alpha=70)
 THUNDER_DELAY = 22      # 稲光から雷鳴までのフレーム数
 TITLE_START = 40        # 決定（刀の音）から、始まるまでのフレーム数。この間、案内が速く点滅する
+
+# ステージ選択の地図（assets/images/stage_map.png、480×270）: ゲームの始まりと、面をクリアしたあとに出す。
+# 駒（タヌキ侍）が、前の場所から次の場所へ、道を歩いて、「第N面 地名」を出す。Enter で飛ばせる（やり直しのときは出さない）
+# 場所の番号は、面の番号（1 毛越寺・2 高館・3 月見坂・4 金色堂）。座標は、絵の上の、駒の足元
+MAP_IMAGE = "stage_map.png"
+MAP_PADS = {1: (178, 234), 2: (343, 220), 3: (192, 146), 4: (107, 52)}
+MAP_JUNCTION = (275, 198)    # 毛越寺・高館・月見坂の道が集まる分かれ道（地図に、道が描いてある）
+# 隣り合う場所の間の道（途中の点）。遠い面へ飛ぶとき（高館がまだ無い間）は、間の道をつなげて歩く
+MAP_ROUTE = {
+    (1, 2): [(230, 212), MAP_JUNCTION, (310, 208)],
+    (2, 3): [(310, 208), MAP_JUNCTION, (235, 172)],
+    (3, 4): [(165, 110), (128, 70)],
+}
+MAP_WAIT = 45         # 地図を出してから、駒が歩き出すまでのフレーム数
+MAP_WALK_SPEED = 1.2   # 駒が歩く速さ（1フレームに進むピクセル数）
+MAP_HOLD = 150         # 着いてから、次へ進むまでのフレーム数（待たずに Enter で進める）
+MAP_SKIP_WAIT = 20    # 出してから、Enter を受け付けるまで（押しっぱなしで飛ばさない）
+MAP_DOT_GAP = 7       # 道の点線の、点の間隔（ピクセル）
+MAP_VIGNETTE = 150    # 地図の四隅を暗くする強さ（0〜255）。中心は暗くしない
+MAP_PIECE_SCALE = 0.5  # 駒の大きさ（主人公の絵に対する倍率）
+
+# エンディング画面（assets/images/ending.png、480×270）: 最後の面をクリアして Enter を押すと、出る。夜明けの金色堂の前で、タヌキ侍が手を合わせる絵と、「交通安全」の文字。
+# 暗い所から、ゆっくり明るくなる。しばらくして、Enter で、スタート画面へ戻る
+ENDING_IMAGE = "ending.png"
+ENDING_SCREEN = dict(fade=90, wait=240)   # 明るくなるまでのフレーム数 / Enter を受け付けるまで
 
 # 始まりの語り: スタート画面で決定すると、暗い画面の上半分を、文章が下から上へゆっくり流れる（1回だけ）。
 # 下には、タヌキ侍が立っている。しばらくすると、座って眠ってしまい、夢の中でおにぎりのことを考える。
@@ -272,6 +322,20 @@ BOSS2 = dict(w=36, h=76, hp=28, touch=1, speed=0.6, near=80, gravity=0.3,
              petal_ready=50, petal_frames=30)
 BOSS2_PATTERN = "WTWT"
 BOSS2_RAGE_PATTERN = "TPWP"
+# 3面のボス（三代・秀衡「鬼角薙将」）。縦に高く、角のある兜に、大鎧、長い薙刀。動きは、1面の泰衡と同じ形
+# （歩く → 構える → 薙刀を振って光波、3回に1回、跳びかかり）だが、間合いが長く、光波が速くて遠くまで届く。
+# 光波の高さの順は、「低・高」を、交互に薙ぎ分ける
+BOSS3 = dict(BOSS, w=34, h=88, hp=30, speed=0.55, near=90, wave_speed=2.3, wave_range=520, high_bottom=34,
+             rage_walk_frames=46, rage_recover_frames=40)
+BOSS3_PATTERN = "LHLLHH"
+# 4面のボス（初代・清衡）。地面から少し浮いて、座ったまま動く。数珠の玉を、高さを変えて飛ばす（低い・真ん中・高い）。
+# 玉は、刀で消せる。体力が半分になると、玉の数が増え、間が短くなる
+BOSS4 = dict(w=30, h=44, hp=36, touch=1, speed=0.7, near=110, gravity=0.3, hover=12,
+             walk_frames=80, rage_walk_frames=52, recover_frames=60, rage_recover_frames=40,
+             ready=36, fire_at=8, cast_frames=44, gap=14)
+BOSS4_VOLLEYS = ("LMH", "HML", "MHL", "LHM")          # 玉の高さの順（L=低い / M=真ん中 / H=高い）。くり返す
+BOSS4_RAGE_VOLLEYS = ("LMHML", "HLMLH", "MHLHM")
+BEAD = dict(w=8, h=8, speed=2.2, rage_speed=2.7, range=360, damage=1, low=10, mid=26, high=44, ticks=6)   # 高さは、地面から
 GUST = dict(w=26, h=34, speed=1.5, range=150, push=2.2, ticks=5)    # 扇の風（押す速さは、最高速より小さい。押されながらでも、進める）
 FAN = dict(w=16, h=16, speed=1.7, range=170, damage=1, y=40, spin=9)   # 投げた扇（y=地面からの高さ）。往路のあと、同じ速さで戻る
 PETAL = dict(w=7, h=7, count=4, spread=34, warn=44, speed=2.6, top=-12, damage=1, stagger=10)   # 花びらの雨
