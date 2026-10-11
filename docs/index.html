@@ -70,9 +70,9 @@ async def custom_site():
         __import__(__name__).__file__ = main
 
         # now make a prompt
-        msg  = "".join(map(chr, [24179, 27849, 12479, 12492, 12461, 20365] + [10] + [12463, 12522, 12483, 12463, 12391, 32, 12473, 12479, 12540, 12488]))   # ASCII only: Japanese text written directly gets garbled by the in-browser Python
+        msg  = "Ready to start ! Please click/touch page"   # shown in console only; the on-screen text is drawn by CSS below (Python->JS strings with Japanese get garbled)
         platform.window.infobox.classList.add("ready")
-        platform.window.infobox.innerText = msg
+        platform.window.infobox.innerText = ""
         print("\n"*4, f"    * Waiting for media user engagement. {msg} *" , "\n"*4)
 
         while not platform.window.MM.UME:
@@ -231,6 +231,17 @@ function show_infobox() {
             background-repeat: no-repeat;
             background-position: -45% 100%;
             animation: slide 1.5s linear infinite;
+        }
+        /* 開始前の文字は、CSSで出す（Pythonから日本語をJSへ渡すと、文字化けするため） */
+        #infobox.ready::before {
+            content: "平泉タヌキ侍";
+            display: block;
+            font-size: 30px;
+            letter-spacing: 0.25em;
+        }
+        #infobox.ready::after {
+            content: "クリックで スタート";
+            display: block;
         }
         @keyframes dots { 0% { content: ""; } 25% { content: "."; } 50% { content: ".."; } 75% { content: "..."; } }
         @keyframes slide { to { background-position: 145% 100%; } }
