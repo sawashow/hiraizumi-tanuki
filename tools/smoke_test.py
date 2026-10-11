@@ -16,7 +16,7 @@ import pygame  # noqa: E402
 import config as C  # noqa: E402
 from main import ENEMY_SPAWNS, Game, drop_kind  # noqa: E402
 from sprites import Item, Karasu, Kitsunebi, Ochimusha, Shuriken, Wave  # noqa: E402
-from stage import GROUND, ITEMS, PLATFORMS, Terrain  # noqa: E402
+from stage import GROUND, ITEMS, PLATFORMS, STAGES, Terrain  # noqa: E402
 
 # 古い（平らな）地形。穴と足場の動きのテスト用
 _T = C.FLOOR_Y
@@ -89,8 +89,10 @@ check("手裏剣の発数: 落ち武者3発・狐火1発・烏1発",
 check("落ち武者が一番大きい", oc.w * oc.h > max(ki.w * ki.h, ka.w * ka.h))
 check("烏は横長・狐火は小さい", ka.w > ka.h * 1.5 and ki.w * ki.h < ka.w * ka.h)
 kinds = [k for k, _ in ENEMY_SPAWNS]
-check("面の配置が、落ち武者8・狐火5・烏6", (kinds.count("ochimusha"), sum(k.startswith("kitsunebi") for k in kinds),
-                                      kinds.count("karasu")) == (8, 5, 6))
+check("1面の配置が、落ち武者11・狐火6・烏7（敵が多い面）", (kinds.count("ochimusha"), sum(k.startswith("kitsunebi") for k in kinds),
+                                      kinds.count("karasu")) == (11, 6, 7))
+check("2面は、1面より敵が少ない（飛ぶ敵が中心）", len(STAGES[1].spawns) < len(STAGES[0].spawns) * 0.6
+      and sum(k != "ochimusha" for k, _ in STAGES[1].spawns) > sum(k == "ochimusha" for k, _ in STAGES[1].spawns))
 check("序盤は落ち武者だけ（x<1000）", all(k == "ochimusha" for k, x in ENEMY_SPAWNS if x < 1000))
 check("烏は後半（x>=1800）にだけ出る", all(x >= 1800 for k, x in ENEMY_SPAWNS if k == "karasu"))
 
@@ -767,21 +769,31 @@ check("落ち武者は、穴の縁まで行って止まる（落ちない）", m
 check("落ち武者は、端で折り返して戻る（行ったり来たりする）", min(xs[200:]) < 650, "後半の最小 %.0f" % min(xs[200:]))
 
 # ---------------------------------------------------------------- 13. 足場の配置・アイテム
-# 地面と足場を「面」として、ジャンプで渡れるか（横のすき間90以下・上り66以下）を調べる
-surf = [(a, b, top) for a, b, top in GROUND] + [(a, b, top) for a, b, top in PLATFORMS]
-reach = {0}
-frontier = [0]
-while frontier:
-    i = frontier.pop()
-    for j, (a2, b2, t2) in enumerate(surf):
-        if j in reach:
-            continue
-        a1, b1, t1 = surf[i]
-        gap = max(a2 - b1, a1 - b2, 0)
-        if gap <= 90 and (t1 - t2) <= 66 and not (j < len(GROUND) and i < len(GROUND) and (t1 - t2) > 40 and gap == 0):
-            reach.add(j)
-            frontier.append(j)
-check("すべての地面と足場に、ジャンプで行ける", len(reach) == len(surf), "行けない: %s" % [surf[k] for k in range(len(surf)) if k not in reach])
+# 地面と足場を「面」として、ジャンプで渡れるか（横のすき間90以下・上り66以下）を、すべての面で調べる
+from stage import STAGES  # noqa: E402
+for st in STAGES:
+    surf = [(a, b, top) for a, b, top in st.ground] + [(a, b, top) for a, b, top in st.platforms]
+    ng = len(st.ground)
+    reach = {0}
+    frontier = [0]
+    while frontier:
+        i = frontier.pop()
+        for j, (a2, b2, t2) in enumerate(surf):
+            if j in reach:
+                continue
+            a1, b1, t1 = surf[i]
+            gap = max(a2 - b1, a1 - b2, 0)
+            if gap <= 90 and (t1 - t2) <= 66 and not (j < ng and i < ng and (t1 - t2) > 40 and gap == 0):
+                reach.add(j)
+                frontier.append(j)
+    check("[%s] すべての地面と足場に、ジャンプで行ける" % st.name, len(reach) == len(surf),
+          "行けない: %s" % [surf[k] for k in range(len(surf)) if k not in reach])
+    sp = Terrain(st.ground, st.platforms)
+    check("[%s] 落ち武者の配置が、すべて地面の上" % st.name, all(sp.height_at(x) is not None for k, x in st.spawns if k == "ochimusha"))
+    check("[%s] アイテムが、地面の中に埋まっていない" % st.name,
+          all((sp.height_at(x) is None) or (y + C.ITEM_SIZE / 2 <= sp.height_at(x) + 1) for _, x, y in st.items))
+    check("[%s] 団子がある・敵がいる・中間地点が地面の上" % st.name,
+          st.dango_total > 0 and len(st.spawns) > 0 and sp.height_at(st.checkpoint[0]) == st.checkpoint[1])
 check("アイテムが、地面の中に埋まっていない", all((R.height_at(x) is None) or (y + C.ITEM_SIZE / 2 <= R.height_at(x) + 1) for _, x, y in ITEMS))
 check("アイテムは、団子・おにぎり・金の葉の3種類", {k for k, _, _ in ITEMS} == {"dango", "onigiri", "leaf"})
 
@@ -1179,8 +1191,26 @@ run(g, 10, {"right"}, {"restart"})
 check("クリアのあとは、動かない（時間も止まる。すぐには、Enterを受け付けない）", g.cleared and g.frames == t0)
 run(g, C.CLEAR_WAIT)
 snap(g, "clear")
+_lives0 = g.lives
 run(g, 1, (), {"restart"})
-check("Enterで、最初から", not g.cleared and g.player.px == 60 and g.score == 0 and g.frames <= 1 and g.boss_state is None)
+check("クリアのあと、Enterで、次の面へ進む（スコアは引き継ぎ、体力は満タン、団子・時間は数え直す）",
+      not g.cleared and g.stage_i == 1 and g.stage.name == "毛越寺" and g.player.px == 60 and g.player.hp == C.PLAYER_HP
+      and g.score == 1500 + C.SCORE_BOSS and g.dango == 0 and g.frames <= 1 and g.boss_state is None and g.cp_state is None
+      and g.lives == _lives0 and not g.boss_on and len(g.enemies) > 0,
+      "stage %d px %.0f hp %d score %d dango %d frames %d lives %d enemies %d" % (g.stage_i, g.player.px, g.player.hp, g.score, g.dango, g.frames, g.lives, len(g.enemies)))
+check("次の面の地形に切り替わっている", g.terrain.ground == [tuple(x) for x in g.stage.ground] and g.stage.width != C.STAGE_W)
+g.lives = 3
+g.player.hp = 1
+g.player.take_damage(g.player.px + 5, 1)
+run(g, C.RESPAWN_AT + 5)
+check("次の面で、やられても、その面の最初から再開する", g.stage_i == 1 and g.player.hp == C.PLAYER_HP and g.player.px == 60)
+g.lives = 1
+g.player.invincible = 0
+g.player.hp = 1
+g.player.take_damage(g.player.px + 5, 1)
+run(g, C.GAMEOVER_WAIT + 5)
+run(g, 1, (), {"restart"})
+check("次の面でゲームオーバーになったら、その面を最初から（残機は戻る）", g.stage_i == 1 and g.lives == C.LIVES and g.player.hp == C.PLAYER_HP and g.score == 0)
 
 # ---------------------------------------------------------------- 16. スタート画面
 g = Game()
@@ -1258,8 +1288,11 @@ boss_until(g, lambda gg: gg.boss.state == "recover")
 g.boss.hit(g.boss.hp)
 boss_until(g, lambda gg: gg.cleared, 1500)
 run(g, C.CLEAR_WAIT)
+_saved = list(STAGES)
+STAGES[:] = [STAGES[0]]   # 最後の面をクリアしたときの動き（1面だけの設定にする）
 run(g, 1, (), {"restart"})
-check("クリアのあと、Enterで、スタート画面へ戻る（雷も、最初から数え直す）", g.title and not g.story and not g.cleared and g.player.px == 60 and g.score == 0
+STAGES[:] = _saved
+check("最後の面のクリアのあと、Enterで、スタート画面へ戻る（雷も、最初から数え直す）", g.title and not g.story and not g.cleared and g.player.px == 60 and g.score == 0
       and g.title_t == 0 and g.thunder_n == 0)
 
 # ---------------------------------------------------------------- 17. 回復・落とし物・強化3種類・中間地点の演出
@@ -1476,6 +1509,148 @@ def swing_at(gap):
 check("刀は、軌跡のぶんだけ遠くまで届く（刀の長さ %d + 軌跡 %d）" % (C.SWORD_W, C.SWORD_TRAIL),
       swing_at(C.SWORD_W + C.SWORD_TRAIL - 2) and swing_at(C.SWORD_W + 2))
 check("軌跡の先までは、届かない（光波のようには飛ばない）", not swing_at(C.SWORD_W + C.SWORD_TRAIL + 3))
+
+# ---------------------------------------------------------------- 18. コントローラ
+import pygame as _pg  # noqa: E402
+import gamepad  # noqa: E402
+
+pad = gamepad.Pad()
+check("コントローラが無くても、起動できる（何も押していない扱い）", not pad.connected and pad.held() == set())
+
+
+def ev(kind, **kw):
+    return _pg.event.Event(getattr(_pg, kind), **kw)
+
+
+if pad.sdl:
+    A, B, X, Y = _pg.CONTROLLER_BUTTON_A, _pg.CONTROLLER_BUTTON_B, _pg.CONTROLLER_BUTTON_X, _pg.CONTROLLER_BUTTON_Y
+    S = _pg.CONTROLLER_BUTTON_START
+    check("Aで、ジャンプ（と、決定）", pad.handle(ev("CONTROLLERBUTTONDOWN", button=A, instance_id=0)) == {"jump", "restart"})
+    check("Aを離すと、ジャンプを切る（長押しで高く跳べる）", pad.handle(ev("CONTROLLERBUTTONUP", button=A, instance_id=0)) == {"jump_release"})
+    check("Xで刀", pad.handle(ev("CONTROLLERBUTTONDOWN", button=X, instance_id=0)) == {"attack"})
+    check("BとYで手裏剣", pad.handle(ev("CONTROLLERBUTTONDOWN", button=B, instance_id=0)) == {"throw"}
+          and pad.handle(ev("CONTROLLERBUTTONDOWN", button=Y, instance_id=0)) == {"throw"})
+    check("Startで再開", pad.handle(ev("CONTROLLERBUTTONDOWN", button=S, instance_id=0)) == {"restart"})
+    check("割り当てのないボタンは、何もしない", pad.handle(ev("CONTROLLERBUTTONDOWN", button=_pg.CONTROLLER_BUTTON_LEFTSTICK, instance_id=0)) == set())
+check("スティックを倒すと、その向きに動く（少し倒しただけでは動かない）",
+      gamepad.stick_held(0.9, 0.0) == {"right"} and gamepad.stick_held(-0.9, 0.0) == {"left"} and gamepad.stick_held(0.0, 0.9) == {"down"}
+      and gamepad.stick_held(0.2, -0.3) == set() and gamepad.stick_held(0.0, -0.9) == set())
+check("抜き差しのイベントが来ても、止まらない", pad.handle(ev("CONTROLLERDEVICEADDED", device_index=99)) == set()
+      and pad.handle(ev("CONTROLLERDEVICEREMOVED", instance_id=99)) == set())
+pad2 = gamepad.Pad.__new__(gamepad.Pad)    # コントローラの部品が無い環境（ブラウザ版など）の想定
+pad2.sdl, pad2.pads, pad2.fallback, pad2.names = None, {}, {}, {}
+check("コントローラの部品が無い環境でも、止まらない", pad2.handle(ev("CONTROLLERBUTTONDOWN", button=0, instance_id=0)) == set() and pad2.held() == set())
+g = Game()
+g.enemies = []
+x0 = g.player.px
+g.title = False
+run(g, 20, {"right"} | pad.held())
+check("コントローラの入力を、ゲームに渡す形（キーボードと同じ文字列）で受け取れる", g.player.px > x0)
+
+# ---------------------------------------------------------------- 20. 2面のボス（基衡）
+from sprites import Boss2, Fan, Gust, Petal  # noqa: E402
+
+
+def boss2_game():
+    gg = Game()
+    gg.reset(1)
+    gg.title = False
+    gg.intro_t = 999
+    gg.player.hp = 6
+    gg.player.px = gg.stage.arena_x0 + C.BOSS_TRIGGER + 10
+    gg.player.py = gg.terrain.height_at(gg.player.px)
+    run(gg, 2)
+    return gg
+
+
+gg = boss2_game()
+check("2面は、基衡が出てくる", isinstance(gg.boss, Boss2) and gg.boss.max_hp == C.BOSS2["hp"])
+check("1面は、泰衡のまま", type(Game().stage.boss_kind) is str and Game().stage.boss_kind == "boss")
+seen, kinds = [], set()
+for _ in range(1600):
+    gg.step(set(), set())
+    gg.player.hp, gg.player.invincible = 6, 0
+    if gg.boss.state not in seen:
+        seen.append(gg.boss.state)
+    kinds |= {type(w).__name__ for w in gg.waves}
+check("基衡は、風と扇を出す", {"Gust", "Fan"} <= kinds, str(kinds))
+check("基衡は、構えてから攻撃して、隙になる", all(x in seen for x in ("wind_ready", "wind", "throw_ready", "throw", "recover")), str(seen))
+check("体力が多いうちは、花びらを出さない", "Petal" not in kinds and "petal" not in seen)
+check("基衡のどの状態でも、絵がある", all(gg.boss.image() is not None for _ in (0,)))
+
+gg = boss2_game()
+gg.boss.hp = gg.boss.max_hp // 2
+kinds = set()
+for _ in range(1500):
+    gg.step(set(), set())
+    gg.player.hp, gg.player.invincible = 6, 0
+    kinds |= {type(w).__name__ for w in gg.waves}
+check("体力が半分になると、花びらの雨が入る", "Petal" in kinds, str(kinds))
+
+# 風: ダメージなしで押し戻す
+gg = boss2_game()
+b = gg.boss
+b.state, b.st, b.cx = "walk", 0, gg.player.px + 80
+g_ = Gust(gg.player.px + 10, gg.player.py - 17, -1, gg.a)
+gg.waves.append(g_)
+hp0, x0 = gg.player.hp, gg.player.px
+run(gg, 12)
+check("風に当たると、押し戻される（ダメージなし）", gg.player.px < x0 - 4 and gg.player.hp == hp0, "x %.1f→%.1f hp %d" % (x0, gg.player.px, gg.player.hp))
+gg.waves = []
+check("風は、刀で消せない", getattr(Gust, "cuttable", True) is False)
+
+# 扇: 飛んで、戻ってくる。当たるとダメージ。刀で消せる
+gg = boss2_game()
+b = gg.boss
+b.state, b.st = "walk", 0
+b.cx = gg.player.px + 200
+f = Fan(b.cx - 20, gg.player.py - C.FAN["y"], -1, gg.a, b)
+far = f.px
+for _ in range(300):
+    f.update(gg.stage.width)
+    if f.back:
+        break
+check("扇は、距離まで飛んだら、戻りに入る", f.back and far - f.px >= C.FAN["range"] - 2, "px %.1f" % f.px)
+for _ in range(400):
+    f.update(gg.stage.width)
+    if not f.alive:
+        break
+check("扇は、ボスのところまで戻ったら、消える", not f.alive)
+gg.waves = [Fan(gg.player.px + 4, gg.player.py - 20, -1, gg.a, b)]
+hp0 = gg.player.hp
+gg.step(set(), set())
+check("扇に当たると、ダメージ", gg.player.hp == hp0 - C.FAN["damage"])
+gg = boss2_game()
+b = gg.boss
+b.state, b.st = "walk", 0
+gg.player.facing = 1
+gg.waves = [Fan(gg.player.px + 14, gg.player.py - 20, -1, gg.a, b)]
+gg.player.attack()
+run(gg, 8)
+check("扇は、刀で消せる", not any(isinstance(w, Fan) and w.alive for w in gg.waves) or gg.player.hp == 6)
+
+# 花びら: 落ちる前は、当たらない。落ちたら、ダメージ
+gg = boss2_game()
+pt = Petal(gg.player.px, gg.player.py, gg.a)
+check("花びらは、落ちる前は当たらない", pt.rect.w == 0)
+gg.waves = [pt]
+run(gg, C.PETAL["warn"] + 160)
+check("花びらは、落ちて消える", not pt.alive)
+gg = boss2_game()
+gg.waves = [Petal(gg.player.px, gg.player.py, gg.a)]
+gg.waves[0].t = C.PETAL["warn"]
+gg.waves[0].py = gg.player.py - 20
+hp0 = gg.player.hp
+run(gg, 12)
+check("花びらに当たると、ダメージ", gg.player.hp == hp0 - C.PETAL["damage"])
+
+# 倒す: 吹っ飛んで、倒れた絵になる
+gg = boss2_game()
+run(gg, 400)
+gg.boss.hit(gg.boss.hp)
+run(gg, 200)
+check("基衡を倒すと、倒れた絵になる", gg.boss.dying and gg.boss.image() is gg.a.boss2["down"][gg.boss.facing > 0])
+snap(gg, "boss2 down")
 
 # ---------------------------------------------------------------- 出力
 cols = 3

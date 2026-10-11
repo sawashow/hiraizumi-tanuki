@@ -108,7 +108,11 @@ ENEMY_ART = {
     "kitsunebi": dict(w=16, h=18, ax=8, ay=9, mode="center"),
     "karasu": dict(w=42, h=25, ax=21, ay=12, mode="center"),
     "boss": dict(w=124, h=102, ax=62, ay=102, mode="bottom"),   # 仮の絵: 落ち武者を2倍にしたもの
+    "boss2": dict(w=120, h=77, ax=60, ay=77, mode="bottom"),    # 基衡: 霧の下端が、地面より3ドット下に来る
 }
+# 基衡のコマ（assets/images/enemies/boss2_名前.png。左向き。tools/make_boss2.py が作る）
+BOSS2_FRAMES = ("idle_0", "idle_1", "idle_2", "walk_0", "walk_1", "fan_up", "fan_swing", "throw_0", "throw_1",
+                "petal", "hurt", "down", "vanish", "fan")
 
 # 落ち武者の光波（刀を振ると、前方の地面すれすれを飛ぶ。ジャンプでよけるか、刀で消せる。手裏剣は通り抜ける）
 WAVE_FRAMES = 3
@@ -230,6 +234,15 @@ STORY_SLEEP_SEQ = (4, 5, 4, 5, 4, 6)   # 眠っている間のコマの順番（
 REST = dict(start=480, yawn=70, drowsy=70, sit=30, breath=60)   # start = 眠りに入るまでの、何もしない時間（8秒）
 STORY_PROMPT = (350, 216)   # 「PUSH ENTER KEY」の、左右の中心と上端
 
+# 面の名前の表示（面の始まりに、縦書きで出す）: 少し待って → 現れる → 見せる → 消える（フレーム数）
+STAGE_TITLE = dict(wait=20, fade_in=25, hold=120, fade_out=35)
+STELE_Y = 2           # 石碑を、地面に少し埋める（足元から）
+STONE_PAD = 5         # 礎石の足場の絵を、足場の幅より、左右にはみ出させる分
+
+# 池（水面の絵がある面）
+WATER_DEPTH = 8       # 穴の上端から、水面までの深さ
+WATER_TICKS = 30      # 水面が、もう1コマに切り替わるまでのフレーム数
+
 # 残機・中間地点
 LIVES = 3
 RESPAWN_AT = 215        # 倒れてから、中間地点で再開するまでのフレーム数（残機が残っているとき）
@@ -248,3 +261,17 @@ GAMEOVER_DIM = 190     # 暗さ（0〜255。255で真っ黒）。背景がうっ
 GAMEOVER_TEXT_AT = 25  # 「GAME OVER」が出始めるフレーム
 GAMEOVER_PROMPT_AT = 60  # 「PRESS ENTER」が出始めるフレーム
 GAMEOVER_WAIT = 145    # このフレームまでは、Enter を押しても再開しない
+
+# 2面のボス（二代・基衡「怨庭公家」）: 歩いて、「扇の風」「扇を投げる」を交互に出す。体力が半分になると、「花びらの雨」が入る。
+# 順番の文字: W=扇の風 / T=扇を投げる / P=花びらの雨。風は、ダメージなしで、主人公を押し戻す（池や穴が近いと危ない）。
+# 扇は、ゆっくり飛んで、戻ってくる（刀で消せる）。花びらは、落ちる場所に、先に目印が出る
+BOSS2 = dict(w=36, h=76, hp=28, touch=1, speed=0.6, near=80, gravity=0.3,
+             walk_frames=90, rage_walk_frames=60, recover_frames=75, rage_recover_frames=50,
+             wind_ready=34, wind_at=12, wind_frames=34,
+             throw_ready=38, throw_at=8, throw_frames=26,
+             petal_ready=50, petal_frames=30)
+BOSS2_PATTERN = "WTWT"
+BOSS2_RAGE_PATTERN = "TPWP"
+GUST = dict(w=26, h=34, speed=1.5, range=150, push=2.2, ticks=5)    # 扇の風（押す速さは、最高速より小さい。押されながらでも、進める）
+FAN = dict(w=16, h=16, speed=1.7, range=170, damage=1, y=40, spin=9)   # 投げた扇（y=地面からの高さ）。往路のあと、同じ速さで戻る
+PETAL = dict(w=7, h=7, count=4, spread=34, warn=44, speed=2.6, top=-12, damage=1, stagger=10)   # 花びらの雨
