@@ -72,6 +72,9 @@ python main.py
 変換のとき、ドットの粗さと色数を、1面にそろえています。
 敵・アイテム・鳥居も同じ方法で作っています。
 
+変換の元になる絵と試作（`assets/concept/`）は、容量が増え続けるので、リポジトリには含めていません（`.gitignore`）。
+Google Drive（s.sawada@ponpoco-works.com）に置いてあります。元絵を増やしたら、Drive にも上げ直してください。
+
 曲は、生成AI（Gemini）で作りました。曲名は、次のとおりです。
 
 - 始まりの語りの曲: 「Evening at the Border Post」（`assets/audio/bgm_story.ogg`）
