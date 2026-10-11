@@ -4,7 +4,7 @@
   元絵フォルダに、stage3_sky.jpg・stage3_mid.jpg・stage3_tiles.jpg を置く（assets/concept/source/）。
   出力: bg_sky.png・bg_mid.png・tile_00〜05.png・stone_0〜2.png（assets/images/stage3/）
 
-  - 空: 山と川の景色。高さ 270 に合わせ、少し大きくして上を切り、左右に流せる幅（約 560）にする
+  - 空: 山と川の景色。幅 810 に合わせて縮め（縦横の比は保つ）、上を少し切って高さ 270 にする。2ドット角の粗さ、16色
   - 中景: 義経堂の絵（白背景）。そのままだと 1 画面ぶんしかないので、松・草・柵を切り出して、間をあけて並べ、
     いちばん右に義経堂を置く（面の終わりに近づくと、堂が見えてくる）。足元が地面に重なるように、下げて置く
   - タイル: 草の上端（tile_01）と、岩・土の下の部分（tile_00・03・04・05）。足場は、岩の塊（stone_0〜2）
@@ -15,22 +15,25 @@ from collections import deque
 
 from PIL import Image
 
-SKY_SCALE_H = 311        # 空を、この高さに拡大してから、上を切って 270 にする（横に流す余白を作る）
+SKY_W = 810              # 空の幅（横に流せる余白を作る。毛越寺の空と同じ）
+SKY_TOP = 100            # 縮めた空の、上から切り取りはじめる位置（雲の下のほうを残すため、上を少し切る）
+CHUNK = 2                # ドットの粗さ（2ドット角。ドット絵基準の、背景の粗さ）
 MID_H = 270
 MID_DROP = 60            # 中景を下げる量（義経堂の足元を、地面の上端のあたり（y 220）に合わせる）
 MID_W = 1500
-COLORS_SKY = 48
+COLORS_SKY = 16
 COLORS_MID = 32
 COLORS_TILE = 16
 WHITE = 225              # これより明るい（全チャンネル）なら、背景の白
 
 
 def make_sky(src, out):
+    """空: 横 SKY_W に合わせて縮め（縦横の比は保つ）、下の 270 を残す。ドットを粗く（CHUNK ドット角）して、色数を絞る"""
     im = Image.open(src).convert("RGB")
-    w, h = im.size
-    scale = SKY_SCALE_H / h
-    im = im.resize((round(w * scale), SKY_SCALE_H), Image.LANCZOS)
-    im = im.crop((0, SKY_SCALE_H - 270, im.width, SKY_SCALE_H))      # 上の空を切って、川と山を残す
+    h = round(im.height * SKY_W / im.width)
+    im = im.resize((SKY_W, h), Image.LANCZOS).crop((0, SKY_TOP, SKY_W, SKY_TOP + 270))      # 雲の下半分と、山・川を残す
+    small = im.resize((SKY_W // CHUNK, 270 // CHUNK), Image.BOX)
+    im = small.resize((SKY_W, 270), Image.NEAREST)                                 # 2ドット角の、粗いドットにする
     im = im.quantize(colors=COLORS_SKY, method=Image.MEDIANCUT, dither=Image.NONE).convert("RGB")
     im.save(out, optimize=True)
     return im.size
