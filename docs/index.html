@@ -23,7 +23,7 @@ from pathlib import Path
 # do not rename
 async def custom_site():
     import embed
-    platform.document.body.style.background = "#7f7f7f"
+    platform.document.body.style.background = "#0b0d1f"   # ゲームの夜空に合わせた暗い色
 
     platform.window.transfer.hidden = true
     platform.window.canvas.style.visibility = "visible"
@@ -70,7 +70,8 @@ async def custom_site():
         __import__(__name__).__file__ = main
 
         # now make a prompt
-        msg  = "Ready to start ! Please click/touch page"
+        msg  = "平泉タヌキ侍
+クリックで スタート"
         platform.window.infobox.innerText = msg
         print("\n"*4, f"    * Waiting for media user engagement. {msg} *" , "\n"*4)
 
@@ -206,9 +207,15 @@ function show_infobox() {
 
         #infobox {
             position: fixed; /* center relative to viewport */
-            background: green;
-            color: blue;
+            background: transparent;
+            color: #f2e8c9;
+            font-family: "Yu Mincho", "Hiragino Mincho ProN", serif;
+            font-size: 22px;
             font-weight: bold;
+            letter-spacing: 0.15em;
+            text-align: center;
+            white-space: pre-line;
+            line-height: 1.8;
             padding: 12px 24px;
  /*           display: none; */
             z-index: 999999;
@@ -242,7 +249,7 @@ function show_infobox() {
             font-family: arial;
             margin: 0;
             padding: none;
-            background-color:powderblue;
+            background-color:#0b0d1f;
         }
 
         .topright{
@@ -314,7 +321,7 @@ height="720px"
     oncontextmenu="event.preventDefault()" tabindex=1 hidden>
     </canvas>
 
-    <div id="infobox">Loading, please wait ...</div>
+    <div id="infobox">読み込み中 ...</div>
 
     <div id=html></div>
 
