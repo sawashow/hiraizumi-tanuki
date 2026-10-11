@@ -109,6 +109,19 @@ class Assets:
         self.title_prompt = _load("title_prompt.png")   # 「PUSH ENTER KEY」
         # スタート画面の絵（無ければ、1面の景色で代わりにする）
         self.title_bg = _load(C.TITLE_BG) if os.path.exists(os.path.join(IMG, C.TITLE_BG)) else None
+        # ステージ選択の地図、駒、「第N面 地名」
+        self.map_image = _load(C.MAP_IMAGE).convert()
+        self.map_label = {n: _load(f"map_label_{n}.png") for n in C.MAP_PADS}
+        self._map_pieces = {}
+        # 周りを暗くする膜（周辺減光）。小さく作って、引き伸ばす
+        vw, vh = 60, 34
+        vig = pygame.Surface((vw, vh), pygame.SRCALPHA)
+        for yy in range(vh):
+            for xx in range(vw):
+                d = math.hypot((xx + 0.5) / vw - 0.5, (yy + 0.5) / vh - 0.5) / 0.7071   # 中心 0 → 角 1
+                vig.set_at((xx, yy), (6, 4, 14, round(C.MAP_VIGNETTE * max(0.0, d - 0.45) / 0.55)))
+        self.map_vignette = pygame.transform.smoothscale(vig, (C.BASE_W, C.BASE_H))
+        self.ending_image = _load(C.ENDING_IMAGE).convert() if os.path.exists(os.path.join(IMG, C.ENDING_IMAGE)) else None
         self.story = _load("story_intro.png")           # 始まりの語り（縦に長い1枚）
         trail = _sword_trail()
         self.sword_trail = {True: trail, False: pygame.transform.flip(trail, True, False)}   # True=右向き
@@ -118,6 +131,15 @@ class Assets:
         self.gameover_prompt = _load("gameover_prompt.png")  # 「Enterキーで再開」
         self.stage = None
         self.load_stage(stage or STAGE1)
+
+    def map_piece(self, right, frame):
+        """地図の上の駒（タヌキ侍の絵を、小さくしたもの）"""
+        key = (right, frame)
+        if key not in self._map_pieces:
+            img = self.player[right][frame]
+            self._map_pieces[key] = pygame.transform.scale(
+                img, (round(img.get_width() * C.MAP_PIECE_SCALE), round(img.get_height() * C.MAP_PIECE_SCALE)))
+        return self._map_pieces[key]
 
     def load_stage(self, stage):
         """面ごとの絵（背景・タイル・ボスの名前・寸劇のせりふ）を読み込む。無ければ、1面の絵で代わりにする"""
@@ -610,6 +632,8 @@ class Enemy:
             pygame.draw.rect(surface, C.BLACK, r.inflate(2, 2))
             pygame.draw.rect(surface, (168, 0, 32), r)
             return
+        if getattr(self, "shadow", False):   # 影のボス: 暗く、青みがかった色にする
+            img = self._shadow_image(img)
         if self.flash:   # 攻撃を受けた直後は、白いシルエットにする
             img = pygame.mask.from_surface(img).to_surface(setcolor=C.WHITE, unsetcolor=(0, 0, 0, 0))
         art = C.ENEMY_ART[self.KIND]
@@ -618,6 +642,20 @@ class Enemy:
 
     def _frames(self, anim):
         return self.a.enemy[self.KIND][anim][self.facing > 0]
+
+    _SHADOW_CACHE = {}
+
+    @classmethod
+    def _shadow_image(cls, img):
+        """影の絵（暗く、青みがかる）。一度作ったら、使い回す"""
+        key = id(img)
+        out = cls._SHADOW_CACHE.get(key)
+        if out is None or out[0] is not img:
+            dark = img.copy()
+            dark.fill(C.SHADOW_MULT, special_flags=pygame.BLEND_RGB_MULT)
+            dark.fill(C.SHADOW_ADD, special_flags=pygame.BLEND_RGB_ADD)
+            cls._SHADOW_CACHE[key] = out = (img, dark)
+        return out[1]
 
 
 class Ochimusha(Enemy):
@@ -812,6 +850,11 @@ class Boss(Enemy):
     def rage(self):
         return self.hp <= self.max_hp // 2
 
+    def make_shadow(self):
+        """影にする（面の途中のボスの間）: 体力は半分、見た目は暗く。ふつうの動きは、そのまま"""
+        self.shadow = True
+        self.max_hp = self.hp = max(C.SHADOW_MIN_HP, self.max_hp // 2)
+
     def update(self, player_rect, stage_w, terrain=None):
         self.t += 1
         if self.dying:      # 決まった場所へ、弧を描いて吹っ飛ぶ。落ちたら、倒れたまま残る
@@ -950,6 +993,72 @@ class Boss(Enemy):
         return f[(self.t // 12) % len(f)]
 
 
+class Boss3(Boss):
+    """3面のボス（三代・秀衡）。動きは、泰衡（Boss）と同じ。体が大きく、体力が多く、薙刀の光波が速くて遠くまで届く"""
+    P = C.BOSS3
+    KIND = "boss3"
+
+
+class Boss4(Boss):
+    """4面のボス（初代・清衡「金色坐仏」）。地面から少し浮いて、座ったまま動く。上から降りてきて、
+    「近づく → 手を合わせる（予告）→ 数珠の玉を、高さを変えて飛ばす → 隙」を繰り返す。
+    玉は刀で消せる。攻撃を受けても、ひるまない。体力が半分になると、玉が増え、間が短くなる"""
+    P = C.BOSS4
+    KIND = "boss4"
+    DEATH_TICKS = 16
+
+    def __init__(self, *args, **kw):
+        super().__init__(*args, **kw)
+        self.floor -= self.P["hover"]       # 浮いている高さ（降りてきても、地面には着かない）
+        self.volley = 0                      # 飛ばした回数（玉の高さの順番を決める）
+
+    def _volley(self):
+        seq = C.BOSS4_RAGE_VOLLEYS if self.rage else C.BOSS4_VOLLEYS
+        return seq[self.volley % len(seq)]
+
+    def think(self, pr, stage_w, terrain=None):
+        P = self.P
+        s = self.state
+        if s in self.INTRO or s == "drop":     # 出てくる場面は、1面のボスと同じ（降りてきて、止まる）
+            return Boss.think(self, pr, stage_w, terrain)
+        self.st += 1
+        if s in ("walk", "recover"):
+            self.facing = 1 if pr.centerx > self.cx else -1
+        if s == "walk":
+            if abs(pr.centerx - self.cx) > P["near"]:
+                self.cx = max(self.x_min, min(self.cx + self.facing * P["speed"], self.x_max))
+            if self.st >= P["rage_walk_frames" if self.rage else "walk_frames"]:
+                self._set("ready")
+        elif s == "ready":                     # 手を合わせる（予告）
+            if self.st >= P["ready"]:
+                self._set("cast")
+        elif s == "cast":                      # 数珠を向けて、玉を、ひとつずつ飛ばす
+            heights = self._volley()
+            k = (self.st - P["fire_at"]) // P["gap"]
+            if self.st >= P["fire_at"] and (self.st - P["fire_at"]) % P["gap"] == 0 and 0 <= k < len(heights):
+                B = C.BEAD
+                y = self.floor + C.BOSS4["hover"] - B[{"L": "low", "M": "mid", "H": "high"}[heights[k]]]
+                self.spawned.append(Bead(self.cx + self.facing * (self.w / 2 + 10), y, self.facing, self.a,
+                                         B["rage_speed"] if self.rage else B["speed"]))
+            if self.st >= P["cast_frames"] + P["gap"] * (len(heights) - 1):
+                self.volley += 1
+                self._set("recover")
+        elif s == "recover":
+            if self.st >= P["rage_recover_frames" if self.rage else "recover_frames"]:
+                self._set("walk")
+
+    def image(self):
+        if self.dying:
+            return self._death()[1 if self.down_t else 0]
+        s = self.state
+        bob = (self.t // 14) % 3                # 浮いて、ゆらゆら動く
+        if s == "ready":
+            return self._frames("cast")[0]
+        if s == "cast":
+            return self._frames("cast")[1 if (self.st // 6) % 2 == 0 else 2]
+        return self._frames("idle")[bob]
+
+
 class Boss2(Boss):
     """2面のボス（二代・基衡）。上から降りてきて、「歩く → 構える → 扇の風 / 扇を投げる / 花びらの雨 → 隙」を繰り返す。
     攻撃を受けても、ひるまない。体力が半分になると、歩く時間と隙が短くなり、花びらの雨が入る"""
@@ -1041,6 +1150,40 @@ class Boss2(Boss):
         if self.flash and s in ("walk", "recover"):
             name = "hurt"
         return f[name][d]
+
+
+class Bead:
+    """数珠の玉: 決まった高さを、まっすぐ飛ぶ。刀で消せる。当たるとダメージ"""
+    cuttable = True
+    damage = C.BEAD["damage"]
+
+    def __init__(self, x, y, direction, assets, speed=None):
+        self.a = assets
+        self.px, self.py = float(x), float(y)
+        self.dir = direction
+        self.speed = speed or C.BEAD["speed"]
+        self.travel = 0.0
+        self.t = 0
+        self.alive = True
+
+    @property
+    def rect(self):
+        w, h = C.BEAD["w"], C.BEAD["h"]
+        return pygame.Rect(round(self.px - w / 2), round(self.py - h / 2), w, h)
+
+    def update(self, stage_w):
+        self.px += self.dir * self.speed
+        self.travel += self.speed
+        self.t += 1
+        if self.travel > C.BEAD["range"] or not (0 <= self.px <= stage_w):
+            self.alive = False
+
+    def draw(self, surface, cam_x):
+        x, y = round(self.px) - cam_x, round(self.py)
+        r = 4 if (self.t // C.BEAD["ticks"]) % 2 else 3      # 脈打つ
+        pygame.draw.circle(surface, (150, 96, 8), (x, y), r + 1)
+        pygame.draw.circle(surface, (252, 212, 64), (x, y), r)
+        pygame.draw.circle(surface, (255, 250, 214), (x - 1, y - 1), 1)
 
 
 class Gust:

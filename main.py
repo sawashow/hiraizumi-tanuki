@@ -11,13 +11,12 @@ import sys
 import pygame
 
 import config as C
-from stage import STAGE1, STAGES
+from stage import STAGE1_LEGACY, STAGES
 from audio import DIR as AUDIO_DIR, Audio
 from gamepad import Pad
-from sprites import Assets, Boss, Boss2, Checkpoint, draw_zzz, HitEffect, Item, Player, Shuriken, SlashWave, Wave, make_enemy
+from sprites import Assets, Boss, Boss2, Boss3, Boss4, Checkpoint, draw_zzz, HitEffect, Item, Player, Shuriken, SlashWave, Wave, make_enemy
 
-DANGO_TOTAL = STAGE1.dango_total   # 1面の団子の数（ほかの面は、stage.dango_total）
-ENEMY_SPAWNS = STAGE1.spawns       # 1面の敵の配置
+ENEMY_SPAWNS = STAGE1_LEGACY.spawns       # 古い短い版の月見坂の敵の配置（動作テスト用）
 # 地面タイルの並べ方（石畳A・B・苔・落ち葉）。位置から決めるので、スクロールしても変わらない
 FILL_PATTERN = (0, 3, 0, 4, 3, 0, 3, 5, 0, 3, 4, 0)
 
@@ -40,6 +39,15 @@ class Game:
         self._stone_cache = {}
         self.terrain = terrain or self.stage.terrain()
         self.use_title = title   # スタート画面から始める（クリアのあとも、スタート画面へ戻る）
+        self.use_map = title     # ステージ選択の地図を出す（始まりと、面をクリアしたあと）
+        self.ending_screen = False   # いま、エンディング画面を出している
+        self.ending_t = 0
+        self.map_on = False      # いま、地図を出している
+        self.map_t = 0
+        self.map_to = 1          # 着く場所（面の番号）
+        self.map_from = None     # 出発する場所（面の番号）。最初の1面は、歩かない
+        self.map_path = []       # 駒が歩く道（点の並び）
+        self.map_len = 0.0
         self.sfx = []            # このフレームに鳴らす効果音（メインループが鳴らして、空にする）
         self.rng = random.Random()   # 落とし物の、くじ
         self.story_bgm = os.path.exists(os.path.join(AUDIO_DIR, C.BGM_STORY))   # 語りの曲があるか
@@ -80,8 +88,61 @@ class Game:
 
     def advance(self):
         """次の面へ（体力は満タン。残機とスコアは、引き継ぐ）"""
+        prev = self.stage.number
         self._set_stage(self.stage_i + 1)
         self._begin_stage()
+        if self.use_map:
+            self._open_map(prev)
+
+    def _map_route(self, a, b):
+        """場所 a から b（a < b）へ歩く道（点の並び）。間の面が無いとき（高館がまだ無い間）は、寄らずに、分かれ道から直接つなぐ"""
+        pads, route = C.MAP_PADS, C.MAP_ROUTE
+        playable = {st.number for st in STAGES}
+        pts = [pads[a]]
+        for k in range(a, b):
+            seg = list(route[(k, k + 1)])
+            if k > a and k not in playable and C.MAP_JUNCTION in seg and C.MAP_JUNCTION in pts:
+                pts = pts[:len(pts) - pts[::-1].index(C.MAP_JUNCTION)]
+                seg = seg[seg.index(C.MAP_JUNCTION) + 1:]
+            pts += seg + [pads[k + 1]]
+        return pts
+
+    def _map_chain(self):
+        """地図に点線で描く、場所の順。遊べる面と、そのあとに続く（まだ無い）面。間の、まだ無い面は、飛ばす"""
+        playable = {st.number for st in STAGES}
+        top = max(playable)
+        return [n for n in sorted(C.MAP_PADS) if n in playable or n > top]
+
+    def _open_map(self, prev=None):
+        """地図を出す。prev（前の面の番号）から、いまの面（stage.number）まで、道を歩く。prev が無ければ、歩かずに、そこに立つ"""
+        self.map_on, self.map_t, self.map_to = True, 0, self.stage.number
+        self.map_from = prev if prev is not None and prev < self.map_to else None
+        pts = self._map_route(self.map_from, self.map_to) if self.map_from else [C.MAP_PADS[self.map_to]]
+        self.map_path = pts
+        self.map_len = sum(math.dist(a, b) for a, b in zip(pts, pts[1:]))
+
+    def _map_pos(self):
+        """地図の上の、駒の位置（足元）と、右向きか、着いたか。歩いた距離から、道の上の点を求める"""
+        d = min(max(0.0, (self.map_t - C.MAP_WAIT) * C.MAP_WALK_SPEED), self.map_len)
+        arrived = d >= self.map_len     # 道を進むうちに d を減らすので、着いたかは、先に決めておく
+        pts = self.map_path
+        if len(pts) < 2:
+            return pts[0], True, True
+        right = True
+        for i, (a, b) in enumerate(zip(pts, pts[1:])):
+            seg = math.dist(a, b)
+            right = b[0] >= a[0]
+            if d <= seg or i == len(pts) - 2:
+                u = min(1.0, d / seg) if seg else 1.0
+                return (a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u), right, arrived
+            d -= seg
+        return pts[-1], right, True
+
+    def _step_map(self, pressed):
+        self.map_t += 1
+        walk = math.ceil(self.map_len / C.MAP_WALK_SPEED)
+        if (self.map_t >= C.MAP_SKIP_WAIT and {"restart", "attack", "jump"} & pressed) or self.map_t >= C.MAP_WAIT + walk + C.MAP_HOLD:
+            self.map_on = False
 
     def _begin_stage(self):
         self.dango = 0
@@ -91,6 +152,10 @@ class Game:
         self.checkpoint = Checkpoint(*self.stage.checkpoint, self.a)
         self.cp_state = None        # 中間地点を通ったときの (スコア, 団子の数, 取ったもの)
         self.boss_state = None      # ボスの場所に入ったときの (スコア, 団子の数, 取ったもの)。入り直すと、出てくる場面が短くなる
+        self.boss_arena_i = 0       # boss_state を取ったのは、何番目のボスの間か
+        self.arena_i = 0            # いま、次に戦うボスの間（面の途中の影のボスの間 → 最後の間）
+        self.gate_cp = None         # 影のボスを倒した所の (スコア, 団子の数, 取ったもの, 再開の x)
+        self.cam_ease = False       # 影を倒したあと、画面を、ゆっくり主役に戻している
         self.frames = 0             # 遊んだ時間（フレーム数。クリア画面に出す）
         self.cleared = False
         self.clear_t = 0            # クリアしてからの経過フレーム
@@ -99,12 +164,18 @@ class Game:
     def respawn(self):
         """やられて、残機が残っているとき: 中間地点（なければ最初）から、体力満タンで再開する。
         再開した場所の近くの敵は置かない。ボスまで進んでいたら、ボスの場所の入口から（ザコ敵は置かない）"""
+        gate_x = self.gate_cp[3] if self.gate_cp else -1
+        cp_ahead = bool(self.cp_state) and self.checkpoint.x > gate_x     # 鳥居のほうが、影を倒した所より先なら、鳥居から
         if self.boss_state:
             self.score, self.dango, taken = self.boss_state
             self.taken = set(taken)
-            ax = self.stage.arena_x0 + 100
+            ax = self.stage.arenas[self.boss_arena_i]["x0"] + 100
             self._start(ax, float(self.terrain.height_at(ax) or C.FLOOR_Y), C.RESPAWN_CLEAR)
-            self.enemies = []
+            self.enemies = [e for e in self.enemies if e.cx > ax + C.BASE_W + 60]   # ボスの間の先の敵は、いるまま
+        elif self.gate_cp and not cp_ahead:
+            self.score, self.dango, taken, gx = self.gate_cp
+            self.taken = set(taken)
+            self._start(gx, float(self.terrain.height_at(gx) or C.FLOOR_Y), C.RESPAWN_CLEAR)
         elif self.cp_state:
             self.score, self.dango, taken = self.cp_state
             self.taken = set(taken)
@@ -143,6 +214,9 @@ class Game:
     # --- 1フレーム進める。held は押している間のキー、pressed はこのフレームに押したキー ---
     def step(self, held, pressed=()):
         p = self.player
+        if self.map_on:     # ステージ選択の地図: 駒が歩いて、着いたら、少し待つ。Enter で飛ばせる
+            self._step_map(set(pressed))
+            return
         if self.story:      # 始まりの語り: 決定のキーを押すまで、続く。押すと、タヌキ侍が気づいて、右へ駆け抜けて、ゲームが始まる
             T = C.STORY_TANUKI
             self.story_t += 1
@@ -152,6 +226,8 @@ class Game:
                     self.story_x += T["run_speed"]
                 if self.story_x > C.BASE_W + T["head_x"]:
                     self.story = False
+                    if self.use_map:
+                        self._open_map()
             elif self.story_t > C.STORY_SKIP_WAIT and {"restart", "attack", "jump"} & set(pressed):
                 self.story_wake = T["wake"] if self.story_asleep else T["notice"]
                 self.story_woke = self.story_asleep     # 眠っていたか（飛び起きる動きにする）
@@ -180,11 +256,20 @@ class Game:
                 self.thunder_n += 1
                 self.thunder_at += C.TITLE_THUNDER[self.thunder_n % len(C.TITLE_THUNDER)]
             return
+        if self.ending_screen:   # エンディング: 暗い所から明るくなる。しばらくして、Enter で、スタート画面へ戻る
+            self.ending_t += 1
+            if {"restart", "attack", "jump"} & set(pressed) and self.ending_t >= C.ENDING_SCREEN["wait"]:
+                self.ending_screen = False
+                self.reset()
+                self._enter_title(self.use_title)
+            return
         if self.cleared:    # クリア: 止めて、結果を出す。Enter で最初から（スタート画面があれば、そこへ戻る）
             self.clear_t += 1
             if "restart" in pressed and self.clear_t >= C.CLEAR_WAIT:
                 if self.stage_i + 1 < len(STAGES):
                     self.advance()
+                elif self.use_title and self.a.ending_image:    # 最後の面: エンディング画面へ
+                    self.ending_screen, self.ending_t = True, 0
                 else:
                     self.reset()
                     self._enter_title(self.use_title)
@@ -339,7 +424,14 @@ class Game:
             self.shake_t -= 1
         self.bar_t = max(0, min(C.BOSS_INTRO["bar_frames"], self.bar_t + (1 if self.boss_intro else -1)))
         self.enemies = [e for e in self.enemies if e.alive]
-        if self.boss and self.boss.dying:   # ボスを倒した: すぐ寸劇へ（ボスは吹っ飛んで、倒れたまま残る）
+        if self.boss and self.boss.dying and getattr(self.boss, "shadow", False):    # 影を倒した: 倒れて消えたら、先へ進める
+            if not getattr(self.boss, "shadow_done", False):
+                self.boss.shadow_done = True
+                self.waves, self.shurikens, self.slashes = [], [], []
+                self.score += C.SCORE_SHADOW
+            if not self.boss.alive:
+                self._gate_cleared()
+        elif self.boss and self.boss.dying:   # ボスを倒した: すぐ寸劇へ（ボスは吹っ飛んで、倒れたまま残る）
             self.waves, self.shurikens, self.slashes = [], [], []
             self.score += C.SCORE_BOSS
             self.ending = 1
@@ -352,9 +444,13 @@ class Game:
         self.effects = [fx for fx in self.effects if fx.alive]
 
         if not self.boss_on:   # ボスと戦っている間は、画面を動かさない（入ったときだけ、右端まで流す）
-            self.cam_x = max(0, min(p.rect.centerx - C.BASE_W // 2, self.stage.width - C.BASE_W))
-        elif self.cam_x < self.stage.arena_x0:
-            self.cam_x = min(self.stage.arena_x0, self.cam_x + C.BOSS_CAM_SPEED)
+            target = max(0, min(p.rect.centerx - C.BASE_W // 2, self.stage.width - C.BASE_W))
+            if self.cam_ease and abs(target - self.cam_x) > C.BOSS_CAM_SPEED:     # 影を倒したあとは、ゆっくり戻す
+                self.cam_x += C.BOSS_CAM_SPEED if target > self.cam_x else -C.BOSS_CAM_SPEED
+            else:
+                self.cam_x, self.cam_ease = target, False
+        elif self.cam_x < self._arena()["x0"]:
+            self.cam_x = min(self._arena()["x0"], self.cam_x + C.BOSS_CAM_SPEED)
 
     def _end_phase(self):
         """寸劇の、いまの場面と、その場面に入ってからのフレーム数。
@@ -431,21 +527,57 @@ class Game:
         self.shake_t = max(0, self.shake_t - 1)
         self.bar_t = min(C.BOSS_INTRO["bar_frames"], self.bar_t + 1)
 
+    def _arena(self):
+        """いま、戦っている（次に戦う）ボスの間"""
+        arenas = self.stage.arenas
+        return arenas[min(self.arena_i, len(arenas) - 1)]
+
     def _boss_area(self, p):
-        """最後の1画面に少し入ったら、ボスが出る（画面は、右端まで流れて止まる。ボスと、離れて向き合う）。そこからは、左へ戻れない"""
-        if not self.boss_on and p.hp > 0 and p.px >= self.stage.arena_x0 + C.BOSS_TRIGGER:
+        """ボスの間に少し入ったら、ボスが出る（画面は、ボスの間の右端まで流れて止まる。ボスと、離れて向き合う）。
+        そこからは、左へ戻れない（面の途中の影のボスの間は、右にも出られない）。最後の間は、面の端"""
+        if not self.boss_on:    # 確認用に先へ飛んだときなど、通り過ぎたボスの間は、飛ばす
+            while self.arena_i < len(self.stage.arenas) - 1 and p.px > self.stage.arenas[self.arena_i]["x1"] + 60:
+                self.arena_i += 1
+        ar = self._arena()
+        if not self.boss_on and p.hp > 0 and p.px >= ar["x0"] + C.BOSS_TRIGGER:
             self.boss_on = True
-            self.cam_x = max(0, min(p.rect.centerx - C.BASE_W // 2, self.stage.arena_x0))   # ここから、右端まで流す
-            boss_cls = Boss2 if self.stage.boss_kind == "boss2" and self.a.boss2 else Boss
-            self.boss = boss_cls(self.stage.boss_x, self.a, self.terrain.height_at(self.stage.boss_x), self.stage.arena_x0,
-                             self.stage.width, quick=self.boss_state is not None,
-                             end_x=self.stage.end_boss_x, pattern=self.stage.boss_pattern)
+            self.cam_x = max(0, min(p.rect.centerx - C.BASE_W // 2, ar["x0"]))   # ここから、右端まで流す
+            cls = self._boss_class(ar["kind"])
+            final = not ar["shadow"]
+            pattern = self.stage.boss_pattern if final else C.BOSS3_PATTERN if ar["kind"] == "boss3" else None
+            self.boss = cls(ar["boss_x"], self.a, self.terrain.height_at(ar["boss_x"]), ar["x0"], ar["x1"],
+                            quick=self.boss_state is not None or not final, end_x=ar["boss_x"], pattern=pattern)
+            if not final:
+                self.boss.make_shadow()
             self.boss_state = (self.score, self.dango, frozenset(self.taken))
-            self.enemies = []   # ザコ敵は、ここで消える
+            self.boss_arena_i = self.arena_i
+            if final:
+                self.enemies = []   # 最後のボスの間では、ザコ敵は、ここですべて消える
+            else:                   # 影の間では、その間と、まわりの敵だけが消える（先の敵は、そのまま）
+                self.enemies = [e for e in self.enemies if not (ar["x0"] - 120 <= e.cx <= ar["x1"] + 60)]
             self.waves = []
-        if self.boss_on and p.px < self.stage.arena_x0 + C.PLAYER_W / 2:
-            p.px = self.stage.arena_x0 + C.PLAYER_W / 2
+        if self.boss_on and p.px < ar["x0"] + C.PLAYER_W / 2:
+            p.px = ar["x0"] + C.PLAYER_W / 2
             p.vx = 0.0
+        if self.boss_on and ar["shadow"] and p.px > ar["x1"] - C.PLAYER_W / 2:
+            p.px = ar["x1"] - C.PLAYER_W / 2
+            p.vx = 0.0
+
+    def _boss_class(self, kind):
+        return {"boss2": Boss2 if self.a.boss2 else Boss, "boss3": Boss3, "boss4": Boss4}.get(kind, Boss)
+
+    def _gate_cleared(self):
+        """影を倒して、光になって消えた: 先へ進める。おにぎりが出て、やられたら、ここから再開する"""
+        ar = self._arena()
+        self.boss, self.boss_on = None, False
+        self.arena_i += 1
+        self.boss_state = None
+        self.cam_ease = True
+        fx = ar["boss_x"] - 70
+        self.items.append(Item("onigiri", fx, float(self.terrain.height_at(fx) or C.FLOOR_Y) - 40, self.a, drop=True))
+        rx = ar["x1"] + 60
+        self.gate_cp = (self.score, self.dango, frozenset(self.taken), rx)
+        self.sfx.append(C.SFX_CHECKPOINT)
 
     @property
     def story_asleep(self):
@@ -467,9 +599,11 @@ class Game:
         """いま鳴らす曲。スタート画面・やられている間・クリアのあとは、鳴らさない（None）。
         始まりの語りの間は、語りの曲（無ければ、無音）。ゲームが始まると、1面の曲。
         ボスが降ってくるまでは静かにして、着地したときに、ボスの曲を始める"""
+        if self.ending_screen:
+            return C.BGM_STORY if self.story_bgm else None
         if self.player.hp <= 0 or self.cleared or self.ending or self.title:
             return None
-        if self.story:
+        if self.story or self.map_on:
             return C.BGM_STORY if self.story_bgm else None
         if self.boss and self.boss.state in ("wait", "drop"):
             return None
@@ -479,6 +613,12 @@ class Game:
 
     # --- 描画 ---
     def draw(self, screen, font):
+        if self.ending_screen:
+            self._draw_ending_screen(screen)
+            return
+        if self.map_on:
+            self._draw_map(screen)
+            return
         if self.story:
             self._draw_story(screen)
             return
@@ -549,7 +689,7 @@ class Game:
         if self.a.water:   # 池の水面（穴の中。地面は、このあとで上から描くので、すき間にだけ見える）
             self._draw_water(screen, cam)
         else:
-            pygame.draw.rect(screen, (8, 6, 18), (0, C.GROUND_Y, C.BASE_W, C.BASE_H - C.GROUND_Y))
+            pygame.draw.rect(screen, self.stage.pit, (0, C.GROUND_Y, C.BASE_W, C.BASE_H - C.GROUND_Y))
         for x0, x1, top_y in self.terrain.ground:
             sx0, sx1 = max(x0 - cam, 0), min(x1 - cam, C.BASE_W)
             if sx1 <= sx0:
@@ -649,7 +789,7 @@ class Game:
         screen.blit(font.render("LIFE x%d" % max(self.lives, 0), False, C.TEXT), (C.BASE_W - 64, 24))
         if self.boss and self.boss.active and self.boss.intro_done:
             self._draw_boss_hp(screen, font)
-        if self.boss and self.boss.state == "pose":   # ボスの二つ名と名前（ゆっくり出て、ゆっくり消える）
+        if self.boss and self.boss.state == "pose" and not getattr(self.boss, "shadow", False):   # ボスの二つ名と名前（ゆっくり出て、ゆっくり消える）
             t, total, fade = self.boss.st, self.boss.intro["pose"], C.BOSS_INTRO["name_fade"]
             delay = C.BOSS_NAME_DELAY if total > C.BOSS_NAME_DELAY * 3 else 0   # 短いときは、一度に出す
             for img, y, start in ((self.a.boss_title, C.BOSS_TITLE_Y, 0), (self.a.boss_name, C.BOSS_NAME_Y, delay)):
@@ -746,6 +886,94 @@ class Game:
                 pygame.draw.rect(screen, (252, 208, 40), (sx - 2, sy, 5, 1))
                 pygame.draw.rect(screen, (252, 208, 40), (sx, sy - 2, 1, 5))
 
+    def _map_dots(self, pts):
+        """道（点の並び）の上に、点線の点を、一定の間隔で並べる。各点の（位置, 道のはじめからの距離）"""
+        out, carry, k = [], 0.0, 0
+        for a, b in zip(pts, pts[1:]):
+            seg = math.dist(a, b)
+            d = carry
+            while d < seg:
+                u = d / seg
+                out.append(((a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u), k * C.MAP_DOT_GAP))
+                d += C.MAP_DOT_GAP
+                k += 1
+            carry = d - seg
+        return out
+
+    def _draw_ending_screen(self, screen):
+        """エンディング: 暗い所から、ゆっくり明るくなる。しばらくして、「PUSH ENTER KEY」が点滅する"""
+        E = C.ENDING_SCREEN
+        screen.blit(self.a.ending_image, (0, 0))
+        if self.ending_t < E["fade"]:
+            fade = pygame.Surface((C.BASE_W, C.BASE_H))
+            fade.set_alpha(255 - 255 * self.ending_t // E["fade"])
+            screen.blit(fade, (0, 0))
+        elif self.ending_t >= E["wait"] and ((self.ending_t - E["wait"]) // 30) % 2 == 0:
+            hint = self.a.title_prompt
+            screen.blit(hint, (C.BASE_W - hint.get_width() - 8, 6))
+
+    def _draw_map(self, screen):
+        """ステージ選択の地図。道の上に、マリオワールドのような点線を引く（通った所は金、これからは白、まだ無い面は暗い）。
+        通った場所は金の丸、いまいる場所は金の輪（脈打つ）、行き先は白い輪（点滅）。駒が歩いて、着いたら「第N面 地名」"""
+        a = self.a
+        screen.blit(a.map_image, (0, 0))
+        screen.blit(a.map_vignette, (0, 0))      # 周りを暗くして、道と場所を浮かび上がらせる
+        playable = {st.number for st in STAGES}
+        (x, y), right, arrived = self._map_pos()
+        base = self.map_from or self.map_to
+        walk_d = max(0.0, (self.map_t - C.MAP_WAIT) * C.MAP_WALK_SPEED)   # 駒が歩いた距離
+        chain = self._map_chain()
+        gold, white, dim, dark = (252, 208, 40), (240, 240, 250), (84, 88, 120), (10, 8, 16)
+        for na, nb in zip(chain, chain[1:]):
+            for (dx, dy), dist in self._map_dots(self._map_route(na, nb)):
+                if nb <= base or (arrived and nb <= self.map_to):
+                    color = gold
+                elif na == base and nb == self.map_to and dist <= walk_d:
+                    color = gold         # 駒が通った所から、金に変わる
+                elif nb in playable:
+                    color = white
+                else:
+                    color = dim
+                pygame.draw.rect(screen, dark, (round(dx) - 1, round(dy) - 1, 4, 4))
+                pygame.draw.rect(screen, color, (round(dx), round(dy), 2, 2))
+        for n, (px, py) in C.MAP_PADS.items():
+            if n == self.map_to:
+                continue
+            if n not in playable:
+                pygame.draw.circle(screen, dark, (px, py - 2), 5)
+                pygame.draw.circle(screen, dim, (px, py - 2), 4, 2)
+            elif n < self.map_to or n == self.map_from:    # 通った場所: 金の丸
+                pygame.draw.circle(screen, dark, (px, py - 2), 6)
+                pygame.draw.circle(screen, gold, (px, py - 2), 5)
+            else:                                           # これから行く場所: 白い輪
+                pygame.draw.circle(screen, dark, (px, py - 2), 5)
+                pygame.draw.circle(screen, white, (px, py - 2), 4, 2)
+        tx, ty = C.MAP_PADS[self.map_to]
+        if arrived:     # いまいる場所: 金の輪が、ゆっくり脈打つ
+            r = 9 + round(2 * math.sin(self.map_t * 0.12))
+            pygame.draw.ellipse(screen, dark, (tx - r - 1, ty - r // 2 - 3, r * 2 + 2, r + 2), 3)
+            pygame.draw.ellipse(screen, gold, (tx - r, ty - r // 2 - 2, r * 2, r), 2)
+        elif (self.map_t // 8) % 2 == 0:    # 行き先: 白い輪が、点滅する
+            pygame.draw.ellipse(screen, dark, (tx - 8, ty - 7, 16, 8), 3)
+            pygame.draw.ellipse(screen, white, (tx - 7, ty - 6, 14, 6), 2)
+        walking = self.map_t > C.MAP_WAIT and not arrived
+        frame = C.WALK[(self.map_t // C.WALK_TICKS) % len(C.WALK)] if walking else C.IDLE[0]
+        piece = a.map_piece(right, frame)
+        screen.blit(piece, (round(x) - piece.get_width() // 2, round(y) - piece.get_height()))
+        if arrived:
+            label = a.map_label[self.map_to]
+            u = min(1.0, max(0.0, (self.map_t - C.MAP_WAIT - self.map_len / C.MAP_WALK_SPEED) / 12))
+            strip = pygame.Surface((C.BASE_W, label.get_height() + 10), pygame.SRCALPHA)
+            strip.fill((8, 6, 16, int(150 * u)))
+            by = C.BASE_H - strip.get_height() - 6
+            screen.blit(strip, (0, by))
+            label.set_alpha(int(255 * u))
+            screen.blit(label, ((C.BASE_W - label.get_width()) // 2, by + 5))
+        if self.map_t < 16:      # 出だしは、暗い画面から、すっと明るくなる
+            fade = pygame.Surface((C.BASE_W, C.BASE_H))
+            fade.set_alpha(255 - self.map_t * 16)
+            screen.blit(fade, (0, 0))
+
     def _draw_title(self, screen, dim=True):
         if dim:
             veil = pygame.Surface((C.BASE_W, C.BASE_H))
@@ -766,8 +994,13 @@ class Game:
                         pygame.draw.lines(screen, B["glow"], False, pts, 4)
                     pygame.draw.lines(screen, B["core"] if wide and power > 0.4 else B["glow"], False, pts, 2 if wide else 1)
         logo = self.a.title_logo
-        screen.blit(logo, (C.TITLE_LOGO[0] - logo.get_width() // 2, C.TITLE_LOGO[1]))
-        if (self.title_t // (4 if self.start_t else 30)) % 2 == 0:   # 点滅（決定したあとは、速く）
+        landed = self.title_t - C.TITLE_DROP_WAIT - C.TITLE_DROP    # 着いてからのフレーム数（負なら、まだ下りている）
+        if self.start_t:        # 決定したら、その場で定位置に着く
+            landed = max(landed, 0)
+        k = min(1.0, max(0.0, (self.title_t - C.TITLE_DROP_WAIT) / C.TITLE_DROP)) if landed < 0 else 1.0
+        y = -logo.get_height() + (C.TITLE_LOGO[1] + logo.get_height()) * (1 - (1 - k) ** 3)   # 最後に減速
+        screen.blit(logo, (C.TITLE_LOGO[0] - logo.get_width() // 2, round(C.TITLE_LOGO[1] if landed >= 0 else y)))
+        if landed >= 0 and (landed // (4 if self.start_t else 30)) % 2 == 0:   # 着いてから点滅（決定したあとは、速く）
             img = self.a.title_prompt
             screen.blit(img, (C.TITLE_PROMPT[0] - img.get_width() // 2, C.TITLE_PROMPT[1]))
 
@@ -837,7 +1070,7 @@ class Game:
         veil.set_alpha(min(C.GAMEOVER_DIM, self.clear_t * 4))
         screen.blit(veil, (0, 0))
         sec = self.frames // C.FPS
-        lines = ["STAGE CLEAR", "", "SCORE  %06d" % self.score, "DANGO  %d/%d" % (self.dango, DANGO_TOTAL),
+        lines = ["STAGE CLEAR", "", "SCORE  %06d" % self.score, "DANGO  %d/%d" % (self.dango, self.stage.dango_total),
                  "TIME   %d:%02d" % (sec // 60, sec % 60)]
         if self.clear_t >= C.CLEAR_WAIT and (self.clear_t // 30) % 2 == 0:
             lines += ["", "PRESS ENTER"]

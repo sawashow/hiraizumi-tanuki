@@ -42,10 +42,16 @@
 
 ## パソコンで動かす
 
+仮想環境（`.venv`）を作って、動かします（Windows の例）。
+
 ```
-pip install pygame
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
 python main.py
 ```
+
+遊ぶだけなら `pip install pygame` だけでも動きます。`requirements.txt` には、絵や音を作る道具（Pillow）と、ブラウザ版を作る道具（pygbag）も入っています。動作テストは `python tools/smoke_test.py` です。
 
 `python main.py s2` で2面から、`python main.py boss` で、ボスの場所の手前から、`python main.py cp` で、中間地点の手前から始められます（確認用）。
 

@@ -16,3 +16,6 @@ tools/draw_player.py
 
 # AI用の引き継ぎメモ（リポジトリには含めない）
 AI_CONTEXT.md
+
+# 仮想環境（作り方は README）
+.venv/
