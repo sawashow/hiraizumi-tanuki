@@ -189,7 +189,7 @@ class StageDef:
     def __init__(self, name, width, ground, platforms, items, checkpoint, spawns, bgm, bgm_boss,
                  sky="bg_sky.png", mid="bg_mid.png", tiles="", boss_x=None,
                  boss_title=C.BOSS_TITLE, boss_name=C.BOSS_NAME, boss_pattern=C.BOSS_PATTERN,
-                 talk_boss=C.TALK_BOSS, talk_tanuki=C.TALK_TANUKI, number=1, stele_x=150, boss_kind="boss", pit=(8, 6, 18), gates=(), lanterns=(), zones=(), gilt=False, haze=None, winds=(), traps=()):
+                 talk_boss=C.TALK_BOSS, talk_tanuki=C.TALK_TANUKI, number=1, stele_x=150, boss_kind="boss", pit=(8, 6, 18), gates=(), lanterns=(), zones=(), gilt=False, haze=None, winds=(), traps=(), thought=(), pit_deep=None):
         self.name, self.width = name, width
         self.ground, self.platforms, self.items = ground, platforms, items
         self.checkpoint, self.spawns = checkpoint, spawns
@@ -206,10 +206,13 @@ class StageDef:
         # 区画（面の設計）: (左端, 右端, 名前, 役目, ねらいの強さ 1〜5)。役目は config.ZONE_ROLES。遊びには使わない。
         # tools/difficulty.py が、区画ごとに、実際の強さを測って、ねらいと比べる
         self.zones = tuple(zones)
+        self.pit_deep = pit_deep    # 穴の、いちばん下の色（None なら、pit の一色）。下へ行くほど、この色に近づく
         self.haze = haze        # 穴の上の「もや」の高さ（None なら、config.PIT_HAZE の h）。空が明るい面では、低くする
         # 面ごとの仕掛け（その面だけの遊び。同じ敵と地形の繰り返しに、ならないように）
         self.winds = tuple(winds)   # 山おろし: (左端, 右端, 間隔のフレーム数)。右端から、風が、地面ぞいに吹き下ろす
         self.traps = tuple(traps)   # 光の柱の廊下: (左端, 右端, 柱の間隔, 一巡りのフレーム数)。床の印の所に、左から順に、光の柱が落ちる
+        # ボスを倒したあと、タヌキ侍が、返事の代わりに、頭に思い浮かべる物（アイテムの名前。順に出る）。空なら、せりふ（talk_tanuki）で返す
+        self.thought = tuple(thought)
         self.gilt = gilt        # 堂の中の面: 石の小物（石灯籠）を、金に塗り替えて出す
         self.gates = tuple(gates)   # 面の途中の「ボスの間」（影のボス）: (左端の x, ボスの種類)。最後のボスの間は、面の端
 
@@ -322,7 +325,7 @@ STAGE1 = StageDef("月見坂", W1, GROUND1, PLATFORMS1, thin_dango(ITEMS1, PLATF
                   number=3, stele_x=140,
                   boss_title="enemies/boss3_title.png", boss_name="enemies/boss3_name.png",
                   talk_boss="talk_boss3.png", talk_tanuki="talk_tanuki3.png",
-                  boss_kind="boss3", boss_pattern=C.BOSS3_PATTERN, zones=ZONES1,
+                  boss_kind="boss3", boss_pattern=C.BOSS3_PATTERN, zones=ZONES1, thought=("onigiri", "dango"),
                   winds=((3450, 3970, 170),),    # 長い登り: 坂の上から、山おろし
                   pit=(26, 18, 44), haze=32)     # 夕焼けの空に、黒いもやは浮く。穴の底を、夕闇の紫にして、もやを低くする
 
@@ -421,7 +424,7 @@ ZONES2 = (
 STAGE2 = StageDef("毛越寺", 5000, GROUND2, PLATFORMS2, thin_dango(ITEMS2, PLATFORMS2), (2170, T - 32), SPAWNS2, C.BGM_STAGE1, C.BGM_BOSS,
                   lanterns=(("triple", 300), ("onigiri", 2310), ("onigiri", 4370)),   # 石灯籠: 入口（強化）・中間地点の先（回復）・ボスの前（回復）
                   sky="stage2/bg_sky.png", mid="stage2/bg_mid.png", tiles="stage2/",
-                  number=1, stele_x=130, zones=ZONES2)   # ボスは、1面の泰衡（遊ぶ順で決まる）。絵が無いあいだは、1面の絵で代わりにする
+                  number=1, stele_x=130, zones=ZONES2, thought=("onigiri",))   # ボスは、1面の泰衡（遊ぶ順で決まる）。絵が無いあいだは、1面の絵で代わりにする
 # ---------------------------------------------------------------- 2面（高館）
 # 義経堂のある高台。北上川と衣川を見下ろす崖の道。夏の昼。高低差が大きく、遠くから撃たれる面（敵の絵・弓兵は、まだ無いので、いまは既存の敵）
 W3 = 6000
@@ -530,8 +533,8 @@ STAGE3 = StageDef("高館", W3, GROUND3, PLATFORMS3, thin_dango(ITEMS3, PLATFORM
                   boss_title="enemies/boss2_title.png", boss_name="enemies/boss2_name.png",
                   talk_boss="talk_boss2.png", talk_tanuki="talk_tanuki2.png", number=2, stele_x=130,
                   boss_kind="boss2", boss_pattern=C.BOSS2_PATTERN,   # ボスは遊ぶ順で決まる（2面: 基衡）
-                  gates=GATES3, zones=ZONES3,
-                  pit=(24, 52, 60))   # 崖の切れ目の底は、昼でも暗い谷（深い青緑）
+                  gates=GATES3, zones=ZONES3, thought=("dango",),
+                  pit=(226, 240, 246), pit_deep=(132, 178, 208), haze=100)   # 崖の切れ目の下は、白い霞（雲海）。昼の景色に、暗い穴は合わない。高い崖の上にいる感じを出す
 # ---------------------------------------------------------------- 4面（金色堂）
 # 堂の中。暗い所から、金色の光へ。いちばん長い面（総まとめ）。走る区間と、ボスの間を、交互に並べる:
 # 入口の間 → 影・泰衡 → 回廊 → 影・基衡 → 柱の間 → 影・秀衡 → 奥の廊下（いちばん長い）→ 清衡。

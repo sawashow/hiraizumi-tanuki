@@ -4,6 +4,7 @@
 出力: assets/concept/smoke_sheet.png（場面の一覧）
 """
 import math
+import re
 import os
 import sys
 
@@ -1399,7 +1400,18 @@ _saved = list(STAGES)
 STAGES[:] = [STAGES[0]]   # 最後の面をクリアしたときの動き（1面だけの設定にする）
 run(g, 1, (), {"restart"})
 STAGES[:] = _saved
-check("最後の面のクリアのあと、Enterで、エンディング画面が出る", g.ending_screen and not g.title and g.a.ending_image is not None)
+check("最後の面のクリアのあと、Enterで、姫を助ける場面（THANK YOU TANUKI!）が出る", g.thanks and not g.ending_screen and not g.title)
+run(g, g._thanks_at("arrive") - 4)
+snap(g, "thanks walk")
+check("タヌキ侍が歩いてくる間は、まだ文は出ない", g._thanks_shown() == 0 and g.thanks)
+run(g, g._thanks_at("type") - g.thanks_t + 3 * C.THANKS["type"])
+check("姫が喜んだあと、礼の文が、1文字ずつ出る", 0 < g._thanks_shown() < len(C.THANKS["lines"][0]))
+run(g, 1, (), {"restart"})
+check("途中で押すと、文が全部出る（まだ、先へは進まない）", g.thanks and g._thanks_shown() == sum(len(x) for x in C.THANKS["lines"]))
+run(g, C.THANKS["wait"] + 1)
+snap(g, "thanks")
+run(g, 1, (), {"restart"})
+check("もう一度押すと、エンディングの絵が出る", g.ending_screen and not g.thanks and g.a.ending_image is not None)
 run(g, 5, (), {"restart"})
 check("エンディングは、しばらくはEnterを受け付けない", g.ending_screen)
 snap(g, "ending screen")
@@ -1898,7 +1910,7 @@ if pad.sdl:
     check("Xで刀", pad.handle(ev("CONTROLLERBUTTONDOWN", button=X, instance_id=0)) == {"attack"})
     check("BとYで手裏剣", pad.handle(ev("CONTROLLERBUTTONDOWN", button=B, instance_id=0)) == {"throw"}
           and pad.handle(ev("CONTROLLERBUTTONDOWN", button=Y, instance_id=0)) == {"throw"})
-    check("Startで再開", pad.handle(ev("CONTROLLERBUTTONDOWN", button=S, instance_id=0)) == {"restart"})
+    check("Startで、再開と、ポーズ（遊んでいる間は、ポーズ。それ以外の画面では、決定）", pad.handle(ev("CONTROLLERBUTTONDOWN", button=S, instance_id=0)) == {"restart", "pause"})
     check("割り当てのないボタンは、何もしない", pad.handle(ev("CONTROLLERBUTTONDOWN", button=_pg.CONTROLLER_BUTTON_LEFTSTICK, instance_id=0)) == set())
 check("スティックを倒すと、その向きに動く（少し倒しただけでは動かない）",
       gamepad.stick_held(0.9, 0.0) == {"right"} and gamepad.stick_held(-0.9, 0.0) == {"left"} and gamepad.stick_held(0.0, 0.9) == {"down"}
@@ -2382,6 +2394,46 @@ for _ in range(trap[3]):
     seen_x |= {round(w.px) for w in gp.waves if isinstance(w, Pillar)}
 check("金色堂の廊下では、床の印の所に、左から順に、光の柱が落ちる（印の間に、立てる幅がある）",
       seen_x == set(spots) and len(spots) >= 3 and trap[2] - C.PILLAR["w"] >= C.PLAYER_W + 40, "%s / %s" % (sorted(seen_x), spots))
+
+# ---------------------------------------------------------------- 効果音
+import sprites as _sp  # noqa: E402
+_audio = os.path.join(os.path.dirname(__file__), "..", "assets", "audio")
+lost = [f for f in C.SFX.values() if not os.path.exists(os.path.join(_audio, f))]
+check("遊びの効果音のファイルが、すべてある（%d 種類）。大きさも、決めてある" % len(C.SFX), not lost and all(C.SFX[k] in C.SFX_VOLUME for k in C.SFX), str(lost))
+used = set(k for call in re.findall(r'snd\(([^)]*)\)', open(os.path.join(os.path.dirname(__file__), "..", "sprites.py"), encoding="utf-8").read())
+           for k in re.findall(r'"(\w+)"', call))
+_unused = set(re.findall(r'snd\("(\w+)"', open(os.path.join(os.path.dirname(__file__), "..", "sprites.py"), encoding="utf-8").read()))
+used |= set(re.findall(r'C\.SFX\["(\w+)"\]', open(os.path.join(os.path.dirname(__file__), "..", "main.py"), encoding="utf-8").read()))
+check("用意した効果音は、すべて、どこかで鳴らしている（名前の書き間違いも無い）", used == set(C.SFX), "使っていない: %s / 無い名前: %s" % (sorted(set(C.SFX) - used), sorted(used - set(C.SFX))))
+_sp.SOUNDS.clear()
+g = fresh([Ochimusha(340)], px=300)
+run(g, 1, pressed_first={"jump"})
+heard = set(_sp.SOUNDS)
+run(g, 30)
+run(g, 1, pressed_first={"attack"})
+run(g, 12)
+heard |= set(_sp.SOUNDS)
+check("跳ぶ・斬る・当たる、で音が鳴る", {C.SFX["jump"], C.SFX["swing"], C.SFX["hit"]} <= heard, str(sorted(heard)))
+_sp.SOUNDS.clear()
+
+# ---------------------------------------------------------------- ポーズ
+g = fresh([Ochimusha(420)], px=300)
+run(g, 5, {"right"})
+x0, ex0 = g.player.px, g.enemies[0].cx
+run(g, 1, (), {"pause"})
+run(g, 40, {"right"}, {"jump"})
+check("ポーズ中は、主人公も敵も、止まる（キーを押しても、動かない）", g.paused and g.player.px == x0 and g.enemies[0].cx == ex0 and g.player.on_ground)
+snap(g, "pause")
+run(g, 1, (), {"pause"})
+run(g, 5, {"right"})
+check("もう一度押すと、続きから動く", not g.paused and g.player.px > x0)
+gt = Game(title=True)
+gt.step(set(), {"pause"})
+check("スタート画面では、ポーズにならない", not gt.paused and gt.title)
+g = fresh(px=300)
+g.step(set(), {"pause_on"})
+g.step(set(), {"pause_on"})
+check("窓が後ろに回ると、止まる（もう一度来ても、解除はされない）", g.paused)
 
 # ---------------------------------------------------------------- 25. 高館の中ボス（弁慶）
 st3 = STAGES[1]

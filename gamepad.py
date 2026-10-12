@@ -16,7 +16,7 @@ DEADZONE = 0.45   # スティックを倒したとみなす量（0〜1）
 
 # 「どのボタンを押したら、何になるか」（押した瞬間）。A は、ジャンプと決定（再開）を兼ねる
 PRESS = {
-    "A": ("jump", "restart"), "X": ("attack",), "B": ("throw",), "Y": ("throw",), "START": ("restart",),
+    "A": ("jump", "restart"), "X": ("attack",), "B": ("throw",), "Y": ("throw",), "START": ("restart", "pause"),
 }
 RELEASE = {"A": ("jump_release",)}
 

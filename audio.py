@@ -42,6 +42,15 @@ class Audio:
         except (pygame.error, FileNotFoundError):
             pass   # 効果音が鳴らせなくても、続ける
 
+    def set_paused(self, on):
+        """曲を、止める・続きから鳴らす（ポーズ）"""
+        if self.ok and on != getattr(self, "paused", False):
+            self.paused = on
+            try:
+                (pygame.mixer.music.pause if on else pygame.mixer.music.unpause)()
+            except pygame.error:
+                pass
+
     def fade_out(self, ms):
         if self.ok and self.playing:
             pygame.mixer.music.fadeout(ms)
