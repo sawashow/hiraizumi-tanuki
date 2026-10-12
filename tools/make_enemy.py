@@ -17,7 +17,7 @@ import os
 import statistics
 import sys
 
-from PIL import Image
+from PIL import Image, ImageFilter
 
 sys.path.insert(0, os.path.dirname(__file__))
 from make_shuriken import runs  # noqa: E402
@@ -99,7 +99,12 @@ def palette_from(crops, n):
     return [tuple(pal[i : i + 3]) for i in range(0, len(pal), 3)]
 
 
-def to_dots(crop, scale, pal):
+def to_dots(crop, scale, pal, blur=0.0):
+    if blur > 0:
+        a = crop.getchannel("A")
+        rgb = crop.convert("RGB").filter(ImageFilter.GaussianBlur(blur))
+        crop = rgb.convert("RGBA")
+        crop.putalpha(a)
     w, h = max(1, round(crop.width * scale)), max(1, round(crop.height * scale))
     small = crop.resize((w, h), Image.BOX)
     alpha = small.getchannel("A").point(lambda v: 255 if v >= 110 else 0)
@@ -141,6 +146,37 @@ def anchor_x(crop, mode, scale):
     return round((sum(xs) / len(xs)) * scale) if xs else round(crop.width * scale / 2)
 
 
+def strip_ground_line(crop):
+    """コマの下端にある、黒い横線（地面の線）を消して、詰める。下から見て、黒が横に長く続く行（幅の4割以上）を、線とみなす。
+    線と同じ高さに、刀の先などが掛かっていても、線だけを消す"""
+    cp = crop.load()
+    w, h = crop.size
+    y = h - 1
+    while y > h * 0.6:
+        best = run = start = 0
+        span = (0, 0)
+        for x in range(w + 1):
+            dark = x < w and cp[x, y][3] and max(cp[x, y][:3]) < 110
+            if dark:
+                if run == 0:
+                    start = x
+                run += 1
+                if run > best:
+                    best, span = run, (start, x + 1)
+            else:
+                run = 0
+        if not any(cp[x, y][3] for x in range(w)):
+            y -= 1
+            continue
+        if best < w * 0.4:
+            break               # 長い黒が無い行 = 絵の本体
+        for x in range(*span):
+            cp[x, y] = (0, 0, 0, 0)
+        y -= 1
+    box = crop.getbbox()
+    return crop.crop(box) if box else crop
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("src")
@@ -154,8 +190,11 @@ def main():
     ap.add_argument("--valign", choices=["bottom", "center"], default="bottom")
     ap.add_argument("--colors", type=int, default=20)
     ap.add_argument("--gain", type=float, default=1.0)
+    ap.add_argument("--blur", type=float, default=0.0, help="細かい模様をつぶすガウスぼかしの半径（細線率を下げる）")
     ap.add_argument("--rim", default="", help="暗い敵を背景から浮かせる、外側の縁取りの色 R,G,B（1ドット）")
     ap.add_argument("--foot-white", default="", help="足の間に残った白を消す動き。番号:しきい値 をコンマ区切り（例 0:195,2:232）。番号は --names の順で0始まり")
+    ap.add_argument("--keep-colors", default="", help="必ず残す色 R,G,B を「;」区切りで（火や灯りなど、面積が小さくて、色を絞ると消える色）")
+    ap.add_argument("--ground-line", action="store_true", help="コマごとの足元に引かれた、短い黒い横線（地面の線）を消す")
     a = ap.parse_args()
     names = a.names.split(",")
     rows_sel = [int(v) for v in a.rows.split(",")]
@@ -174,10 +213,12 @@ def main():
             thr = int(foot[str(k)])
             for c in crops:   # 足元（下から30%）に残った、白に近い画素を消す
                 cp = c.load()
-                for y in range(int(c.height * 0.7), c.height):
+                for y in range(int(c.height * 0.45), c.height):
                     for x in range(c.width):
                         if cp[x, y][3] and min(cp[x, y][:3]) > thr:
                             cp[x, y] = (0, 0, 0, 0)
+        if a.ground_line:
+            crops = [strip_ground_line(c) for c in crops]
         print("  %s: %d コマ" % (names[k], len(crops)))
         anims.append((names[k], anchors[k], crops))
 
@@ -187,11 +228,12 @@ def main():
     pal = palette_from([c for _, _, cs in anims for c in cs], a.colors)
     if a.gain != 1.0:
         pal = [tuple(min(255, round(v * a.gain)) for v in c) for c in pal]
+    pal += [tuple(int(v) for v in c.split(",")) for c in a.keep_colors.split(";") if c]
 
     placed = []   # (動き名, 番号, dots, ax, ay)
     for name, mode, crops in anims:
         for i, c in enumerate(crops):
-            d = to_dots(c, scale, pal)
+            d = to_dots(c, scale, pal, blur=a.blur)
             ax = anchor_x(c, mode, scale)
             if a.rim:
                 d = add_rim(d, tuple(int(v) for v in a.rim.split(",")))

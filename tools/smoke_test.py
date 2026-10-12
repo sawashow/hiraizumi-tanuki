@@ -294,6 +294,25 @@ for i in range(200):
 check("烏は、近づくまで待つ（予告の間は動かない）", telegraph_moved < 1, "予告中の移動 %.1f" % telegraph_moved)
 check("予告は約0.5秒（30フレーム）", dive_start is not None and 28 <= dive_start <= 32, "急降下の開始 %s" % dive_start)
 check("急降下の速さは3.5", dive_start is not None and abs(speed - C.KARASU["speed"]) < 0.01, "速さ %.2f" % speed)
+vs = []
+for py in (C.FLOOR_Y, C.FLOOR_Y - 60):      # 主人公が、地面にいるときと、高い所にいるとき
+    g = fresh([Karasu(520)], px=300)
+    g.player.py = float(py)
+    e = g.enemies[0]
+    e.t = C.KARASU["telegraph"]
+    e.state = "telegraph"
+    e.think(pygame.Rect(290, py - 30, 20, 30), C.STAGE_W)
+    vs.append((round(e.vx, 3), round(e.vy, 3)))
+check("烏の急降下の向きは、主人公の高さに関係なく、同じ", vs[0] == vs[1] and vs[0][1] > 0, str(vs))
+g = fresh([Karasu(320)], px=300)
+e = g.enemies[0]
+e.t = C.KARASU["telegraph"]
+e.state = "telegraph"
+e.think(g.player.rect, C.STAGE_W)
+check("主人公が真下にいても、まっすぐ落ちない（横へ進む）", abs(e.vx) > 1.5, "%.2f" % e.vx)
+for _ in range(120):
+    e.think(g.player.rect, C.STAGE_W)
+check("烏は、地面を滑らず、すり抜けて飛び去る（画面の下で消える）", not e.alive and e.cy > C.FLOOR_Y)
 g = fresh([Karasu(520)], px=300)
 e = g.enemies[0]
 nearest = 9999
@@ -541,11 +560,31 @@ for _ in range(swing + 1):
 n0 = gg.player.swing_id
 gg.step(set(), {"attack"})
 check("刀の隙は、次の刀では打ち切れない（連打しても、速くならない）", gg.player.swing_id == n0 and gg.player.recovering)
-for _ in range(C.SWORD_SEQ[-1][1]):
+waited = 0
+for _ in range(C.SWORD_SEQ[-1][1] + C.SWORD_COOLDOWN + 4):
     if gg.player.swing_id != n0:
         break
     gg.step(set())
-check("隙が終わったら、すぐ次の刀が出る（押し直さなくていい）", gg.player.swing_id == n0 + 1 and seq_frame(gg.player.attack_t, C.SWORD_SEQ)[0] == 0)
+    waited += 1
+check("刀は、振り終わってから少し間をおいて、次が出る（連打しても、速くならない。押し直さなくていい）",
+      gg.player.swing_id == n0 + 1 and waited >= C.SWORD_SEQ[-1][1] + C.SWORD_COOLDOWN - 3, "待ち %d" % waited)
+gg = vx_after(5, {"right"})
+starts, last = [], gg.player.swing_id
+for f in range(160):
+    gg.step(set(), {"attack"})      # 連打する
+    if gg.player.swing_id != last:
+        starts.append(f)
+        last = gg.player.swing_id
+per = (starts[-1] - starts[0]) / max(1, len(starts) - 1)
+check("刀を連打したときの間隔は、1振り＋間（約0.6秒）", total + C.SWORD_COOLDOWN - 2 <= per <= total + C.SWORD_COOLDOWN + 4, "%.1f フレームに1回" % per)
+gg = vx_after(5, {"right"})
+gg.step(set(), {"attack"})
+for _ in range(swing + 1):
+    gg.step(set())
+gg.step({"right"})
+check("刀の間のあいだも、歩く・手裏剣は、すぐできる", not gg.player.attack_t and gg.player.sword_cool > 0 and gg.player.vx > 0)
+gg.step(set(), {"throw"})
+check("（手裏剣）", gg.player.throw_t > 0)
 gg = vx_after(5, {"right"})
 gg.step(set(), {"attack"})
 for _ in range(swing + 1):
@@ -916,20 +955,59 @@ run(g, C.RESPAWN_AT + 20)
 check("ゲームオーバーでは、再開しない", g.player.hp == 0)
 run(g, 1, (), {"restart"})
 check("Enterで、最初から（残機も初期値に戻る）", g.player.hp == C.PLAYER_HP and g.lives == C.LIVES and g.score == 0)
-# 団子を全部取ると、残機が増える
-g = Game()
-g.enemies = []
-g.dango = DANGO_TOTAL - 1
-dango_items = [it for it in g.items if it.kind == "dango"]
-g.player.px, g.player.py = dango_items[0].cx, dango_items[0].cy + 8
-g.player.py = float(R.height_at(g.player.px) or C.FLOOR_Y)
+# 団子 = 手裏剣を投げられる数（悪魔城ドラキュラのサブウェポンと同じ扱い）
+A = C.AMMO
+g = fresh(px=300)
+check("面の始まりは、団子を %d 持っている（持てるのは %d まで）" % (A["start"], A["max"]), g.player.ammo == A["start"] < A["max"])
+run(g, 1, (), {"throw"})
+run_until(g, lambda gg: gg.shurikens, (), 40)
+check("手裏剣を投げると、団子が1つ減る", g.player.ammo == A["start"] - A["cost"] and len(g.shurikens) == 1)
+run(g, 60)
+g.player.triple = True
+n0 = g.player.ammo
+run(g, 1, (), {"throw"})
+run_until(g, lambda gg: gg.shurikens, (), 40)
+check("三方手裏剣は、3つ出ても、団子は1つしか減らない", len(g.shurikens) == 3 and g.player.ammo == n0 - A["cost"])
+g = fresh(px=300)
+g.player.ammo = 0
+run(g, 1, (), {"throw"})
+run(g, 20)
+check("団子が無いと、手裏剣は投げられない（ゲージが、赤く点滅する）", not g.shurikens and not g.player.throw_t and g.player.empty_t > 0)
+snap(g, "ammo empty")
+run(g, 1, (), {"attack"})
+check("団子が無くても、刀は振れる", g.player.attack_t > 0)
+g = fresh(px=300)
+g.player.ammo = 3
 g.items = [Item("dango", g.player.px, g.player.py - 8, g.a, 0)]
 run(g, 2)
-check("団子を全部取ると、残機が1増える", g.lives == C.LIVES + 1 and g.one_up_given)
+check("団子を拾うと、投げられる数が %d 増える（スコアも入る）" % A["dango"], g.player.ammo == 3 + A["dango"] and g.score == C.SCORE_DANGO)
+g.player.ammo = A["max"] - 1
 g.items = [Item("dango", g.player.px, g.player.py - 8, g.a, 1)]
 run(g, 2)
-check("1UPは、1回だけ", g.lives == C.LIVES + 1)
-snap(g, "1UP")
+check("団子は、持てる数までしか増えない", g.player.ammo == A["max"])
+g.lives = 3
+g.player.ammo = 1
+g.player.hp = 0
+for _ in range(C.RESPAWN_AT + 5):
+    g.step(set())
+check("やられて再開すると、団子は、始まりの数に戻る（無いまま再開しない）", g.player.hp > 0 and g.player.ammo == A["start"])
+check("団子を全部取っても、残機は増えない（団子は、集める物ではなく、使う物になった）", g.lives == 2)
+few = [(st.name, st.dango_total) for st in PROD_STAGES]
+check("本番の面の団子は、足場の上にだけ、1つずつ（地面には置かない）。1面に 26個まで",
+      all(n <= 26 for _, n in few) and all(sum(p[0] <= x <= p[1] and 0 < p[2] - y <= 60 for p in st.platforms) == 1
+                                            for st in PROD_STAGES for k, x, y in st.items if k == "dango"), str(few))
+
+
+def _purpose(st, p):
+    """足場の役目: 穴を渡る / 上に物がある / ボスの間（ボスを跳び越える）。どれも無ければ、意味の無い足場"""
+    cx = (p[0] + p[1]) / 2
+    holes = [(a1, b0) for (_, a1, _), (b0, _, _) in zip(st.ground, st.ground[1:]) if b0 > a1]
+    return (any(h0 - 10 <= cx <= h1 + 10 for h0, h1 in holes) or any(p[0] - 6 <= x <= p[1] + 6 and 0 < p[2] - y <= 60 for _, x, y in st.items)
+            or any(a["x0"] <= cx <= a["x1"] for a in st.arenas))
+
+
+idle = [(st.name, p[0], p[1]) for st in PROD_STAGES for p in st.platforms if not _purpose(st, p)]
+check("[本番] 意味の無い足場が無い（どの足場も、穴を渡るか、上に物があるか、ボスの間にある）", not idle, str(idle))
 
 # ---------------------------------------------------------------- 15. ボスの場所
 def boss_game():
@@ -1026,7 +1104,7 @@ def high_wave_game():
     gg.boss.shots = C.BOSS_PATTERN.index("H")
     boss_until(gg, lambda x: x.boss.state == "ready")
     gg.waves = []   # 前の光波は消しておく
-    high_pose = gg.boss.image() is gg.boss._frames("swing")[0]
+    high_pose = gg.boss.image() in (gg.boss._opt("high") or [gg.boss._frames("swing")[0]])
     boss_until(gg, lambda x: x.waves)
     gg.player.invincible = 0
     return gg, high_pose
@@ -1342,9 +1420,9 @@ class FixedRng:
 
 C.DROPS = DROPS
 total = sum(c for _, c in DROPS)
-check("落とし物は、おにぎりと強化3種類。何も落とさないことのほうが多い", {k for k, _ in DROPS} == {"onigiri", "leaf", "triple", "super"} and total < 0.5,
+check("落とし物は、おにぎり・強化2種類・団子（スーパータヌキは出ない）。何も落とさないことのほうが多い", {k for k, _ in DROPS} == {"onigiri", "leaf", "triple", "dango"} and total < 0.5,
       "落とす確率 %.2f" % total)
-check("くじの値で、落とす物が決まる", drop_kind(0.0) == DROPS[0][0] and drop_kind(total - 0.001) == DROPS[-1][0] and drop_kind(total) is None
+check("くじの値で、落とす物が決まる", drop_kind(0.0) == DROPS[0][0] and drop_kind(total - 0.001) == DROPS[-1][0] and drop_kind(total + 0.001) is None
       and drop_kind(0.999) is None)
 check("おにぎりの回復は2。面には5個置いてある", C.HEAL_ONIGIRI == 2 and sum(1 for k, _, _ in ITEMS if k == "onigiri") == 5)
 
@@ -1544,6 +1622,261 @@ def swing_at(gap):
 check("刀は、軌跡のぶんだけ遠くまで届く（刀の長さ %d + 軌跡 %d）" % (C.SWORD_W, C.SWORD_TRAIL),
       swing_at(C.SWORD_W + C.SWORD_TRAIL - 2) and swing_at(C.SWORD_W + 2))
 check("軌跡の先までは、届かない（光波のようには飛ばない）", not swing_at(C.SWORD_W + C.SWORD_TRAIL + 3))
+
+_STAGES = PROD_STAGES     # 本番の4面で調べる（このテストの大半は、昔の2面で動かしている）
+over = [(st.name, pf) for st in _STAGES for pf in st.platforms
+        if pf[0] - 34 < st.checkpoint[0] < pf[1] + 34 and st.checkpoint[1] - 110 < pf[2] < st.checkpoint[1]]
+check("どの面でも、中間地点（鳥居）の真上に、足場が重ならない", not over, str(over))
+
+# ---------------------------------------------------------------- 弓兵
+from sprites import Archer, Arrow  # noqa: E402
+
+Y = C.YUMI
+g = fresh([Archer(460)], px=300)
+ar = g.enemies[0]
+x_a = ar.cx
+run(g, Y["first_wait"] + 3)
+check("弓兵は、近づくと、弓を引く（その場から動かない。主人公のほうを向く）", ar.draw_t > 0 and ar.cx == x_a and ar.facing == -1)
+snap(g, "archer draw")
+n = 0
+while not g.waves and n < Y["draw_frames"] + 5:
+    g.step(set())
+    n += 1
+check("弓を引ききると、矢を撃つ（予告の長さ）", g.waves and isinstance(g.waves[0], Arrow) and n >= Y["draw_frames"] - 5, "%d フレーム" % n)
+aw = g.waves[0]
+check("矢は、主人公へ向かって飛ぶ", aw.vx < 0 and abs(aw.vy) < 1.0, "vx=%.2f vy=%.2f" % (aw.vx, aw.vy))
+hp0 = g.player.hp
+run_until(g, lambda gg: gg.player.hp < hp0, (), 120)
+check("矢に当たると、ダメージを受ける（矢は消える）", g.player.hp == hp0 - C.ARROW["damage"] and not g.waves)
+check("撃ったあとは、しばらく撃たない（隙）", ar.cool > Y["cooldown"] // 3 and not ar.draw_t)
+g = fresh([Archer(460)], px=300)
+run_until(g, lambda gg: gg.waves, (), 200)
+aw = g.waves[0]
+run_until(g, lambda gg: abs(aw.px - gg.player.px) < 46, (), 120)
+hp0 = g.player.hp
+run(g, 1, {"right"}, {"attack"})
+run(g, 14, {"right"})
+check("矢は、刀で斬ると消せる（ダメージを受けない。折れた矢が落ちる）", not aw.alive and g.player.hp == hp0)
+g = fresh([Archer(460)], px=300)
+run_until(g, lambda gg: gg.waves, (), 200)
+aw = g.waves[0]
+g.player.invincible = 200
+run(g, 1, {"right"}, {"throw"})
+run(g, 16, {"right"})
+check("矢は、手裏剣では消せない（すり抜ける）", aw.alive or g.player.invincible)
+g = fresh([Archer(460)], px=300)
+ar = g.enemies[0]
+ar.hit(C.SHURIKEN_DAMAGE)
+alive1 = ar.active
+ar.hit(C.SHURIKEN_DAMAGE)
+check("弓兵は、手裏剣2発（刀なら1回）で倒れる", alive1 and ar.dying and Y["hp"] <= C.SWORD_DAMAGE)
+g = fresh([Archer(460)], px=300)
+g.player.py = C.FLOOR_Y - 200.0     # ずっと高い所にいる
+g.player.on_ground = False
+aimed = Arrow(460, C.FLOOR_Y - 27, 300, C.FLOOR_Y - 400, -1, g.a)
+check("矢は、真上・真下へは飛ばない（ねらえる角度に、限りがある）",
+      abs(math.degrees(math.atan2(aimed.vy, abs(aimed.vx)))) <= Y["max_angle"] + 0.5)
+check("高館に、弓兵がいる（落ち武者も、残っている）",
+      sum(k == "yumihei" for k, _ in PROD_STAGES[1].spawns) >= 3 and any(k == "ochimusha" for k, _ in PROD_STAGES[1].spawns))
+tr = PROD_STAGES[1].terrain()
+check("弓兵の配置が、すべて地面の上", all(tr.height_at(x) is not None for k, x in PROD_STAGES[1].spawns if k == "yumihei"))
+
+# ---------------------------------------------------------------- 本番の4面: すべての足場に、ジャンプで届くか
+# ジャンプの軌道（横の速さを5通り）を、実際の重力と初速で計算して、面から面へ、乗り移れるかを調べる
+def _jump_arcs():
+    out = []
+    for vx in (0.0, 0.7, 1.4, 2.1, C.MAX_SPEED):
+        x = y = 0.0
+        vy = C.JUMP_SPEED
+        pts = []
+        while y < 300:
+            vy = min(vy + C.GRAVITY * (C.FALL_GRAVITY if vy > 0 else 1.0), C.MAX_FALL)
+            y += vy
+            x += vx
+            pts.append((x, -y, vy >= 0))
+        out.append(pts)
+    return out
+
+
+_ARCS = _jump_arcs()
+
+
+def _can_jump(s1, s2):
+    (a1, b1, t1), (a2, b2, t2) = s1, s2
+    rise = t1 - t2
+    for pts in _ARCS:
+        for sign in (1, -1):
+            for x0 in range(a1, b1 + 1, 4):
+                prev = None
+                for dx, h, down in pts:
+                    if down and prev is not None and prev >= rise >= h and a2 - 6 <= x0 + sign * dx <= b2 + 6:
+                        return True
+                    prev = h
+    return False
+
+
+bad = [(st.name, k, x) for st in PROD_STAGES for k, x in st.spawns if k in ("ochimusha", "yumihei", "tachiojo")
+       and len({st.terrain().height_at(x + d) for d in (-16, 0, 16)} - {None}) != 1 or
+       k in ("ochimusha", "yumihei", "tachiojo") and None in [st.terrain().height_at(x + d) for d in (-16, 0, 16)]]
+check("[本番] 地上の敵は、穴の上や、段差の境目に置かない（足元の左右16ドットが、同じ高さの地面）", not bad, str(bad))
+check("ジャンプの頂点は、70〜74（足場の高さを決める、もとの数字）", 70 <= max(h for pts in _ARCS for _, h, _ in pts) <= 74,
+      "%.1f" % max(h for pts in _ARCS for _, h, _ in pts))
+for st in PROD_STAGES:
+    surf = list(st.ground) + list(st.platforms)
+    ng = len(st.ground)
+    reach, frontier = {0}, [0]
+    while frontier:
+        i = frontier.pop()
+        for j, s2 in enumerate(surf):
+            if j in reach:
+                continue
+            s1 = surf[i]
+            walk = j < ng and i < ng and max(s2[0] - s1[1], s1[0] - s2[1], 0) == 0 and s1[2] <= s2[2]   # 隣の、同じか低い地面へは、歩ける
+            if walk or _can_jump(s1, s2):
+                reach.add(j)
+                frontier.append(j)
+    lost = [(surf[j][0], surf[j][1], C.FLOOR_Y - surf[j][2]) for j in range(len(surf)) if j not in reach]
+    check("[本番 %s] すべての地面と足場に、ジャンプで届く（軌道を計算して調べる）" % st.name, not lost, "届かない: %s" % lost)
+
+# ---------------------------------------------------------------- 秀衡の連続光波・光波の高さ
+from sprites import Boss3  # noqa: E402
+
+b3 = Boss3(600, None, C.FLOOR_Y, 300, 780)
+b3.state, b3.st, b3.count = "walk", C.BOSS3["walk_frames"], 0
+pr = pygame.Rect(400, C.FLOOR_Y - 36, 16, 36)
+got, states = 0, []
+for _ in range(400):
+    b3.think(pr, 2000)
+    got += len(b3.spawned)
+    b3.spawned.clear()
+    states.append(b3.state)
+    if b3.state == "recover":
+        break
+check("秀衡は、光波を続けて2発撃ってから、隙になる（1面の泰衡は、1発ずつ）", got == C.BOSS3["combo"] == 2 and C.BOSS.get("combo", 1) == 1, "%d 発" % got)
+check("2発目の前にも、構え（予告）がある", states.count("ready") >= C.BOSS3["ready_frames"] + C.BOSS3["combo_ready"] - 2)
+wv = Wave(100, C.FLOOR_Y + C.WAVE["dy"], 1, None)
+check("低い光波は、地面にめり込まない（絵の下端が、地面の高さ。しゃがんでも当たり、跳べば越えられる）",
+      C.FLOOR_Y + C.WAVE["dy"] + 31 // 2 <= C.FLOOR_Y and wv.rect.bottom > C.FLOOR_Y - C.CROUCH_H and wv.rect.top > C.FLOOR_Y - 40,
+      "下端 %d 床 %d" % (C.FLOOR_Y + C.WAVE["dy"] + 15, C.FLOOR_Y))
+
+# ---------------------------------------------------------------- 立ち往生
+from sprites import Tachiojo  # noqa: E402
+
+g = fresh([Tachiojo(380)], px=300)
+tj = g.enemies[0]
+hp0 = g.player.hp
+run(g, 120, {"right"})
+check("立ち往生に歩いてぶつかっても、ダメージは無く、通れない（手前で止まる）",
+      g.player.hp == hp0 and not g.player.hurt_t and g.player.px <= tj.cx - (tj.w + C.PLAYER_W) / 2 + 0.5, "x=%.1f" % g.player.px)
+snap(g, "tachiojo block")
+g.sfx.clear()
+run(g, 1, {"right"}, {"attack"})
+run(g, 14, {"right"})
+check("刀で斬っても、倒せない（白く光って、弾く音が鳴る）", tj.alive and not tj.dying and C.SFX_CLANG in g.sfx)
+g.sfx.clear()
+g.player.px = tj.cx - 80
+run(g, 1, set(), {"throw"})
+run(g, 40)
+check("手裏剣も、弾かれる（手裏剣は、消える）", tj.alive and not tj.dying and not g.shurikens and C.SFX_CLANG in g.sfx)
+g = fresh([Tachiojo(380)], px=300)
+tj = g.enemies[0]
+hp0 = g.player.hp
+run_until(g, lambda gg: gg.player.px > tj.cx - 52, {"right"}, 200)
+run(g, 1, {"right"}, {"jump"})
+run(g, 70, {"right"})
+check("手前から跳べば、立ち往生を越えられる（ダメージなし）", g.player.px > tj.cx + 20 and g.player.hp == hp0, "x=%.1f" % g.player.px)
+g = fresh([Tachiojo(380)], px=380)
+tj = g.enemies[0]
+g.player.py, g.player.on_ground, g.player.vy = float(C.FLOOR_Y - 90), False, 0.0     # 真上から落ちてくる
+run(g, 60)
+check("上には、乗れない（横へ押し出されて、地面に降りる）", g.player.on_ground and g.player.py == C.FLOOR_Y
+      and abs(g.player.px - tj.cx) >= (tj.w + C.PLAYER_W) / 2 - 0.5, "x=%.1f y=%.1f" % (g.player.px, g.player.py))
+g = fresh([Tachiojo(380)], px=430)      # うしろ（右）に回った
+tj = g.enemies[0]
+g.player.facing = -1
+run(g, 3)
+g.sfx.clear()
+run(g, 1, {"left"}, {"attack"})
+run(g, 12)
+check("立ち往生は、うしろから斬ると、倒せる（弾かれない）", tj.dying and C.SFX_CLANG not in g.sfx, "体力 %d" % tj.hp)
+run(g, 3)
+check("倒すと、おにぎりを必ず落とす。倒れたあとは、通れる", any(it.kind == "onigiri" and it.drop for it in g.items) and not tj.solid)
+run(g, C.TACHIOJO["fade"] + 2)
+check("立ち往生は、光になって消える", not g.enemies)
+g = fresh([Tachiojo(380)], px=300)
+check("立ち往生は、向きを変えない（来る側を、にらんだまま）", g.enemies[0].facing == -1)
+g.player.px = 430.0
+run(g, 5)
+check("（うしろに回っても、振り向かない）", g.enemies[0].facing == -1 and g.enemies[0].behind)
+g = fresh([Tachiojo(380)], px=350)
+g.player.super_t = 100
+run(g, 30, {"right"})
+check("スーパータヌキでも、立ち往生は倒せない", g.enemies and not g.enemies[0].dying)
+g = fresh([Tachiojo(380), Archer(560)], px=300)
+tj, ar = g.enemies
+hp0 = g.player.hp
+g.player.px = tj.cx - (tj.w + C.PLAYER_W) / 2 - 2      # 立ち往生のすぐうしろ（弓兵の反対側）に隠れる
+g.sfx.clear()
+n_shots = 0
+for _ in range(C.YUMI["cooldown"] * 2 + 120):
+    n0 = len(g.waves)
+    g.step(set())
+    n_shots += len(g.waves) > n0
+check("立ち往生のうしろに隠れると、弓兵の矢は、弾かれて届かない（矢よけ）",
+      n_shots >= 2 and g.player.hp == hp0 and C.SFX_CLANG in g.sfx, "撃った %d 体力 %d" % (n_shots, g.player.hp))
+check("高館の道ばたには、立ち往生を置かない（中ボスの弁慶として、弁慶の間に出る）",
+      not any(k == "tachiojo" for k, x in PROD_STAGES[1].spawns) and [k for _, k in PROD_STAGES[1].gates] == ["benkei"])
+
+# ---------------------------------------------------------------- 石灯籠
+from sprites import Lantern  # noqa: E402
+from stage import Terrain as _Terrain  # noqa: E402
+
+bad = []
+for st in _STAGES:
+    tr = st.terrain()
+    for kind, lx in st.lanterns:
+        h = tr.height_at(lx)
+        flat = h is not None and tr.height_at(lx - 18) == h == tr.height_at(lx + 18)
+        clash = (abs(lx - st.stele_x) < 40 or abs(lx - st.checkpoint[0]) < 50 or not 40 < lx < st.width - 40
+                 or any(pf[0] - 30 < lx < pf[1] + 30 and h - 110 < pf[2] < h for pf in st.platforms))
+        if not flat or clash or kind == "dango":
+            bad.append((st.name, kind, lx))
+check("どの面にも石灯籠があり、平らな地面の上で、石碑・鳥居・足場と重ならない（団子は入れない）",
+      all(st.lanterns for st in _STAGES) and not bad, str(bad))
+_swap = list(STAGES)
+STAGES[:] = PROD_STAGES
+g = Game()
+check("面を始めると、石灯籠が置かれている（火がともっている）", len(g.lanterns) == len(g.stage.lanterns) and all(lt.active for lt in g.lanterns))
+lt = g.lanterns[0]
+g.enemies = []
+g.player.px, g.player.py = lt.cx - 30, lt.floor
+run(g, 3)
+n_items = len(g.items)
+run(g, 1, (), {"attack"})
+run(g, 12)
+check("刀で斬ると、石灯籠が壊れて、中の物が出る", not lt.active and len(g.items) == n_items + 1 and g.items[-1].kind == lt.kind and g.items[-1].drop,
+      "壊れた=%s 物=%d→%d" % (lt.broken, n_items, len(g.items)))
+snap(g, "lantern break")
+run(g, 60)
+run(g, 1, (), {"attack"})
+run(g, 12)
+check("壊れた石灯籠は、もう何も出さない", len(g.items) <= n_items + 1)
+C.DROPS = ()
+g = Game()
+lt = g.lanterns[0]
+g.enemies = []
+g.player.px, g.player.py = lt.cx - 90, lt.floor
+run(g, 3)
+run(g, 1, (), {"throw"})
+run(g, 40)
+check("手裏剣でも、壊せる（手裏剣は、そこで消える）", not lt.active and not g.shurikens)
+g.player.hp = 0
+for _ in range(C.RESPAWN_AT + 5):
+    g.step(set())
+check("やられて再開しても、壊した石灯籠は、壊れたまま", g.player.hp > 0 and not g.lanterns[0].active and g.lanterns[1].active)
+g.reset(0)
+check("最初からやり直すと、石灯籠は、元に戻る", all(x.active for x in g.lanterns))
+STAGES[:] = _swap
 
 # ---------------------------------------------------------------- 18. コントローラ
 import pygame as _pg  # noqa: E402
@@ -1917,6 +2250,191 @@ run(gg4, 2)
 check("最後の間（清衡）は、本家（影ではない）", type(gg4.boss).__name__ == "Boss4" and not getattr(gg4.boss, "shadow", False) and gg4.arena_i == 3)
 
 # ---------------------------------------------------------------- 出力
+# ---------------------------------------------------------------- 清衡の攻撃（数珠の玉・光の柱・数珠の輪・転移）
+from sprites import Boss4, Pillar  # noqa: E402
+b4 = Boss4(400, None, C.FLOOR_Y, 0, 480, quick=True)
+b4.state, b4.cy = "walk", b4.floor - b4.h / 2
+me = pygame.Rect(100, C.FLOOR_Y - 36, 16, 36)
+seen4, kinds4, x_before = [], set(), None
+for _ in range(2600):
+    b4.think(me, 480)
+    if not seen4 or seen4[-1] != b4.state:
+        seen4.append(b4.state)
+    if b4.state == "warp_out" and x_before is None:
+        x_before, hp_w = b4.cx, b4.hp
+        b4.hit(1)
+        warp_safe = b4.hp == hp_w
+    kinds4 |= {type(w).__name__ for w in b4.spawned}
+check("清衡は、数珠の玉・光の柱・数珠の輪・転移を、順に出す", all(k in seen4 for k in ("ready", "cast", "pillar_ready", "ring_ready", "warp_out", "warp_in"))
+      and kinds4 == {"Bead", "Pillar"}, str(sorted(set(seen4))))
+check("転移の間は、攻撃が当たらない。現れた先から、すぐ次の攻撃に移る（隙が無い）",
+      warp_safe and seen4[seen4.index("warp_in") + 1] in ("ready", "ring_ready", "pillar_ready"))
+b4 = Boss4(100, None, C.FLOOR_Y, 0, 480, quick=True)
+b4.state, b4.cy = "walk", b4.floor - b4.h / 2
+me = pygame.Rect(200, C.FLOOR_Y - 36, 16, 36)
+b4._begin("warp", me)
+check("転移は、主人公をはさんで、反対側へ（離れた所に現れる）", b4.dest > me.centerx and abs(b4.dest - me.centerx) >= C.BOSS4["warp_min"], "%.0f" % b4.dest)
+b4.spawned.clear()
+b4._begin("pillar", me)
+ps = list(b4.spawned)
+check("光の柱は3本。1本は主人公の足元、間に立てる幅がある", len(ps) == 3 and any(abs(q.px - me.centerx) < 1 for q in ps)
+      and C.PILLAR["spread"] - C.PILLAR["w"] >= C.PLAYER_W + 20)
+q = ps[1]
+safe = all(not q.rect.colliderect(me) for _ in range(q.warn - 1) if q.update(480) is None)
+q.update(480)
+q.update(480)
+check("光の柱は、予告の間は当たらない。落ちてくると当たる。刀では消せない", safe and q.rect.colliderect(me) and not q.cuttable)
+b4.spawned.clear()
+b4._set("ring_ready")
+for _ in range(C.BOSS4["ring_ready"]):
+    b4.think(me, 480)
+ring = list(b4.spawned)
+crouch = pygame.Rect(me.x, C.FLOOR_Y - C.CROUCH_H, 16, C.CROUCH_H)
+flat = [r_ for r_ in ring if abs(r_.vy) < 0.01]
+check("数珠の輪は、8つの玉が八方へ飛ぶ。横へ飛ぶ玉は、しゃがめば当たらない高さ",
+      len(ring) == 8 and len(flat) == 2 and all(r_.rect.bottom <= crouch.top for r_ in flat), str([r_.rect.bottom for r_ in flat]))
+b4.hp = b4.max_hp // 2
+b4._set("walk")
+for _ in range(C.BOSS4["rage_walk_frames"] + 1):
+    b4.think(me, 480)
+check("体力が半分になると、怒る（画面が揺れて、すぐ転移する）。柱は5本に増える", b4.state == "roar" and b4.landed and C.PILLAR["rage_count"] == 5)
+
+# ---------------------------------------------------------------- 難しさ（やさしい・ふつう・むずかしい）
+def level_game(level):
+    gl = Game()
+    gl.level = level
+    gl.reset(1)
+    return gl
+
+
+ge, gn, gh = level_game("easy"), level_game("normal"), level_game("hard")
+check("やさしい: 敵が減り、残機と団子が増える", len(ge.enemies) < len(gn.enemies) and ge.lives > gn.lives and ge.player.ammo > gn.player.ammo,
+      "敵 %d / %d" % (len(ge.enemies), len(gn.enemies)))
+check("むずかしい: 敵の数は同じ。落ち武者・弓兵が硬くなり、狐火・烏は1発のまま。残機と団子が減る",
+      len(gh.enemies) == len(gn.enemies) and gh.lives < gn.lives and gh.player.ammo < gn.player.ammo
+      and all(a.hp == b.hp + (1 if b.hp >= 2 else 0) for a, b in zip(gh.enemies, gn.enemies)))
+check("ふつう: これまでと同じ（敵は、配置表どおり）", len(gn.enemies) == len(STAGES[1].spawns) and gn.lives == C.LIVES and gn.player.ammo == C.AMMO["start"])
+hps = []
+for gl in (ge, gn, gh):
+    gl.title, gl.intro_t = False, 999
+    gl.player.px = float(gl.stage.arenas[0]["x0"] + C.BOSS_TRIGGER + 10)
+    gl.player.py = float(gl.terrain.height_at(gl.player.px))
+    run(gl, 2)
+    hps.append(gl.boss.max_hp)
+check("ボス・中ボスの体力は、やさしい < ふつう < むずかしい", hps[0] < hps[1] < hps[2] and hps[1] == C.BENKEI["hp"], str(hps))
+gt = Game(title=True)
+gt.title_t = 999
+gt.step({"right"})
+gt.step({"right"})
+check("スタート画面で、右を押すと、難しさが1つ上がる（押しっぱなしでは、進まない）", gt.level == "hard" and gt.lives == C.LEVELS["hard"]["lives"])
+gt.step(set())
+gt.step({"left"})
+gt.step(set())
+gt.step({"left"})
+gt.step(set())
+gt.step({"left"})
+check("左で下がる。端で止まる", gt.level == "easy")
+snap(gt, "title level")
+
+# ---------------------------------------------------------------- 面の仕掛け（山おろし・光の柱の廊下）
+from sprites import HillGust  # noqa: E402
+wx0, wx1, wper = STAGES[2].winds[0]
+gw = Game()
+gw.reset(2)
+gw.title, gw.enemies = False, []
+gw.intro_t = wper - 1
+gw.player.px = float(wx0 + 60)
+gw.player.py = float(gw.terrain.height_at(gw.player.px))
+run(gw, 2)
+gust = [w for w in gw.waves if isinstance(w, HillGust)]
+check("月見坂の坂では、上から、山おろしが吹き下ろす（坂の上の端から、左へ）", len(gust) == 1 and gust[0].dir == -1 and gust[0].px > wx1 - 20)
+ys = set()
+for _ in range(260):
+    gust[0].update(gw.stage.width)
+    h = gw.terrain.height_at(gust[0].px)
+    if h is not None:
+        ys.add(round(gust[0].rect.bottom - h))
+check("山おろしは、段差を、地面ぞいに降りる", ys == {0} and gust[0].alive, str(ys))
+gw.player.px, hp0 = gust[0].px - 6, gw.player.hp
+gw.player.py = float(gw.terrain.height_at(gw.player.px))
+x_before = gw.player.px
+run(gw, 12)
+check("山おろしに当たると、押し戻される（ダメージは無い）。跳べば越えられる高さ",
+      gw.player.px < x_before - 10 and gw.player.hp == hp0 and C.GUST["h"] < 70, "%.0f" % (gw.player.px - x_before))
+gw2 = Game()
+gw2.reset(2)
+gw2.intro_t = wper - 1
+gw2.player.px = float(wx0 - C.WIND["near"] - 200)
+run(gw2, 2)
+check("離れている間は、風は吹かない", not any(isinstance(w, HillGust) for w in gw2.waves))
+trap = STAGES[3].traps[0]
+gp = Game()
+gp.reset(3)
+gp.title, gp.enemies = False, []
+gp.player.px = float(trap[0] + 30)
+gp.player.py = float(gp.terrain.height_at(gp.player.px))
+gp.intro_t = trap[3] - 1
+spots = gp._trap_spots(trap)
+seen_x = set()
+for _ in range(trap[3]):
+    gp.player.hp = 6
+    gp.step(set())
+    seen_x |= {round(w.px) for w in gp.waves if isinstance(w, Pillar)}
+check("金色堂の廊下では、床の印の所に、左から順に、光の柱が落ちる（印の間に、立てる幅がある）",
+      seen_x == set(spots) and len(spots) >= 3 and trap[2] - C.PILLAR["w"] >= C.PLAYER_W + 40, "%s / %s" % (sorted(seen_x), spots))
+
+# ---------------------------------------------------------------- 25. 高館の中ボス（弁慶）
+st3 = STAGES[1]
+ar3 = st3.arenas[0]
+tr3 = st3.terrain()
+check("高館には、弁慶の間がある（中間地点の手前。弁慶の立つあたりは、平ら）",
+      ar3["kind"] == "benkei" and ar3["x1"] <= st3.checkpoint[0]
+      and len({tr3.height_at(x) for x in range(ar3["x0"] + C.BOSS_TRIGGER, ar3["x1"], 20)}) == 1)
+
+
+def benkei_game(dist):
+    gb = Game()
+    gb.reset(1)
+    gb.title = False
+    gb.intro_t = 999
+    gb.enemies = []
+    gb.player.px = float(ar3["x0"] + C.BOSS_TRIGGER + 10)
+    gb.player.py = float(gb.terrain.height_at(gb.player.px))
+    run(gb, 2)
+    gb.cam_x = ar3["x0"]
+    gb.player.px = float(gb.boss.cx - dist)
+    return gb
+
+
+gb = benkei_game(200)
+bk = gb.boss
+check("弁慶の間に入ると、弁慶が、最初から地面に立っている（影ではない・降ってこない）",
+      type(bk).__name__ == "Benkei" and not getattr(bk, "shadow", False) and bk.midway and abs(bk.rect.bottom - gb.terrain.height_at(bk.cx)) <= 1)
+x0 = bk.cx
+run_until(gb, lambda q: q.boss.state == "ready", ())
+check("離れていると、薙ぎ（光波）の構えになる。動かない", not bk.thrust and bk.cx == x0)
+snap(gb, "benkei ready")
+run_until(gb, lambda q: q.waves, ())
+check("構えのあと、光波が、主人公のほうへ飛ぶ", bool(gb.waves) and gb.waves[0].vx < 0 if hasattr(gb.waves[0], "vx") else bool(gb.waves))
+gb = benkei_game(50)
+bk = gb.boss
+gb.player.hp = 6
+run_until(gb, lambda q: q.boss.state == "ready", ())
+check("近づいていると、突きの構えになる", bk.thrust)
+snap(gb, "benkei thrust")
+gb.player.px = float(bk.cx - 150)        # 構えを見て、下がる
+run_until(gb, lambda q: q.boss.state == "recover", ())
+run(gb, 30)
+check("突きは、下がれば届かない", gb.player.hp == 6, "HP %d" % gb.player.hp)
+hp_b = bk.hp
+bk.hit(1)
+check("弁慶は、正面から斬っても、効く（特別な決まりは無い）", bk.hp == hp_b - 1)
+bk.hit(bk.hp)
+snap(gb, "benkei fade")
+done = run_until(gb, lambda q: q.boss is None, ())
+check("弁慶を倒すと、光になって消えて、先へ進める（おにぎりが出て、ここから再開できる）",
+      done and not gb.boss_on and gb.arena_i == 1 and gb.gate_cp is not None and any(it.kind == "onigiri" for it in gb.items))
+
 cols = 3
 rows = (len(shots) + cols - 1) // cols
 sheet = pygame.Surface((cols * C.BASE_W, rows * C.BASE_H))
