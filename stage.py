@@ -96,9 +96,13 @@ ITEMS = (
 class Terrain:
     FOOT = 6   # 足元の判定の、中心から左右への幅（端に少しかかっていれば立てる）
 
-    def __init__(self, ground=GROUND, platforms=PLATFORMS, climb=None):
+    def __init__(self, ground=GROUND, platforms=PLATFORMS, climb=None, blinks=()):
         self.ground = [tuple(g) for g in ground]
         self.platforms = [tuple(p) for p in platforms]
+        # 消える光の足場: (x0, x1, 上面の高さ, ずれ)。点いたり消えたりする（config.BLINK）。ずれは、一巡りの中の、始まりのフレーム
+        self.blinks = [tuple(b) for b in blinks]
+        self.lit = []       # いま、乗れる光の足場（tick が、毎フレーム入れ直す）
+        self.tick(0)
         # 崖登り: (左端, 右端, 高さ)。右端より手前は、高さのぶん、低い所にある（面の絵が、そのぶん縦に長い）。
         # 左端〜右端の間だけ、画面が上下に動く。右端から先は、ふつうの高さ
         self.climb = tuple(climb) if climb else None
@@ -111,6 +115,14 @@ class Terrain:
     def depth_at(self, x):
         """x の所が、ふつうの高さより、どれだけ低い所にあるか（崖の手前は、崖の高さぶん。穴の底・落ちた判定を、そのぶん下げる）"""
         return self.climb[2] if self.climb and x < self.climb[1] else 0
+
+    def blink_state(self, b, t):
+        """光の足場 b の、時刻 t の状態: on（乗れる）/ warn（乗れる。もうすぐ消える）/ off（消えている）"""
+        k = (t + b[3]) % C.BLINK["period"]
+        return "on" if k < C.BLINK["on"] - C.BLINK["warn"] else "warn" if k < C.BLINK["on"] else "off"
+
+    def tick(self, t):
+        self.lit = [b[:3] for b in self.blinks if self.blink_state(b, t) != "off"]
 
     def height_at(self, x):
         """x にある地面の上面の高さ（一番高いもの）。地面がなければ None"""
@@ -130,7 +142,7 @@ class Terrain:
             if a < x1 and x0 < b and prev_bottom <= top + 1 and new_bottom >= top:
                 if best is None or top < best[0]:
                     best = (top, True)
-        for a, b, top in self.platforms:
+        for a, b, top in self.platforms + self.lit:
             if a < x1 and x0 < b and prev_bottom <= top + 1 and new_bottom >= top:
                 if best is None or top < best[0]:
                     best = (top, False)
@@ -201,9 +213,13 @@ class StageDef:
     def __init__(self, name, width, ground, platforms, items, checkpoint, spawns, bgm, bgm_boss,
                  sky="bg_sky.png", mid="bg_mid.png", tiles="", boss_x=None,
                  boss_title=C.BOSS_TITLE, boss_name=C.BOSS_NAME, boss_pattern=C.BOSS_PATTERN,
-                 talk_boss=C.TALK_BOSS, talk_tanuki=C.TALK_TANUKI, number=1, stele_x=150, boss_kind="boss", pit=(8, 6, 18), gates=(), lanterns=(), zones=(), gilt=False, haze=None, winds=(), traps=(), thought=(), pit_deep=None, climb=None):
+                 talk_boss=C.TALK_BOSS, talk_tanuki=C.TALK_TANUKI, number=1, stele_x=150, boss_kind="boss", pit=(8, 6, 18), gates=(), lanterns=(), zones=(), gilt=False, haze=None, winds=(), traps=(), thought=(), pit_deep=None, climb=None, blinks=(), mid_follow=None):
         self.name, self.width = name, width
+        self.blinks = tuple(blinks)     # 消える光の足場: (x0, x1, 高さ, ずれ)。Terrain の blinks を見よ
         self.climb = climb      # 崖登り: (左端, 右端, 高さ)。Terrain の climb を見よ
+        # 崖登りで、中景が、画面の動きに、どれだけついてくるか（None なら config.CLIMB_BG の mid。0 なら、画面に貼り付いたまま）。
+        # 堂の中の柱は、上から下まで通っているので、沈めると、柱の上の端が、切り口になって見える。0 にする
+        self.mid_follow = mid_follow
         self.ground, self.platforms, self.items = ground, platforms, items
         self.checkpoint, self.spawns = checkpoint, spawns
         self.bgm, self.bgm_boss = bgm, bgm_boss
@@ -256,7 +272,12 @@ class StageDef:
         return sum(1 for k, _, _ in self.items if k == "dango")
 
     def terrain(self):
-        return Terrain(self.ground, self.platforms, self.climb)
+        return Terrain(self.ground, self.platforms, self.climb, self.blinks)
+
+    @property
+    def footholds(self):
+        """乗れる足場のすべて（いつもある足場と、消える光の足場）。届くかどうか・跳ぶ難しさを調べるのに使う"""
+        return tuple(self.platforms) + tuple(b[:3] for b in self.blinks)
 
 
 # 古い短い版の月見坂（長さ 4080。動作テストが、この形を前提にしている）。ゲームでは使わない
@@ -385,7 +406,7 @@ PLATFORMS2 = (
     (1785, 1820, T - 42), (1835, 1870, T - 52),                # 池2の飛び石
     (1960, 2000, T - 60),
     (2400, 2440, T - 56), (2450, 2490, T - 108),               # 庭の塔を登る足場
-    (2620, 2660, T - 90), (2800, 2860, T - 72),
+    (2605, 2645, T - 90), (2800, 2860, T - 72),               # 左の足場は、築山の壁（2600）に付ける
     (3115, 3150, T - 40), (3170, 3205, T - 52), (3225, 3260, T - 40),   # 池3の飛び石（長い）
     (3330, 3370, T - 60), (3400, 3440, T - 84),
     (3980, 4040, T - 70), (4100, 4140, T - 96),
@@ -589,7 +610,7 @@ STAGE3 = StageDef("高館", W3, GROUND3, PLATFORMS3, thin_dango(ITEMS3, PLATFORM
 _A = [(300, 0), (120, 16), (120, 32), (120, 16), (120, 0), ("穴", 90), (130, 16), (120, 32), (120, 48), (100, 32), (160, 0)]      # 0〜1500
 _B = [(140, 16), (120, 32), (120, 48), (120, 32), (100, 16), ("穴", 100), (120, 0), (120, 16), (120, 32), (120, 16), (140, 0)]     # 1980〜3300
 _C = [(130, 16), (130, 32), (130, 48), (130, 64), (110, 80), ("穴", 90), (130, 64), (130, 48), (130, 32), (110, 16), (100, 0)]    # 3780〜5100
-_D = [(200, 0), (120, 16), (120, 32), (120, 16), (120, 0), ("穴", 100), (140, 0), (100, 16), (100, 32), (100, 48), (100, 32),
+_D = [(200, 0), (120, 16), (120, 32), (120, 16), (120, 0), ("穴", 100), (140, 0), ("穴", 400),      # 6500〜6900: 光の橋（消える足場で渡る）
       (100, 16), (120, 0), ("穴", 110)]  # 5580〜7230
 W4 = 9000
 # 最後の登り（7230〜7860）: 清衡のいる壇へ、上へ登る。画面が、上下にも動く（高館の崖登りと同じ仕組み）。
@@ -626,7 +647,7 @@ PLATFORMS4 = (
     (3900, 3950, T - 60), (4060, 4110, T - 96), (4200, 4250, T - 124),   # 柱の間（柱を登る）
     (4700, 4750, T - 92), (4900, 4950, T - 76),
     (5650, 5710, T - 60), (5950, 6010, T - 76),                # 奥の廊下
-    (6560, 6620, T - 80), (6700, 6760, T - 100), (6840, 6900, T - 80),
+    (6640, 6690, T - 44),                                      # 光の橋の真ん中の、消えない足場（ひと息つく所）
     (8200, 8260, T - 70),
     # 影の基衡の間（3300〜3780）の足場: 基衡は、地面からは跳び越えられない。追い詰められたら、足場から跳び越える
     (3390, 3450, T - 52), (3620, 3680, T - 52),
@@ -651,7 +672,7 @@ ITEMS4 = (
     ("onigiri", 5040, T - 14),                       # 影の間の手前
     ("dango", 5680, T - 78), ("dango", 5980, T - 94),
     ("dango", 6310, T - 58),
-    ("dango", 6590, T - 98), ("dango", 6730, T - 118), ("dango", 6870, T - 98),
+    ("dango", 6665, T - 62),
     ("onigiri", 7030, T - 30),
     ("dango", 7175, T - 58),
     ("onigiri", 8230, T - 88), ("onigiri", 8440, T - 14),   # 1つは、足場（8200〜8260）の上   # 最後のボスの手前（回復が多い面）
@@ -670,7 +691,7 @@ SPAWNS4 = (   # 堂の中は、敵が少なめ（主役は、ボス）。区画�
     ("kitsunebi_low", 4600), ("kitsunebi_high", 4640), ("miira", 4680), ("miira", 4730), ("ochimusha", 4830),      # 下り: ミイラの列
     # 影・秀衡（5100〜5580）
     ("kitsunebi_low", 5820), ("kitsunebi_high", 5900), ("ochimusha", 6200),                     # 奥の廊下
-    ("karasu", 6450), ("karasu", 6540), ("kitsunebi_high", 6650), ("kitsunebi_low", 6700),      # 灯の山: 飛ぶ敵だけが、まとまって来る
+    # 光の橋（6360〜6900）には、敵を置かない（消える足場で、間合いを計って渡るのが主役）
     # 鳥居（6950）のまわりには、置かない
     # 最後の登り: 一段目に、ミイラ2体（狭い段の上を、歩いてくる）。二段目に、落ち武者。壁には、光の柱。登りきった壇の上に、落ち武者
     ("miira", 7460), ("miira", 7510), ("ochimusha", 7630), ("ochimusha", 7970),
@@ -689,7 +710,7 @@ ZONES4 = (
     (4500, 5000, "下り", "試す", 3),
     (5000, 5580, "影・秀衡", "見せ場", 5),
     (5580, 6360, "奥の廊下", "試す", 3),
-    (6360, 6900, "灯の山", "組み合わせ", 3),
+    (6360, 6900, "光の橋", "渡る", 3),
     (6900, 7230, "鳥居", "休む", 2),
     (7230, 8080, "最後の登り", "組み合わせ", 4),
     (8080, 8520, "清衡の前", "休む", 1),
@@ -699,7 +720,10 @@ STAGE4 = StageDef("金色堂", W4, GROUND4, PLATFORMS4, thin_dango(ITEMS4, PLATF
                   sky="stage4/bg_sky.png", mid="stage4/bg_mid.png", tiles="stage4/",
                   boss_title="enemies/boss4_title.png", boss_name="enemies/boss4_name.png",
                   talk_boss="talk_boss4.png", talk_tanuki="talk_tanuki4.png", number=4, stele_x=130,
-                  boss_kind="boss4", pit=(30, 20, 8), gates=GATES4, zones=ZONES4, gilt=True, climb=CLIMB4,
+                  boss_kind="boss4", pit=(30, 20, 8), gates=GATES4, zones=ZONES4, gilt=True, climb=CLIMB4, mid_follow=0,
+                  # 光の橋: 幅400の切れ目を、消える光の足場3つと、真ん中の消えない足場1つで渡る。
+                  # 光は、左から右へ、60 フレームずつ遅れて点く（波のように進む）。となりどうしが、70 フレーム、一緒に点いている
+                  blinks=((6540, 6590, _B4 - 30, 0), (6740, 6790, _B4 - 36, 140), (6830, 6880, _B4 - 28, 80)),
                   # 回廊の奥（広い間隔で、覚える）・奥の廊下（狭い間隔）・最後の登りの壁（足場の上に落ちる。落ちた直後に、登る）
                   traps=((2720, 3140, 120, 300), (5640, 6230, 84, 260), (7740, 7830, 90, 280)))
                     # 切れ目の底は、金色の暗がり

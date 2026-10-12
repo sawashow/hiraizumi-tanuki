@@ -1735,7 +1735,7 @@ check("[本番] 地上の敵は、穴の上や、段差の境目に置かない�
 check("ジャンプの頂点は、70〜74（足場の高さを決める、もとの数字）", 70 <= max(h for pts in _ARCS for _, h, _ in pts) <= 74,
       "%.1f" % max(h for pts in _ARCS for _, h, _ in pts))
 for st in PROD_STAGES:
-    surf = list(st.ground) + list(st.platforms)
+    surf = list(st.ground) + list(st.footholds)
     ng = len(st.ground)
     reach, frontier = {0}, [0]
     while frontier:
@@ -2669,6 +2669,69 @@ snap(gm, "miira")
 mi.hit(1)
 check("ミイラは、1発で倒せる", mi.dying)
 check("本番の毛越寺で、最初に出会う敵は、ミイラ", min(PROD_STAGES[0].spawns, key=lambda sp: sp[1])[0] == "miira")
+
+# 消える光の足場（金色堂の、光の橋）
+gk = Game()
+gk.reset(3)
+K = C.BLINK
+bl = gk.terrain.blinks
+check("金色堂に、消える光の足場が3つある（ほかの面には、無い）", len(bl) == 3 and all(not st.blinks for st in STAGES[:3]))
+b0 = bl[0]
+gk._start((b0[0] + b0[1]) / 2, float(b0[2]))
+gk.enemies = []
+t_on = (-b0[3]) % K["period"]
+gk.intro_t = t_on + 5
+run(gk, 10)
+check("光の足場は、点いている間、乗れる", gk.player.on_ground and gk.player.py == b0[2])
+snap(gk, "blink on")
+run(gk, K["on"] - K["warn"])
+check("消える前は、点滅する（まだ乗れる）", gk.terrain.blink_state(b0, gk.intro_t) == "warn" and gk.player.on_ground)
+snap(gk, "blink warn")
+run(gk, K["period"] - (gk.intro_t + b0[3]) % K["period"] - (K["period"] - K["on"]) + 8)     # 消えてから、8フレーム
+check("消えると、乗っていても、落ちる", gk.terrain.blink_state(b0, gk.intro_t) == "off" and not gk.player.on_ground and gk.player.py > b0[2])
+snap(gk, "blink off")
+
+
+def _lit_frames(b):
+    return {t for t in range(K["period"]) if gk.terrain.blink_state(b, t) != "off"}
+
+
+both = [len(_lit_frames(a) & _lit_frames(b)) for a, b in zip(bl, bl[1:])]
+check("となりどうしの光の足場は、60フレーム以上、一緒に点いている（乗り移る間がある）", min(both) >= 60, str(both))
+# 実際に、光の橋を渡る（点いたばかりの足場へ、順に跳ぶ）
+gc = gk
+B = C.FLOOR_Y + gk.terrain.climb[2]
+BRIDGE = [(6360, 6500, B), bl[0][:3], (6640, 6690, B - 44), bl[1][:3], bl[2][:3], (6900, 7000, B - 16)]
+check("光の橋の足場が、面のデータにある", all(s3 in gk.terrain.ground or s3 in gk.terrain.platforms or s3 in [b[:3] for b in bl] for s3 in BRIDGE))
+climb_at(6440, B)
+hp0, lost = gk.player.hp, []
+for cur, nxt in zip(BRIDGE, BRIDGE[1:]):
+    blink = [b for b in bl if b[:3] == nxt]
+    for _ in range(K["period"] + 5):        # 行き先が、点いたばかりになるまで、待つ
+        if not blink or (gk.intro_t + blink[0][3]) % K["period"] < 12:
+            break
+        climb_step(())
+    if not hop(cur, nxt):
+        lost.append((nxt, round(gk.player.px), round(gk.player.py)))
+        break
+check("光の橋: 点いた足場へ、順に跳んで、向こう岸まで渡れる（操作を入れて、確かめる。落ちない）", not lost and gk.player.hp == hp0, str(lost))
+check("光の足場は、左から右へ、順に点く", [(-b[3]) % K["period"] for b in bl] == sorted((-b[3]) % K["period"] for b in bl))
+
+# 手裏剣の射程: 画面の端まで飛ぶ（画面の外に出たら、消える）
+gs = fresh(px=1000)
+run(gs, 2)
+run(gs, 1, (), {"throw"})
+run_until(gs, lambda q: q.shurikens, (), 40)
+sh = gs.shurikens[0]
+x_sh, far = sh.px, 0.0
+for _ in range(200):
+    gs.step(set())
+    if not sh.alive:
+        break
+    far = sh.px - x_sh
+edge = gs.cam_x + C.BASE_W - x_sh
+check("手裏剣は、画面の端まで飛ぶ（前は、画面の3分の1で消えた）", not sh.alive and edge - 8 <= far <= edge + C.SHURIKEN_W + 1,
+      "飛んだ距離 %.0f（画面の端まで %.0f）" % (far, edge))
 
 # ボスと戦っている間、ザコ敵は、動かない（影のボスの間に、外の狐火が入ってこない）
 gz = Game()
