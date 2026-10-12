@@ -93,6 +93,37 @@ def hole_jumps(stage):
     return out
 
 
+JUMP_MAX = max(h for _, h, _ in ARC)     # 跳べる高さ（これより高い段は、壁。足場を踏んで登る）
+
+
+def climb_cost(s1, s2):
+    """s1 から、上の s2 へ、跳んで登る難しさ（1〜5）と、余裕（px）。左右どちらへ跳んでもよい。届かなければ None"""
+    gap, r = max(0, s2[0] - s1[1], s1[0] - s2[1]), reach(s1[2] - s2[2])
+    if not r or gap > r:
+        return None
+    return 1 + sum(gap / r > t for t in M["jump"]) + (s2[1] - s2[0] < M["narrow"]), r - gap
+
+
+def climb_jumps(stage):
+    """壁（跳べない高さの段）ごとの、登る難しさ: (登り始めの x, 壁の x, 難しさの合計, 跳ぶ回数, いちばん少ない余裕)。
+    下の地面 → 壁の手前の足場（低い順）→ 上の地面を、いちばん楽な順でたどる"""
+    out = []
+    for g1, g2 in zip(stage.ground, stage.ground[1:]):
+        if g2[0] != g1[1] or g1[2] - g2[2] <= JUMP_MAX:
+            continue
+        mid = sorted((p for p in stage.platforms if g1[0] <= (p[0] + p[1]) / 2 < g2[0] and g2[2] < p[2] < g1[2]), key=lambda p: -p[2])
+        nodes = [g1] + mid + [g2]
+        best = {0: (0, 0, 999.0, g1[1])}
+        for j in range(1, len(nodes)):
+            for i in range(j):
+                cc = climb_cost(nodes[i], nodes[j]) if i in best else None
+                if cc and (j not in best or best[i][0] + cc[0] < best[j][0]):
+                    best[j] = (best[i][0] + cc[0], best[i][1] + 1, min(best[i][2], cc[1]), min(best[i][3], nodes[j][0]))
+        cost, hops, margin, left = best.get(len(nodes) - 1, (9, 1, 0.0, g1[1]))    # 登れない壁（テストが見つける）は、いちばん難しい扱い
+        out.append((min(left, g1[1] - 1), g1[1], cost, hops, margin))
+    return out
+
+
 def play_end(stage):
     """道中の右端（最後のボスの間の手前）"""
     return stage.arena_x0
@@ -117,14 +148,15 @@ def measure(stage, x0, x1):
     """1つの区画の数字"""
     kinds = Counter(base(k) for k, x in stage.spawns if x0 <= x < x1)
     hs = [h for h in hole_jumps(stage) if x0 <= h[0] < x1]
-    jump = sum(h[2] for h in hs) + sum(1 for k, x in stage.spawns if any(h[0] - M["edge"] <= x <= h[1] + M["edge"] for h in hs))
+    cs = [c for c in climb_jumps(stage) if x0 <= c[1] < x1]     # 壁を、足場づたいに登る所（穴と同じく、跳ぶ難しさに数える）
+    jump = sum(h[2] for h in hs + cs) + sum(1 for k, x in stage.spawns if any(h[0] - M["edge"] <= x <= h[1] + M["edge"] for h in hs + cs))
     foes = sum(difficulty_of(k) * n for k, n in kinds.items())
     steps = sum(1 for (_, a1, t1), (b0, _, t2) in zip(stage.ground, stage.ground[1:]) if a1 == b0 and t1 != t2 and x0 <= b0 < x1)
     gates = [k for x, k in stage.gates if x0 <= x + C.BASE_W // 2 < x1]
     gim = sum(max(0, min(x1, w[1]) - max(x0, w[0])) for w in list(stage.winds) + list(stage.traps)) * M["gimmick"] / 500
     raw = foes + jump + gim + sum(C.BOSS_DIFFICULTY.get(k, 6) * 4 for k in gates)
     raw = raw * 500 / max(1, x1 - x0)
-    return dict(kinds=kinds, holes=len(hs), steps=steps, jump=jump, foes=foes, gates=gates, raw=raw, level=level_of(raw),
+    return dict(kinds=kinds, holes=len(hs), climbs=sum(c[3] for c in cs), steps=steps, jump=jump, foes=foes, gates=gates, raw=raw, level=level_of(raw),
                 plats=sum(1 for p in stage.platforms if x0 <= p[0] < x1),
                 dango=sum(1 for k, x, _ in stage.items if k == "dango" and x0 <= x < x1),
                 heal=sum(1 for k, x, _ in stage.items if k == "onigiri" and x0 <= x < x1)
@@ -237,7 +269,7 @@ def warnings(stage, secs):
     return out
 
 
-NAMES = {"winds": "山おろし（風）", "traps": "光の柱の廊下", "pond": "池の飛び石", "benkei": "中ボス・弁慶",
+NAMES = {"winds": "山おろし（風）", "traps": "光の柱の廊下", "pond": "池の飛び石", "benkei": "中ボス・弁慶", "climb": "崖登り（画面が上へ動く）",
          "boss": "影・泰衡", "boss2": "影・基衡", "boss3": "影・秀衡"}
 
 
@@ -245,7 +277,7 @@ def elements(stage):
     """その面に出てくる「もの」の一覧（敵の種類・仕掛け・途中のボス）。面ごとの、新しさを見るのに使う"""
     out = [base(k) for k, _ in sorted(stage.spawns, key=lambda s: s[1])]
     out += [NAMES[k] for _, k in stage.gates]
-    out += [NAMES[n] for n in ("winds", "traps") if getattr(stage, n)]
+    out += [NAMES[n] for n in ("winds", "traps", "climb") if getattr(stage, n)]
     if max(holes(stage), default=0) >= 130:
         out.append(NAMES["pond"])
     return list(dict.fromkeys(out))

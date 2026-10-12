@@ -87,7 +87,16 @@ def _gilt(img):
     return out
 
 
+WORLD_H = C.BASE_H   # いまの面の絵の高さ（崖登りのある面は、画面より高い。Game が、面を替えるたびに入れる）
 SOUNDS = []     # このフレームに鳴らす効果音（キャラクターの側から足す。メインループが鳴らして、空にする）
+
+
+def _tinted(img, color):
+    """絵を、灰色にしてから、1色に塗り替える（絵がまだ無い敵の、代わりの絵）"""
+    out = pygame.transform.grayscale(img)
+    out.fill((60, 60, 60, 0), special_flags=pygame.BLEND_RGB_ADD)
+    out.fill(tuple(color) + (255,), special_flags=pygame.BLEND_RGBA_MULT)
+    return out
 
 
 def snd(key):
@@ -110,8 +119,13 @@ class Assets:
         self.enemy = {}
         for kind, anims in C.ENEMY_FRAMES.items():
             self.enemy[kind] = {}
+            src, tint = kind, None
+            if kind in C.ENEMY_STANDIN and not os.path.exists(os.path.join(IMG, "enemies", "%s_%s_0.png" % (kind, next(iter(anims))))):
+                src, tint = C.ENEMY_STANDIN[kind]      # 絵がまだ無い: ほかの敵の絵を、塗り替えて借りる
             for anim, n in anims.items():
-                right = [_load(f"enemies/{kind}_{anim}_{i}.png") for i in range(n)]
+                right = [_load(f"enemies/{src}_{anim}_{i}.png") for i in range(n)]
+                if tint:
+                    right = [_tinted(f, tint) for f in right]
                 self.enemy[kind][anim] = {True: right,
                                           False: [pygame.transform.flip(f, True, False) for f in right]}
         # 基衡の絵（右向きで描いてある。左向きは、反転して持つ）。絵が無ければ、持たない
@@ -497,7 +511,7 @@ class Player:
             self.fall_t += 1
         if self.land_t:
             self.land_t -= 1
-        if self.py > C.FALL_Y and self.hp > 0:
+        if self.py > C.FALL_Y + (terrain.depth_at(self.px) if terrain else 0) and self.hp > 0:
             self._fall_into_pit()
 
         if self.attack_t:
@@ -834,6 +848,23 @@ class Ochimusha(Enemy):
         return f[(self.t // 10) % len(f)]
 
 
+class Miira(Ochimusha):
+    """ミイラ（亡者）: 地面を、ゆっくり歩いて近づくだけ。攻撃はしない（触れると、ダメージ）。穴や段差の手前で、折り返す。体力1"""
+    P = C.MIIRA
+    KIND = "miira"
+
+    def __init__(self, x, assets=None, floor=None):
+        super().__init__(x, assets, floor)
+        self.cy = self.floor - self.P["h"] / 2
+
+    def image(self):
+        if self.dying:
+            f = self._frames("death")
+            return f[min(self.dead_t // self.DEATH_TICKS, len(f) - 1)]
+        f = self._frames("walk")
+        return f[(self.t // 14) % len(f)]
+
+
 class Archer(Enemy):
     """弓兵: その場から動かない。主人公が近づくと、弓を引いて（予告）、主人公をねらって、矢をまっすぐ撃つ。
     矢は、刀で斬ると消せる。撃ったあとは、しばらく撃たない（近づいて斬る隙）。体力2"""
@@ -978,7 +1009,7 @@ class Arrow:
         self.px += self.vx
         self.py += self.vy
         self.travel += C.ARROW["speed"]
-        if self.travel > C.ARROW["range"] or not (0 <= self.px <= stage_w) or self.py > C.BASE_H + 20:
+        if self.travel > C.ARROW["range"] or not (0 <= self.px <= stage_w) or self.py > WORLD_H + 20:
             self.alive = False
 
     def cut_effect(self):
@@ -1096,7 +1127,7 @@ class Karasu(Enemy):
             self.cx += self.vx
             self.cy += self.vy
             self.facing = 1 if self.vx > 0 else -1     # 地面は、すり抜けて、そのまま飛び去る（地面を滑らない）
-            if self.cx < -60 or self.cx > stage_w + 60 or self.cy > C.BASE_H + 40:
+            if self.cx < -60 or self.cx > stage_w + 60 or self.cy > WORLD_H + 40:
                 self.alive = False
 
     def image(self):
@@ -1122,7 +1153,7 @@ class Boss(Enemy):
 
     def __init__(self, x, assets=None, floor=None, x_min=0.0, x_max=None, quick=False, end_x=None, pattern=None):
         self.floor = float(floor if floor is not None else C.FLOOR_Y)
-        super().__init__(x, y=-C.BOSS["h"], assets=assets)   # 画面の上から降ってくる
+        super().__init__(x, y=self.floor - C.FLOOR_Y - C.BOSS["h"], assets=assets)   # 画面の上から降ってくる（床が低い所では、そのぶん低い所から）
         self.end_x = float(end_x if end_x is not None else C.END_BOSS_X)   # 倒されて、吹っ飛んで落ちる場所
         self.pattern = pattern or C.BOSS_PATTERN                            # 光波の順番（L=低い / H=高い）
         half = self.w / 2
@@ -1475,7 +1506,7 @@ class Boss4(Boss):
                 x = pr.centerx + (k - n // 2) * L["spread"]
                 if lo <= x <= hi:
                     self.spawned.append(Pillar(x, self._ground(), self.a, delay=abs(k - n // 2) * L["stagger"],
-                                               warn=L["rage_warn" if self.rage else "warn"]))
+                                               warn=L["rage_warn" if self.rage else "warn"], quiet=k != n // 2))
             self._set("pillar_ready")
         else:                                # warp: 主人公をはさんで、反対側へ
             side = -1 if self.cx < pr.centerx else 1
@@ -1786,8 +1817,9 @@ class Pillar:
     cuttable = False
     damage = C.PILLAR["damage"]
 
-    def __init__(self, x, floor, assets, delay=0, warn=None):
+    def __init__(self, x, floor, assets, delay=0, warn=None, quiet=False):
         self.a = assets
+        self.quiet = quiet    # 予告の音を鳴らさない（何本も続けて落ちるとき、音が重なって、うるさいため。鳴らすのは、最初の1本だけ）
         self.px, self.floor = float(x), float(floor)
         self.warn = warn or C.PILLAR["warn"]
         self.t = -delay       # 0になるまで、まだ出ない
@@ -1806,7 +1838,7 @@ class Pillar:
 
     def update(self, stage_w):
         self.t += 1
-        if self.t == 1:
+        if self.t == 1 and not self.quiet:
             snd("pillar_warn")
         elif self.t == self.warn:
             snd("beam")
@@ -1993,7 +2025,7 @@ class Petal:
     def __init__(self, x, floor, assets, delay=0):
         self.a = assets
         self.px, self.floor = float(x), float(floor)
-        self.py = float(C.PETAL["top"])
+        self.py = self.floor - C.FLOOR_Y + C.PETAL["top"]     # 画面の上から（床が低い所では、そのぶん低い所から）
         self.t = -delay       # 0になるまで、まだ出ない
         self.alive = True
 
@@ -2045,6 +2077,8 @@ def make_enemy(kind, x, assets=None, terrain=None):
     """配置表の名前から敵を作る（地上の敵は、そこにある地面の上に立つ）"""
     if kind == "ochimusha":
         return Ochimusha(x, assets, terrain.height_at(x) if terrain else None)
+    if kind == "miira":
+        return Miira(x, assets, terrain.height_at(x) if terrain else None)
     if kind in ("kitsunebi_low", "kitsunebi_high", "karasu"):     # 飛ぶ敵の高さは、そこの地面から測る（高い所で、地面に埋まらないように）
         e = Karasu(x, assets) if kind == "karasu" else Kitsunebi(x, kind.split("_")[1], assets)
         h = terrain.height_at(x) if terrain else None
@@ -2190,7 +2224,7 @@ class Item:
             self.resting = True
         else:
             self.cy += self.vy
-            if self.cy > C.FALL_Y:     # 穴に落ちた
+            if self.cy > C.FALL_Y + (terrain.depth_at(self.cx) if terrain else 0):     # 穴に落ちた
                 self.alive = False
 
     def draw(self, surface, cam_x):
