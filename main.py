@@ -14,6 +14,7 @@ import config as C
 from stage import STAGE1_LEGACY, STAGES
 from audio import DIR as AUDIO_DIR, Audio
 from gamepad import Pad
+import sprites
 from sprites import Assets, Benkei, HillGust, Pillar, Boss, Boss2, Boss3, Boss4, Checkpoint, draw_zzz, HitEffect, Item, Lantern, Player, Shuriken, SlashWave, Wave, make_enemy
 
 ENEMY_SPAWNS = STAGE1_LEGACY.spawns       # 古い短い版の月見坂の敵の配置（動作テスト用）
@@ -40,6 +41,10 @@ class Game:
         self.terrain = terrain or self.stage.terrain()
         self.use_title = title   # スタート画面から始める（クリアのあとも、スタート画面へ戻る）
         self.use_map = title     # ステージ選択の地図を出す（始まりと、面をクリアしたあと）
+        self.paused = False          # ポーズ中（P キー・START）
+        self.pause_t = 0
+        self.thanks = False          # いま、姫を助ける場面（THANK YOU TANUKI!）を出している
+        self.thanks_t = 0
         self.ending_screen = False   # いま、エンディング画面を出している
         self.ending_t = 0
         self.map_on = False      # いま、地図を出している
@@ -50,6 +55,7 @@ class Game:
         self.map_len = 0.0
         self.sfx = []            # このフレームに鳴らす効果音（メインループが鳴らして、空にする）
         self.rng = random.Random()   # 落とし物の、くじ
+        self._songs = {}             # 曲のファイルが、あるか（名前 → あるか）
         self.level = C.LEVEL         # 難しさ（スタート画面で、左右で変える）
         self._lr = 0                 # スタート画面で、前のフレームに押していた左右（押した瞬間だけ、切り替える）
         self.story_bgm = os.path.exists(os.path.join(AUDIO_DIR, C.BGM_STORY))   # 語りの曲があるか
@@ -222,7 +228,24 @@ class Game:
         self.msg_t = 0    # 「1UP!」を出している残りフレーム
 
     # --- 1フレーム進める。held は押している間のキー、pressed はこのフレームに押したキー ---
+    @property
+    def can_pause(self):
+        """ポーズできるのは、面を遊んでいる間だけ（スタート画面・語り・地図・寸劇・結果・やられた画面では、できない）"""
+        return not (self.title or self.story or self.map_on or self.thanks or self.ending_screen or self.cleared
+                    or self.ending or self.player.hp <= 0)
+
     def step(self, held, pressed=()):
+        # ポーズ: P キー・コントローラの START で、止める・再開する。窓が後ろに回ったとき（pause_on）も、止める
+        if self.paused and not self.can_pause:
+            self.paused = False
+        if ("pause" in pressed and (self.paused or self.can_pause)) or ("pause_on" in pressed and self.can_pause and not self.paused):
+            self.paused = not self.paused
+            self.pause_t = 0
+            self.sfx.append(C.SFX["select"])
+            return
+        if self.paused:
+            self.pause_t += 1
+            return
         p = self.player
         if self.map_on:     # ステージ選択の地図: 駒が歩いて、着いたら、少し待つ。Enter で飛ばせる
             self._step_map(set(pressed))
@@ -259,7 +282,7 @@ class Game:
                 order = C.LEVEL_ORDER
                 self.level = order[max(0, min(order.index(self.level) + lr, len(order) - 1))]
                 self.lives = self.L["lives"]
-                self.sfx.append(C.SFX_TALK_HIGH)
+                self.sfx.append(C.SFX["select"])
             self._lr = lr
             if {"restart", "attack", "jump"} & set(pressed):
                 self.start_t = C.TITLE_START
@@ -280,13 +303,32 @@ class Game:
                 self.reset()
                 self._enter_title(self.use_title)
             return
+        if self.thanks:     # 姫を助ける場面: 歩いてきて、礼の文が出る。Enter で、文を全部出す → エンディングの絵へ
+            self.thanks_t += 1
+            n = self._thanks_shown()
+            if 0 < n <= sum(len(s) for s in C.THANKS["lines"]) and self._thanks_typed != n and n % 2:
+                self.sfx.append(C.SFX_TALK_HIGH)
+            self._thanks_typed = n
+            if self.thanks_t == self._thanks_at("hop"):
+                self.sfx.append(C.SFX["heal"])
+            if {"restart", "attack", "jump"} & set(pressed):
+                if self.thanks_t < self._thanks_at("done"):
+                    self.thanks_t = self._thanks_at("done")     # 途中で押すと、文を全部出す
+                elif self.thanks_t >= self._thanks_at("done") + C.THANKS["wait"]:
+                    self.thanks = False
+                    if self.a.ending_image:
+                        self.ending_screen, self.ending_t = True, 0
+                    else:
+                        self.reset()
+                        self._enter_title(self.use_title)
+            return
         if self.cleared:    # クリア: 止めて、結果を出す。Enter で最初から（スタート画面があれば、そこへ戻る）
             self.clear_t += 1
             if "restart" in pressed and self.clear_t >= C.CLEAR_WAIT:
                 if self.stage_i + 1 < len(STAGES):
                     self.advance()
-                elif self.use_title and self.a.ending_image:    # 最後の面: エンディング画面へ
-                    self.ending_screen, self.ending_t = True, 0
+                elif self.use_title:    # 最後の面: 姫を助ける場面へ（そのあと、エンディングの絵）
+                    self.thanks, self.thanks_t, self._thanks_typed = True, 0, 0
                 else:
                     self.reset()
                     self._enter_title(self.use_title)
@@ -295,6 +337,8 @@ class Game:
             if not self.dead:
                 self.dead = True
                 self.lives -= 1
+                if self.lives <= 0:
+                    self.sfx.append(C.SFX["gameover"])
             self.over_t += 1
             p.defeat_t = self.over_t
             if self.lives > 0:
@@ -399,15 +443,19 @@ class Game:
                     self.score += C.SCORE_DANGO      # 団子: 手裏剣を投げられる数が増える（持てる数まで）
                     self.dango += 1
                     p.ammo = min(C.AMMO["max"], p.ammo + C.AMMO["dango"])
+                    self.sfx.append(C.SFX["dango"])
                 elif it.kind == "onigiri":
+                    self.sfx.append(C.SFX["heal"])
                     if p.hp < C.PLAYER_HP:
                         p.hp = min(C.PLAYER_HP, p.hp + C.HEAL_ONIGIRI)
                     else:
                         self.score += C.SCORE_FULL_HP
                 elif it.kind == "leaf":
                     p.power = True
+                    self.sfx.append(C.SFX["power"])
                 elif it.kind == "triple":
                     p.triple = True
+                    self.sfx.append(C.SFX["power"])
                 else:
                     p.super_t = C.SUPER_FRAMES
         # 中間地点（鳥居）を通る
@@ -437,6 +485,7 @@ class Game:
             for w in self.waves:
                 if w.alive and getattr(w, "cuttable", True) and sword.colliderect(w.rect):
                     w.alive = False
+                    self.sfx.append(C.SFX["cut"])
                     self.effects.append(HitEffect(*w.rect.center, self.a))
                     if hasattr(w, "cut_effect"):    # 矢は、折れて落ちる
                         self.effects.append(w.cut_effect())
@@ -467,7 +516,9 @@ class Game:
         if self.boss and self.boss.landed:   # ボスが着地した: 画面を揺らす（降ってきたときは、大きく）
             self.boss.landed = False
             self.shake_t = C.BOSS_INTRO["shake"] if self.boss_intro else C.LEAP_SHAKE
+            self.sfx.append(C.SFX["thud"])
             if self.boss_intro:     # 降ってきたボスに、タヌキ侍が驚く
+                self.sfx.append(C.SFX["startle"])
                 p.startle_t = C.STARTLE
                 p.facing = 1 if self.boss.cx > p.px else -1
         elif self.shake_t:
@@ -513,12 +564,16 @@ class Game:
         return "run", t
 
     def _talk_cells(self, name):
+        if name != "boss" and self.stage.thought:      # 返事の代わりに、食べ物を思い浮かべる: 物の数 + 吹き出しがふくらむ分
+            return len(self.stage.thought) * C.THOUGHT["per"] + C.THOUGHT["grow"]
         img = self.a.talk_boss if name == "boss" else self.a.talk_tanuki
         return img.get_width() // C.TALK_CELL
 
     def _talk_shown(self, name, t):
         """せりふが出始めてから t フレームで、何文字出ているか（途中に、間が入ることがある）"""
         at, wait = C.TALK_PAUSE.get(name, (0, 0))
+        if name != "boss" and self.stage.thought:
+            wait = 0
         k = t // C.ENDING["type"] + 1
         if wait and k > at:
             k = max(at, (t - wait) // C.ENDING["type"] + 1)
@@ -548,12 +603,18 @@ class Game:
         name, t = self._end_phase()
         talk = {"boss": C.SFX_TALK_LOW, "reply": C.SFX_TALK_HIGH}
         if name in talk and t >= E["skip"] and pressed & {"attack", "jump", "restart"}:
-            typed = self._talk_cells(name) * E["type"] + C.TALK_PAUSE.get(name, (0, 0))[1]
+            thinking = name == "reply" and bool(self.stage.thought)
+            typed = self._talk_cells(name) * E["type"] + (0 if thinking else C.TALK_PAUSE.get(name, (0, 0))[1])
             # キーを押すと、字が出ている途中なら全部出す。出きっていれば、次へ送る
             self.ending += (typed - t - 1) if t < typed - 1 else (E[name] - t - 1)
         self.ending += 1
         name, t = self._end_phase()
-        if name in talk and (t == 0 or self._talk_shown(name, t) > self._talk_shown(name, t - 1)):
+        more = name in talk and (t == 0 or self._talk_shown(name, t) > self._talk_shown(name, t - 1))
+        if name == "reply" and self.stage.thought:     # 考えごと: 食べ物が浮かぶたびに、ポンと鳴らす（字の音は、鳴らさない）
+            k = self._talk_shown(name, t) - C.THOUGHT["grow"] - 1
+            if more and k >= 0 and k % C.THOUGHT["per"] == 0:
+                self.sfx.append(C.SFX["dango"])
+        elif more:
             self.sfx.append(talk[name])    # 字が1文字出るたびに、ピッと鳴らす
         if name == "fade" and t == 0:
             self.sfx.append(C.SFX_CHECKPOINT)
@@ -563,6 +624,7 @@ class Game:
             p.update({"right"}, self.stage.width + 120, self.terrain)
             if p.px - self.cam_x >= C.BASE_W + E["exit"]:
                 self.cleared = True
+                self.sfx.append(C.SFX["clear"])
         else:
             p.update(set(), self.stage.width, self.terrain)
             p.rest_t = 0       # 話の途中で、居眠りしない
@@ -685,21 +747,39 @@ class Game:
         """いま鳴らす曲。スタート画面・やられている間・クリアのあとは、鳴らさない（None）。
         始まりの語りの間は、語りの曲（無ければ、無音）。ゲームが始まると、1面の曲。
         ボスが降ってくるまでは静かにして、着地したときに、ボスの曲を始める"""
-        if self.ending_screen:
-            return C.BGM_STORY if self.story_bgm else None
-        if self.player.hp <= 0 or self.cleared or self.ending or self.title:
+        story = C.BGM_STORY if self.story_bgm else None
+        if self.ending_screen or self.thanks:
+            return self._song(C.BGM_ENDING) or story
+        if self.title:
+            return self._song(C.BGM_TITLE)
+        if self.player.hp <= 0 or self.cleared or self.ending:
             return None
-        if self.story or self.map_on:
-            return C.BGM_STORY if self.story_bgm else None
+        if self.map_on:
+            return self._song(C.BGM_MAP) or story
+        if self.story:
+            return story
         if self.boss and self.boss.state in ("wait", "drop"):
             return None
+        n = self.stage.number
         if self.boss_on:
-            return self.stage.bgm_boss
-        return C.BGM_SUPER if self.player.super_t and self.super_bgm else self.stage.bgm
+            mid = getattr(self.boss, "midway", False)
+            return self._song(C.BGM_MIDBOSS if mid else C.BGM_BOSS_N % n) or self.stage.bgm_boss
+        if self.player.super_t and self.super_bgm:
+            return C.BGM_SUPER
+        return self._song(C.BGM_STAGE_N % n) or self.stage.bgm
+
+    def _song(self, name):
+        """曲のファイルがあれば、その名前。無ければ None（あるかどうかは、一度だけ調べる）"""
+        if name not in self._songs:
+            self._songs[name] = os.path.exists(os.path.join(AUDIO_DIR, name))
+        return name if self._songs[name] else None
 
     # --- 描画 ---
     def draw(self, screen, font):
         self._font = font
+        if self.thanks:
+            self._draw_thanks(screen, font)
+            return
         if self.ending_screen:
             self._draw_ending_screen(screen)
             return
@@ -764,13 +844,32 @@ class Game:
             self._draw_bubble(screen, self.a.talk_boss, r.centerx - cam, r.bottom - C.TALK_BOSS_Y, self._talk_shown(*end))
         elif end[0] == "reply":
             r = self.player.rect
-            self._draw_bubble(screen, self.a.talk_tanuki, r.centerx - cam, r.top - 4, self._talk_shown(*end))
+            if self.stage.thought:
+                self._draw_thought(screen, r.centerx - cam, r.top - 2, self._talk_shown(*end))
+            else:
+                self._draw_bubble(screen, self.a.talk_tanuki, r.centerx - cam, r.top - 4, self._talk_shown(*end))
         self._draw_hud(screen, font)
         self._draw_stage_title(screen)
         if self.player.hp <= 0:
             self._draw_gameover_text(screen, font)
         if self.cleared:
             self._draw_clear(screen, font)
+        if self.paused:
+            self._draw_pause(screen, font)
+
+    def _draw_pause(self, screen, font):
+        """ポーズ: 画面を暗くして、真ん中に「PAUSE」。下に、再開のしかた（点滅）"""
+        dim = pygame.Surface((C.BASE_W, C.BASE_H))
+        dim.set_alpha(120)
+        screen.blit(dim, (0, 0))
+        for text, y, scale, blink in (("PAUSE", C.BASE_H // 2 - 24, 2, False), ("P KEY / START BUTTON", C.BASE_H // 2 + 14, 1, True)):
+            if blink and (self.pause_t // 30) % 2:      # 再開のしかたは、点滅。「PAUSE」は、出したまま
+                continue
+            for color, off in ((C.BLACK, scale), (C.WHITE if blink else (255, 236, 150), 0)):
+                img = font.render(text, False, color)
+                if scale > 1:
+                    img = pygame.transform.scale(img, (img.get_width() * scale, img.get_height() * scale))
+                screen.blit(img, (C.BASE_W // 2 - img.get_width() // 2 + off, y + off))
 
     def _draw_ground(self, screen, cam):
         tiles = self.a.tiles
@@ -780,6 +879,13 @@ class Game:
             self._draw_water(screen, cam)
         else:
             pygame.draw.rect(screen, self.stage.pit, (0, C.GROUND_Y, C.BASE_W, C.BASE_H - C.GROUND_Y))
+            deep = self.stage.pit_deep
+            if deep:    # 下へ行くほど、深い色にする（8ドットごとの段）。明るい霞の谷が、のっぺりした白い帯に見えないように
+                n = (C.BASE_H - C.GROUND_Y + 7) // 8
+                for k in range(n):
+                    u = (k + 1) / n
+                    color = tuple(round(a + (b - a) * u) for a, b in zip(self.stage.pit, deep))
+                    pygame.draw.rect(screen, color, (0, C.GROUND_Y + k * 8, C.BASE_W, 8))
             self._draw_pit_haze(screen, cam)
         for x0, x1, top_y in self.terrain.ground:
             sx0, sx1 = max(x0 - cam, 0), min(x1 - cam, C.BASE_W)
@@ -1030,6 +1136,77 @@ class Game:
             carry = d - seg
         return out
 
+    def _thanks_at(self, what):
+        """姫を助ける場面の、区切りのフレーム: arrive（着く）・hop（姫が跳ねる）・type（文が出始める）・done（文が出きる）"""
+        K = C.THANKS
+        arrive = round((K["stop_x"] + 24) / K["walk"])
+        hop = arrive + 16
+        start = hop + K["hop"] * 2 + 10
+        if what == "arrive":
+            return arrive
+        if what == "hop":
+            return hop
+        if what == "type":
+            return start
+        return start + sum(len(s) for s in K["lines"]) * K["type"] + K["gap"] * (len(K["lines"]) - 1)
+
+    def _thanks_shown(self):
+        """いままでに出した字の数（行の変わり目では、少し止まる）"""
+        K = C.THANKS
+        t, n = self.thanks_t - self._thanks_at("type"), 0
+        for s in K["lines"]:
+            if t <= 0:
+                break
+            n += min(len(s), t // K["type"])
+            t -= len(s) * K["type"] + K["gap"]
+        return n
+
+    def _draw_thanks(self, screen, font):
+        """姫を助ける場面。暗い堂の中に、金の床。左から、タヌキ侍が歩いてくる。右に、姫。礼の文が、上に出る"""
+        K, t = C.THANKS, self.thanks_t
+        screen.fill((6, 4, 10))
+        tile = self.a.tiles[1]
+        for x in range(0, C.BASE_W, tile.get_width()):
+            screen.blit(tile, (x, K["floor"]))
+        # タヌキ侍: 歩いてきて、止まる
+        x = min(K["stop_x"], -24 + t * K["walk"])
+        walking = x < K["stop_x"]
+        img = self.a.player[True][C.WALK[(t // C.WALK_TICKS) % len(C.WALK)] if walking else C.IDLE[0]]
+        screen.blit(img, (round(x) - img.get_width() // 2, K["floor"] - img.get_height()))
+        # 姫: 待っている。タヌキ侍が着くと、2回跳ねて喜ぶ
+        u = t - self._thanks_at("hop")
+        dy = round(14 * abs(math.sin(u / K["hop"] * math.pi))) if 0 <= u < K["hop"] * 2 else 0
+        hime = self.a.hime[1 if dy else 0]
+        screen.blit(hime, (K["hime_x"] - hime.get_width() // 2, K["floor"] - hime.get_height() - dy))
+        # 礼の文（大きい字。1文字ずつ）
+        left = self._thanks_shown()
+        for s, y in zip(K["lines"], K["text_y"]):
+            part, left = s[:left], max(0, left - len(s))
+            if not part:
+                continue
+            full = font.render(s, False, C.WHITE)
+            for color, off in ((C.BLACK, 2), ((255, 236, 150), 0)):
+                img = font.render(part, False, color)
+                img = pygame.transform.scale(img, (img.get_width() * 2, img.get_height() * 2))
+                screen.blit(img, (C.BASE_W // 2 - full.get_width() + off, y + off))
+        done = self._thanks_at("done")
+        if t >= done + K["dream"]:      # 礼を言われている間も、タヌキ侍は、食べ物のことを考えている（おにぎりと団子が、かわるがわる浮かぶ）
+            bx, by = round(x) + 4, K["floor"] - img.get_height() - 26
+            white, edge = (244, 244, 252), (16, 10, 24)
+            for cx, cy, r in ((round(x) + 10, K["floor"] - img.get_height() - 3, 1), (round(x) + 8, K["floor"] - img.get_height() - 9, 2)):
+                pygame.draw.circle(screen, edge, (cx, cy), r + 2)
+                pygame.draw.circle(screen, white, (cx, cy), r)
+            for color, pad in ((edge, 2), (white, 0)):
+                pygame.draw.ellipse(screen, color, (bx - 17 - pad, by - 12 - pad, 34 + pad * 2, 24 + pad * 2))
+            food = self.a.item[("onigiri", "dango")[((t - done - K["dream"]) // K["dream_swap"]) % 2]]
+            screen.blit(food, (bx - food.get_width() // 2, by - food.get_height() // 2))
+        if t >= done + 10 and self.a.thanks_sub:
+            sub = self.a.thanks_sub
+            screen.blit(sub, (C.BASE_W // 2 - sub.get_width() // 2, K["sub_y"]))
+        if t >= done + K["wait"] and ((t - done) // 30) % 2 == 0:
+            hint = self.a.title_prompt
+            screen.blit(hint, (C.BASE_W // 2 - hint.get_width() // 2, C.BASE_H - 22))
+
     def _draw_ending_screen(self, screen):
         """エンディング: 暗い所から、ゆっくり明るくなる。しばらくして、「PUSH ENTER KEY」が点滅する"""
         E = C.ENDING_SCREEN
@@ -1180,6 +1357,28 @@ class Game:
         tx, ty = bx + (w - ink.w) // 2 - ink.x, by + (h - ink.h) // 2 - ink.y
         screen.blit(img, (tx, ty), (0, 0, shown * C.TALK_CELL, img.get_height()))
 
+    def _draw_thought(self, screen, x, y, shown):
+        """考えごとの吹き出し（返事の代わり）。頭の上に、小さな丸が2つ出て、その先に雲がふくらみ、中に、食べ物が1つずつ浮かぶ。
+        ボスが何を言っても、タヌキ侍は、おにぎりや団子のことを考えている"""
+        H, foods = C.THOUGHT, self.stage.thought
+        white, edge = (244, 244, 252), (16, 10, 24)
+        for k, (cx, cy, r) in enumerate(((x + 6, y - 2, 1), (x + 9, y - 9, 2))):
+            if shown > k * 2:
+                pygame.draw.circle(screen, edge, (cx, cy), r + 2)
+                pygame.draw.circle(screen, white, (cx, cy), r)
+        g = min(1.0, max(0.0, (shown - 4) / max(1, H["grow"] - 4)))
+        if g <= 0:
+            return
+        w, h = round((22 + 22 * len(foods)) * g), round(30 * g)
+        bx, by = max(w // 2 + 6, min(x + 14, C.BASE_W - w // 2 - 6)), y - 28
+        for color, pad in ((edge, 2), (white, 0)):
+            pygame.draw.ellipse(screen, color, (bx - w // 2 - pad, by - h // 2 - pad, w + pad * 2, h + pad * 2))
+        for i, kind in enumerate(foods):
+            if shown >= H["grow"] + i * H["per"] + 1:
+                img = self.a.item[kind]
+                fx = bx + round((i - (len(foods) - 1) / 2) * 22)
+                screen.blit(img, (fx - img.get_width() // 2, by - img.get_height() // 2 + round(math.sin((self.ending + i * 20) / 14) * 1.5)))
+
     def _draw_boss_fade(self, screen, cam, t):
         """倒れたボスが、光になって消える: 白く光ってから、薄くなりながら昇る。光の粒が、上へ昇っていく"""
         b, total = self.boss, C.ENDING["fade"]
@@ -1255,7 +1454,7 @@ def keys_to_input(keys):
 
 KEYDOWN_MAP = {
     pygame.K_SPACE: "jump", pygame.K_UP: "jump", pygame.K_z: "attack",
-    pygame.K_x: "throw", pygame.K_RETURN: "restart",
+    pygame.K_x: "throw", pygame.K_RETURN: "restart", pygame.K_p: "pause",
 }
 
 
@@ -1292,11 +1491,15 @@ async def main():
                 pressed.add(KEYDOWN_MAP[event.key])
             if event.type == pygame.KEYUP and event.key in (pygame.K_SPACE, pygame.K_UP):
                 pressed.add("jump_release")
+            if event.type == getattr(pygame, "WINDOWFOCUSLOST", -1):     # 窓が後ろに回ったら、止める
+                pressed.add("pause_on")
             pressed |= pad.handle(event)
         game.step(keys_to_input(pygame.key.get_pressed()) | pad.held(), pressed)
-        for name in game.sfx:
+        for name in dict.fromkeys(game.sfx + sprites.SOUNDS):     # 同じ音は、1フレームに1回だけ
             audio.play_sfx(name)
         game.sfx.clear()
+        sprites.SOUNDS.clear()
+        audio.set_paused(game.paused)
         if game.bgm:
             audio.play_bgm(game.bgm)        # ボスの場所に入ると、曲が変わる
         else:

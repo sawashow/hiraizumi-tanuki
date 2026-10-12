@@ -87,6 +87,15 @@ def _gilt(img):
     return out
 
 
+SOUNDS = []     # このフレームに鳴らす効果音（キャラクターの側から足す。メインループが鳴らして、空にする）
+
+
+def snd(key):
+    """効果音を鳴らす（名前は config.SFX_GAME の鍵）"""
+    if len(SOUNDS) < 32:
+        SOUNDS.append(C.SFX[key])
+
+
 class Assets:
     """絵をまとめて読み込む。左向き用は反転して持つ"""
 
@@ -161,6 +170,16 @@ class Assets:
         self.story_tanuki_left = [pygame.transform.flip(f, True, False) for f in self.story_tanuki]
         self.gameover = _load("gameover.png")             # 「無念…」（ドット風フォントで書き出した絵）
         self.gameover_prompt = _load("gameover_prompt.png")  # 「Enterキーで再開」
+        self.thanks_sub = _load(C.THANKS_SUB) if os.path.exists(os.path.join(IMG, C.THANKS_SUB)) else None
+        if all(os.path.exists(os.path.join(IMG, n)) for n in C.HIME_IMAGES):
+            self.hime = [_load(n) for n in C.HIME_IMAGES]
+        else:       # 姫の絵が、まだ無い: タヌキ侍（左向き）を、桃色に染めて、代わりにする
+            self.hime = []
+            for f in (0, 8):
+                img = self.player[False][min(f, len(self.player[False]) - 1)].copy()
+                img.fill((255, 170, 205, 255), special_flags=pygame.BLEND_RGBA_MULT)
+                img.fill((40, 0, 24, 0), special_flags=pygame.BLEND_RGB_ADD)
+                self.hime.append(img)
         self.stage = None
         self.load_stage(stage or STAGE1)
 
@@ -316,6 +335,7 @@ class Player:
         self._cancel()
         late = not self.on_ground and not self.jumped and self.fall_t <= C.COYOTE   # 縁から出た直後
         if (self.on_ground or late) and not self.busy and self.hp > 0:
+            snd("jump")
             self.vy = C.JUMP_SPEED
             self.on_ground = False
             self.air_t = 0
@@ -340,6 +360,7 @@ class Player:
             self._cancel()
         if not self.busy and self.hp > 0:
             self.attack_t = 1
+            snd("swing")
             self.sword_cool = sum(n for _, n in C.SWORD_SEQ) + C.SWORD_COOLDOWN
             self.swing_id += 1
             self.crouch_act = self.crouch
@@ -350,6 +371,8 @@ class Player:
     def throw(self):
         if self.ammo < C.AMMO["cost"]:      # 団子が無い: 投げられない（ゲージを点滅させて、知らせる）
             if not (self.attack_t or self.throw_t or self.hurt_t) and self.hp > 0:
+                if not self.empty_t:
+                    snd("empty")
                 self.empty_t = C.AMMO["empty"]
             return
         if self.attack_t:
@@ -370,6 +393,7 @@ class Player:
         if self.untouchable or self.hp <= 0:
             return
         self.hp -= amount
+        snd("dead" if self.hp <= 0 else "hurt")
         self.invincible = C.INVINCIBLE_FRAMES
         self.hurt_t = C.HURT_FRAMES
         self.power = self.triple = False
@@ -486,6 +510,7 @@ class Player:
             if cur is None:
                 self.throw_t = 0
             elif cur[0] == C.THROW_RELEASE and seq_frame(self.throw_t - 1, C.THROW_SEQ)[0] != C.THROW_RELEASE:
+                snd("throw")
                 self.release = True
                 self.ammo = max(0, self.ammo - C.AMMO["cost"])     # 手を離れた瞬間に、団子を1つ使う
         if self.queued:     # 覚えておいた動作: 前の動作が終わったら、すぐ出す（時間が切れたら、忘れる）
@@ -509,6 +534,7 @@ class Player:
     def _fall_into_pit(self):
         """穴に落ちた: ダメージを受けて、最後に立っていた地面へ戻る（体力が尽きたらゲームオーバー）"""
         self.hp = max(0, self.hp - C.FALL_DAMAGE)
+        snd("fall")
         self.power = self.triple = False
         if self.hp <= 0:
             return
@@ -675,9 +701,13 @@ class Enemy:
         self.hp -= damage
         self.flash = C.HIT_FLASH
         self.stun = C.HIT_STUN
+        big = isinstance(self, Boss)
+        if damage:
+            snd("boss_hit" if big else "hit")
         if self.hp <= 0:
             self.dying = True
             self.dead_t = 0
+            snd("boss_die" if big else "die")
 
     def image(self):
         """いま表示するコマ（種類ごとに決める）。絵がなければ None"""
@@ -756,6 +786,7 @@ class Ochimusha(Enemy):
         if self.swing_t:            # 刀を振る。振り下ろした瞬間に光波が出て、そのあとは隙になる
             self.swing_t -= 1
             if self.swing_t == P["swing_frames"] - P["wave_at"]:
+                snd("wave")
                 self.spawned.append(Wave(self.cx + self.facing * 24, self.cy + self.h / 2 + C.WAVE["dy"],
                                          self.facing, self.a))
             return
@@ -829,6 +860,7 @@ class Archer(Enemy):
             self.draw_t -= 1
             if not self.draw_t:     # 放つ: いま主人公がいる所を、ねらう
                 bow = (self.cx + self.facing * 12, self.floor - P["bow_y"])
+                snd("arrow")
                 self.spawned.append(Arrow(*bow, pr.centerx, pr.centery, self.facing, self.a))
                 self.shoot_t = P["shoot_frames"]
             return
@@ -836,6 +868,7 @@ class Archer(Enemy):
             self.shoot_t -= 1
             return
         if abs(dx) <= P["active"] and abs(pr.centery - self.cy) <= P["reach_y"] and not self.cool:
+            snd("draw")
             self.draw_t = P["draw_frames"]
             self.cool = P["cooldown"]
 
@@ -949,6 +982,7 @@ class Arrow:
             self.alive = False
 
     def cut_effect(self):
+        snd("snap")
         return ArrowBreak(self.px, self.py, self.dir, self.a)
 
     def draw(self, surface, cam_x):
@@ -1045,6 +1079,7 @@ class Karasu(Enemy):
         if self.state == "wait":
             self.facing = 1 if dx > 0 else -1
             if abs(dx) <= P["active"]:
+                snd("caw")
                 self.state = "telegraph"
                 self.t = 0
         elif self.state == "telegraph":
@@ -1055,6 +1090,7 @@ class Karasu(Enemy):
                 tx = max(abs(dx), P["min_dx"]) * (1 if dx > 0 else -1)
                 n = math.hypot(tx, P["drop"])
                 self.vx, self.vy = tx / n * P["speed"], P["drop"] / n * P["speed"]
+                snd("dive")
                 self.state = "dive"
         else:
             self.cx += self.vx
@@ -1171,6 +1207,7 @@ class Boss(Enemy):
     def _wave(self, direction, tall=False):
         P = self.P
         y = self.floor - P["high_bottom"] - P["high_h"] / 2 if tall else self.floor + C.WAVE["dy"]
+        snd("boss_wave")
         self.spawned.append(Wave(self.cx + direction * (self.w / 2 + 8), y, direction, self.a,
                                  P["wave_speed"], P["wave_range"], tall))
 
@@ -1236,6 +1273,7 @@ class Boss(Enemy):
                 target = max(self.x_min, min(float(pr.centerx), self.x_max))
                 self.vx = (target - self.cx) / frames
                 self.vy = -P["gravity"] * frames / 2
+                snd("leap")
                 self._set("leap")
 
     def image(self):
@@ -1328,6 +1366,7 @@ class Benkei(Boss):
         elif s == "swing":
             if self.st == P["wave_at"]:
                 if self.thrust:     # 突き: 速くて、短い
+                    snd("thrust")
                     self.spawned.append(Wave(self.cx + self.facing * (self.w / 2 + 8), self.floor + C.WAVE["dy"], self.facing,
                                              self.a, P["thrust_speed"], P["thrust_range"], False))
                 else:
@@ -1426,6 +1465,7 @@ class Boss4(Boss):
         if kind == "beads":
             self._set("ready")
         elif kind == "ring":
+            snd("charge")
             self._set("ring_ready")
         elif kind == "pillar":               # 主人公の足元と、その左右に、少しずつ遅らせて落とす
             L = C.PILLAR
@@ -1444,6 +1484,7 @@ class Boss4(Boss):
                 ends = [x for x in (self.x_min, self.x_max) if abs(x - pr.centerx) >= P["warp_min"]]
                 dest = max(ends, key=lambda x: abs(x - self.cx)) if ends else dest
             self.dest = dest
+            snd("warp")
             self._set("warp_out")
 
     @property
@@ -1470,6 +1511,7 @@ class Boss4(Boss):
                 if self.rage and not self.roared:      # 体力が半分になった: 怒る（後光が赤くなり、画面が揺れる）
                     self.roared = True
                     self.landed = True
+                    snd("roar")
                     self._set("roar")
                 else:
                     self._begin(self._next_attack(), pr)
@@ -1485,6 +1527,7 @@ class Boss4(Boss):
             if self.st >= P["fire_at"] and (self.st - P["fire_at"]) % P["gap"] == 0 and 0 <= k < len(heights):
                 B = C.BEAD
                 y = self._ground() - B[{"L": "low", "M": "mid", "H": "high"}[heights[k]]]
+                snd("bead")
                 self.spawned.append(Bead(self.cx + self.facing * (self.w / 2 + 10), y, self.facing, self.a,
                                          B["rage_speed"] if self.rage else B["speed"]))
             if self.st >= P["cast_frames"] + P["gap"] * (len(heights) - 1):
@@ -1496,6 +1539,7 @@ class Boss4(Boss):
                 sp = R["rage_speed" if self.rage else "speed"]
                 for k in range(R["count"]):
                     a = 2 * math.pi * k / R["count"]
+                    snd("ring")
                     self.spawned.append(Bead(self.cx + math.cos(a) * R["radius"], self.cy + math.sin(a) * R["radius"], 1, self.a,
                                              math.cos(a) * sp, vy=math.sin(a) * sp, floor=self._ground(), reach=R["range"]))
                 self._set("recover")
@@ -1506,6 +1550,7 @@ class Boss4(Boss):
             if self.st >= P["warp_out"]:
                 self.cx = self.dest
                 self.facing = 1 if pr.centerx > self.cx else -1
+                snd("warp_in")
                 self._set("warp_in")
         elif s == "warp_in":                   # 現れて、すぐ次の攻撃へ（隙は無い）
             if self.st >= P["warp_in"]:
@@ -1637,6 +1682,7 @@ class Boss2(Boss):
                 self._set("wind")
         elif s == "wind":
             if self.st == P["wind_at"]:
+                snd("gust")
                 self.spawned.append(Gust(self.cx + self.facing * (self.w / 2 + 12), self.floor - C.GUST["h"] / 2,
                                          self.facing, self.a))
             if self.st >= P["wind_frames"]:
@@ -1646,6 +1692,7 @@ class Boss2(Boss):
                 self._set("throw")
         elif s == "throw":
             if self.st == P["throw_at"]:
+                snd("fan")
                 self.spawned.append(Fan(self.cx + self.facing * (self.w / 2 + 6), self.floor - C.FAN["y"],
                                         self.facing, self.a, self))
             if self.st >= P["throw_frames"]:
@@ -1668,6 +1715,7 @@ class Boss2(Boss):
         for i in range(K["count"]):
             off = (i - (K["count"] - 1) / 2) * K["spread"]
             x = max(self.x_min - self.w / 2, min(pr.centerx + off, self.x_max + self.w / 2))
+            snd("petal")
             self.spawned.append(Petal(x, self.floor, self.a, K["stagger"] * i))
 
     def image(self):
@@ -1758,6 +1806,10 @@ class Pillar:
 
     def update(self, stage_w):
         self.t += 1
+        if self.t == 1:
+            snd("pillar_warn")
+        elif self.t == self.warn:
+            snd("beam")
         if self.t >= self.warn + C.PILLAR["beam"]:
             self.alive = False
 
@@ -1867,6 +1919,7 @@ class HillGust(Gust):
         super().__init__(x, (C.FLOOR_Y if h is None else h) - C.GUST["h"] / 2, direction, assets)
         self.terrain = terrain
         self.reach = reach
+        snd("gust")
 
     def update(self, stage_w):
         super().update(stage_w)
@@ -2193,6 +2246,7 @@ class Lantern:
         if self.broken:
             return False
         self.broken, self.break_t = True, 0
+        snd("break")
         return True
 
     def update(self):

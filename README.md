@@ -16,6 +16,7 @@
 | Z | 刀 |
 | X | 木の葉手裏剣 |
 | Enter | 再開（ゲームオーバー・クリア時） |
+| P | ポーズ（もう一度押すと、続きから）。窓がうしろに回ったときも、止まります |
 | Esc | 終了（パソコン版のみ） |
 
 コントローラ（Xbox・PlayStation・Switch Pro・8BitDoなど）を挿すと、そのまま使えます（起動したあとに挿しても大丈夫です）。
@@ -26,7 +27,7 @@
 | A（PlayStationは×） | ジャンプ（押し続けるほど高く）・決定 |
 | X（□） | 刀 |
 | B・Y（○・△） | 木の葉手裏剣 |
-| Start | 再開（ゲームオーバー・クリア時） |
+| Start | ポーズ（遊んでいる間）・再開（ゲームオーバー・クリア時） |
 
 ## アイテム
 
@@ -82,6 +83,7 @@ Google Drive（s.sawada@ponpoco-works.com）に置いてあります。元絵を
 - 1面の曲: 「Clash of the Iron Fan」（`assets/audio/bgm_stage1.ogg`）
 - ボス戦の曲: 「Crimson Temple Breach」（`assets/audio/bgm_boss.ogg`）
 - スーパータヌキの曲: 「Seven Blades High」（`assets/audio/bgm_super.ogg`）
+- 地図の曲: 「Steps Into the Morning Sun」（`assets/audio/bgm_map.ogg`）
 
 「無念…」などの文字の絵は、ドット風フォント DotGothic16（SIL Open Font License 1.1）で書き出したものです。
 フォントのファイル自体は、ゲームにもリポジトリにも含めていません。

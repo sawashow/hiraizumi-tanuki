@@ -215,7 +215,10 @@ END_BLOW = dict(vy=-5.0, frames=40, rest=24, limit=600)   # 吹っ飛び: 上向
 STARTLE = 44                    # ボスが降ってきたとき、タヌキ侍が驚いて跳ねるフレーム数
 TALK_BOSS = "talk_boss1.png"        # ボスのせりふ（吹き出しの中の字）
 TALK_TANUKI = "talk_tanuki1.png"    # タヌキ侍のせりふ
-TALK_CELL = 18                  # せりふの絵の、1文字のますの幅（tools/make_talk_text.py と合わせる）
+TALK_CELL = 24                  # せりふの絵の、1文字のますの幅（tools/make_talk_text.py と合わせる）
+# 考えごとの吹き出し（返事の代わりに、食べ物を思い浮かべる面。stage.py の thought）。数は、せりふの「文字」と同じ刻み（ENDING の type フレーム）で数える
+#   grow: 丸が出て、雲がふくらみきるまで / per: 食べ物が1つ浮かぶごとの間
+THOUGHT = dict(grow=10, per=8)
 TALK_PAUSE = {"reply": (3, 90)}   # せりふの途中の間: (何文字目のあとで, 何フレーム止まるか)。「・・・」のあと、間をおいて「姫？」
 TALK_BOSS_Y = 40                # ボスの吹き出しの、しっぽの先（足元からの高さ）
 
@@ -252,6 +255,13 @@ BGM_STAGE1 = "bgm_stage1.ogg"  # 1面の曲。曲名は「Clash of the Iron Fan�
 BGM_STORY = "bgm_story.ogg"    # 始まりの語りの間（おとなしい曲）。曲名は「Evening at the Border Post」。ファイルが無ければ、無音
 BGM_BOSS = "bgm_boss.ogg"      # ボスと戦っている間。曲名は「Crimson Temple Breach」（くり返せるように、終わりの締めを切ってある）
 BGM_SUPER = "bgm_super.ogg"    # スーパータヌキの間（勢いのある曲）。曲名は「Seven Blades High」。ファイルが無ければ、面の曲のまま
+# 場面ごとの曲（ファイルを assets/audio に置けば、鳴る。無ければ、右に書いた、いまの曲で代わりにする）
+BGM_MAP = "bgm_map.ogg"            # ステージ選択の地図。曲名は「Steps Into the Morning Sun」（前後の無音を切ってある。無ければ、語りの曲）
+BGM_TITLE = "bgm_title.ogg"        # スタート画面（無ければ、無音。雷の音だけ）
+BGM_ENDING = "bgm_ending.ogg"      # エンディング（無ければ、語りの曲）
+BGM_STAGE_N = "bgm_stage%d.ogg"    # 面ごとの曲（%d は、遊ぶ順の番号 1〜4。無ければ、その面に決めてある曲 = 1面の曲）
+BGM_BOSS_N = "bgm_boss%d.ogg"      # 面ごとの、ボスの曲（無ければ、ボスの曲）
+BGM_MIDBOSS = "bgm_midboss.ogg"    # 面の途中の相手（弁慶・影のボス。無ければ、ボスの曲）
 BGM_VOLUME = 0.5
 BGM_VOLUMES = {BGM_STORY: 0.4}   # 曲ごとの音量（書いていない曲は BGM_VOLUME）。語りの曲は、少し小さく
 SFX_THUNDER = "sfx_thunder.ogg"   # 雷鳴（スタート画面）
@@ -261,6 +271,18 @@ SFX_TALK_LOW = "sfx_talk_low.ogg"     # せりふの字が出るときの「ピ�
 SFX_TALK_HIGH = "sfx_talk_high.ogg"   # 同じ（タヌキ侍。高い）
 SFX_CLANG = "sfx_clang.ogg"           # 刀や手裏剣が、弾かれる音（立ち往生）
 SFX_VOLUME = {SFX_CLANG: 0.2, SFX_THUNDER: 0.3, SFX_SWORD: 0.3, SFX_CHECKPOINT: 0.22, SFX_TALK_LOW: 0.07, SFX_TALK_HIGH: 0.07}   # 効果音の大きさ（抑えめ）。音は tools/make_sfx.py で作る
+# 遊びの効果音（tools/make_sfx.py --game で作る）。名前 → 音の大きさ。ファイルは sfx_名前.ogg。
+# よく鳴る音（跳ぶ・斬る・拾う）は小さく、大事な合図（予告・ボス）は、少し大きく
+SFX_GAME = dict(
+    jump=0.07, swing=0.14, throw=0.14, hit=0.2, hurt=0.26, dead=0.26, fall=0.22, empty=0.2, startle=0.2,     # 主人公
+    dango=0.16, heal=0.22, power=0.22, **{"break": 0.22},                                                    # 拾う・壊す
+    die=0.18, wave=0.16, cut=0.18, caw=0.16, dive=0.16, draw=0.14, arrow=0.18, snap=0.18,                    # ザコ敵
+    thud=0.3, boss_wave=0.22, leap=0.2, boss_hit=0.22, boss_die=0.32, roar=0.3, thrust=0.22,                 # ボス
+    fan=0.18, gust=0.2, petal=0.14, bead=0.16, ring=0.22, charge=0.2, pillar_warn=0.18, beam=0.24, warp=0.2, warp_in=0.2,
+    select=0.14, clear=0.26, gameover=0.26,                                                                  # 画面
+)
+SFX = {k: "sfx_%s.ogg" % k for k in SFX_GAME}
+SFX_VOLUME.update({SFX[k]: v for k, v in SFX_GAME.items()})
 BGM_FADE_MS = 1200      # やられたとき、曲が消えていくまでの時間
 
 # スタート画面: 絵（assets/images/title.png、480×270）の上に、題名を重ねる。Enter（Z・Space でも）で始まる。
@@ -306,7 +328,15 @@ MAP_PIECE_SCALE = 0.5  # 駒の大きさ（主人公の絵に対する倍率）
 # エンディング画面（assets/images/ending.png、480×270）: 最後の面をクリアして Enter を押すと、出る。夜明けの金色堂の前で、タヌキ侍が手を合わせる絵と、「交通安全」の文字。
 # 暗い所から、ゆっくり明るくなる。しばらくして、Enter で、スタート画面へ戻る
 ENDING_IMAGE = "ending.png"
-ENDING_SCREEN = dict(fade=90, wait=240)   # 明るくなるまでのフレーム数 / Enter を受け付けるまで
+ENDING_SCREEN = dict(fade=90, wait=240)
+# 姫を助ける場面（最後の面の結果のあと、エンディングの絵の前）。昔のゲームの「THANK YOU ○○!」の画面。
+# 暗い堂の中。タヌキ侍が左から歩いてきて、奥で待っていた姫の前で止まる。姫が跳ねて喜び、礼の文が、1文字ずつ出る。
+#   walk: 歩く速さ / stop_x・hime_x: 二人が立つ場所 / hop: 姫が跳ねるフレーム数（2回） / type: 1文字が出る間隔 / gap: 行と行の間 / wait: 文が出きってから、キーを受け付けるまで
+THANKS = dict(walk=1.3, stop_x=178, hime_x=298, floor=198, hop=44, type=4, gap=26, wait=70,
+              lines=("THANK YOU TANUKI!", "YOUR QUEST IS OVER."), text_y=(34, 62), sub_y=94,
+              dream=40, dream_swap=70)     # dream: 文が出きってから、タヌキ侍の頭の上に、食べ物の吹き出しが出るまで / dream_swap: おにぎりと団子が入れ替わる間隔
+HIME_IMAGES = ("hime_0.png", "hime_1.png")      # 姫の絵（立つ・跳ねる）。無ければ、タヌキ侍の絵を、桃色にして代わりにする
+THANKS_SUB = "thanks_sub.png"                   # 英語の文の下に出す、日本語の一行（tools/make_text_image.py）   # 明るくなるまでのフレーム数 / Enter を受け付けるまで
 
 # 始まりの語り: スタート画面で決定すると、暗い画面の上半分を、文章が下から上へゆっくり流れる（1回だけ）。
 # 下には、タヌキ侍が立っている。しばらくすると、座って眠ってしまい、夢の中でおにぎりのことを考える。
