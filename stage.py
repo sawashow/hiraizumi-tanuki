@@ -166,6 +166,22 @@ SPAWNS1 = (
 )
 
 
+def thin_dango(items, platforms):
+    """団子を間引く。団子は、手裏剣を投げられる数を増やす物になったので、数を絞る（画面に、物が多すぎないように）。
+    **足場の上の団子だけを残す（足場1つに、1つ）。地面に置いた団子は、すべて外す。**
+    足場に乗る理由が、団子になる（団子を外した足場は、乗る意味が無くなる）。ほかのアイテムは、そのまま"""
+    out, used = [], set()
+    for it in items:
+        if it[0] != "dango":
+            out.append(it)
+            continue
+        on = [p for p in platforms if p[0] - 6 <= it[1] <= p[1] + 6 and 0 < p[2] - it[2] <= 60]
+        if on and on[0] not in used:
+            used.add(on[0])
+            out.append(("dango", (on[0][0] + on[0][1]) // 2, it[2]))    # 足場の真ん中に置く
+    return tuple(out)
+
+
 class StageDef:
     """1つの面のデータ。地形・アイテム・敵・ボス・背景・曲を、1つにまとめる。
     絵は assets/images 以下の相対パス。面ごとの絵が無ければ、1面の絵で代わりにする"""
@@ -173,7 +189,7 @@ class StageDef:
     def __init__(self, name, width, ground, platforms, items, checkpoint, spawns, bgm, bgm_boss,
                  sky="bg_sky.png", mid="bg_mid.png", tiles="", boss_x=None,
                  boss_title=C.BOSS_TITLE, boss_name=C.BOSS_NAME, boss_pattern=C.BOSS_PATTERN,
-                 talk_boss=C.TALK_BOSS, talk_tanuki=C.TALK_TANUKI, number=1, stele_x=150, boss_kind="boss", pit=(8, 6, 18), gates=()):
+                 talk_boss=C.TALK_BOSS, talk_tanuki=C.TALK_TANUKI, number=1, stele_x=150, boss_kind="boss", pit=(8, 6, 18), gates=(), lanterns=(), zones=(), gilt=False, haze=None, winds=(), traps=()):
         self.name, self.width = name, width
         self.ground, self.platforms, self.items = ground, platforms, items
         self.checkpoint, self.spawns = checkpoint, spawns
@@ -186,6 +202,15 @@ class StageDef:
         self.number = number    # 第N面（面の名前・石碑の絵の番号）
         self.stele_x = stele_x  # 石碑を置く場所
         self.pit = pit          # 穴の底の色（池の絵があれば、そちらを出す）
+        self.lanterns = tuple(lanterns)   # 石灯籠: (中の物, x)。壊すと、中の物が出る。団子は入れない（団子の数に、数えていないため）
+        # 区画（面の設計）: (左端, 右端, 名前, 役目, ねらいの強さ 1〜5)。役目は config.ZONE_ROLES。遊びには使わない。
+        # tools/difficulty.py が、区画ごとに、実際の強さを測って、ねらいと比べる
+        self.zones = tuple(zones)
+        self.haze = haze        # 穴の上の「もや」の高さ（None なら、config.PIT_HAZE の h）。空が明るい面では、低くする
+        # 面ごとの仕掛け（その面だけの遊び。同じ敵と地形の繰り返しに、ならないように）
+        self.winds = tuple(winds)   # 山おろし: (左端, 右端, 間隔のフレーム数)。右端から、風が、地面ぞいに吹き下ろす
+        self.traps = tuple(traps)   # 光の柱の廊下: (左端, 右端, 柱の間隔, 一巡りのフレーム数)。床の印の所に、左から順に、光の柱が落ちる
+        self.gilt = gilt        # 堂の中の面: 石の小物（石灯籠）を、金に塗り替えて出す
         self.gates = tuple(gates)   # 面の途中の「ボスの間」（影のボス）: (左端の x, ボスの種類)。最後のボスの間は、面の端
 
     @property
@@ -258,17 +283,48 @@ ITEMS1 = tuple(it for it in ITEMS if it[1] < 3330) + (
     ("dango", 6655, T - 48), ("dango", 6805, T - 88),
     ("onigiri", 6950, T - 14),                                   # ボスの場所の手前
 )
-SPAWNS1B = tuple(sp for sp in SPAWNS1 if sp[1] < 3330) + (   # 後半は、登りの途中で、押し寄せる
-    ("ochimusha", 3700), ("kitsunebi_high", 3850), ("karasu", 4100), ("ochimusha", 4250), ("kitsunebi_low", 4400),
-    ("karasu", 4650), ("ochimusha", 4800), ("kitsunebi_high", 5000), ("kitsunebi_low", 5200), ("ochimusha", 5400),
-    ("karasu", 5600), ("kitsunebi_high", 5850), ("ochimusha", 6000), ("karasu", 6250), ("kitsunebi_low", 6400),
-    ("ochimusha", 6550), ("kitsunebi_high", 6750), ("karasu", 6900),
+SPAWNS1B = (   # 月見坂は、落ち武者の面。区画（ZONES1）ごとに、かたまりで置く。山は3つ（落ち武者の関・月の坂・最後の関）
+    ("ochimusha", 520),                                                 # 石段: 落ち武者が1体
+    ("ochimusha", 900), ("ochimusha", 1010),                            # 並木道: 二人組
+    ("kitsunebi_low", 1250), ("kitsunebi_high", 1420), ("karasu", 1560),    # 杉の大木: 飛ぶ敵だけ。跳んで登る
+    ("karasu", 1850), ("karasu", 2000), ("ochimusha", 2100),            # 烏の森: 烏2羽と、谷の落ち武者
+    ("ochimusha", 2460), ("kitsunebi_low", 2500),                       # 中の坂
+    ("ochimusha", 2820), ("karasu", 2880), ("ochimusha", 2900), ("kitsunebi_high", 3000),   # 落ち武者の関: 最初の山
+    # 3170〜3450 は、ひと息つく所
+    ("ochimusha", 3620), ("ochimusha", 3880),                           # 長い登り: 山おろし（winds）に逆らって登る。落ち武者は2体
+    ("karasu", 4150), ("karasu", 4300), ("kitsunebi_low", 4400),        # 下り: 飛ぶ敵だけ
+    # 鳥居（4650）のまわりには、置かない
+    ("ochimusha", 4950), ("kitsunebi_high", 5000), ("kitsunebi_low", 5200), ("ochimusha", 5360),   # 月の坂: 登りながら、次々に
+    ("karasu", 5450), ("karasu", 5560), ("ochimusha", 5590),
+    ("kitsunebi_high", 5850), ("ochimusha", 5955), ("karasu", 6250),    # 尾根の下り
+    ("kitsunebi_low", 6480), ("ochimusha", 6500), ("karasu", 6520), ("ochimusha", 6560), ("kitsunebi_high", 6750),   # 最後の関: いちばんの山
 )
-STAGE1 = StageDef("月見坂", W1, GROUND1, PLATFORMS1, ITEMS1, (4650, T), SPAWNS1B, C.BGM_STAGE1, C.BGM_BOSS,
+# 区画: (左端, 右端, 名前, 役目, ねらいの強さ)。tools/difficulty.py 3 で、実際の強さと比べる
+ZONES1 = (
+    (0, 360, "入口", "休む", 1),
+    (360, 760, "石段", "試す", 2),
+    (760, 1180, "並木道", "試す", 4),
+    (1180, 1780, "杉の大木", "試す", 3),
+    (1780, 2300, "烏の森", "組み合わせ", 4),
+    (2300, 2780, "中の坂", "試す", 3),
+    (2780, 3170, "落ち武者の関", "組み合わせ", 5),
+    (3170, 3450, "ひと息", "休む", 1),
+    (3450, 4070, "長い登り", "試す", 4),
+    (4070, 4570, "下り", "試す", 3),
+    (4570, 4890, "鳥居", "休む", 2),
+    (4890, 5670, "月の坂", "組み合わせ", 4),
+    (5670, 6450, "尾根の下り", "試す", 3),
+    (6450, 6860, "最後の関", "組み合わせ", 5),
+    (6860, 7020, "ボス前", "休む", 1),
+)
+STAGE1 = StageDef("月見坂", W1, GROUND1, PLATFORMS1, thin_dango(ITEMS1, PLATFORMS1), (4650, T), SPAWNS1B, C.BGM_STAGE1, C.BGM_BOSS,
+                  lanterns=(("triple", 300), ("onigiri", 4750), ("onigiri", 6880)),   # 石灯籠: 入口（強化）・中間地点の先（回復）・ボスの前（回復）
                   number=3, stele_x=140,
                   boss_title="enemies/boss3_title.png", boss_name="enemies/boss3_name.png",
                   talk_boss="talk_boss3.png", talk_tanuki="talk_tanuki3.png",
-                  boss_kind="boss3", boss_pattern=C.BOSS3_PATTERN)
+                  boss_kind="boss3", boss_pattern=C.BOSS3_PATTERN, zones=ZONES1,
+                  winds=((3450, 3970, 170),),    # 長い登り: 坂の上から、山おろし
+                  pit=(26, 18, 44), haze=32)     # 夕焼けの空に、黒いもやは浮く。穴の底を、夕闇の紫にして、もやを低くする
 
 # ---------------------------------------------------------------- 2面（毛越寺）
 # 浄土庭園。池（広い穴）を、飛び石（足場）で渡る。反橋（太鼓橋）の階段、庭の塔（石灯籠の高台）、石橋
@@ -340,16 +396,32 @@ ITEMS2 = (
     ("dango", 4238, T - 62), ("dango", 4295, T - 62),
     ("onigiri", 4400, T - 14),
 )
-SPAWNS2 = (   # 毛越寺は、敵が少なめ。池と飛び石（ジャンプ）が主役。飛ぶ敵が中心
-    ("ochimusha", 600), ("kitsunebi_low", 1000),
-    ("karasu", 1600), ("kitsunebi_high", 1800), ("karasu", 2000),
-    ("ochimusha", 2440), ("kitsunebi_high", 2650), ("karasu", 2950),
-    ("kitsunebi_low", 3420), ("karasu", 3650),
-    ("ochimusha", 3950), ("kitsunebi_high", 4150), ("karasu", 4400),
+SPAWNS2 = (   # 毛越寺は、最初の面。池と飛び石（ジャンプ）が主役で、敵は少なめ。新しい敵は、1種類ずつ、安全な所で見せる
+    ("ochimusha", 960),                                             # 落ち武者の丘: 平らな岸に、落ち武者が1体だけ
+    ("kitsunebi_high", 1620),                                       # 二つ目の池の手前: 高い足場の道にだけ、狐火
+    ("karasu", 2260),                                               # 烏の岸: 池を渡りきってから、烏が1羽だけ
+    ("ochimusha", 2440), ("kitsunebi_high", 2650), ("karasu", 2700),                # 築山: 3種類を、初めて一緒に
+    # 三つ目の池（2900〜3290）は、いちばん難しい飛び石。敵は置かない
+    ("ochimusha", 3340), ("kitsunebi_low", 3420), ("kitsunebi_high", 3560), ("karasu", 3600), ("karasu", 3700),   # 山越え: この面の山
+    ("kitsunebi_high", 3990),                                       # 最後の池の手前
 )
-STAGE2 = StageDef("毛越寺", 5000, GROUND2, PLATFORMS2, ITEMS2, (2170, T - 32), SPAWNS2, C.BGM_STAGE1, C.BGM_BOSS,
+# 区画: (左端, 右端, 名前, 役目, ねらいの強さ)。tools/difficulty.py 1 で、実際の強さと比べる
+ZONES2 = (
+    (0, 520, "入口", "休む", 1),
+    (520, 860, "最初の池", "渡る", 2),
+    (860, 1480, "落ち武者の丘", "教える", 2),
+    (1480, 1900, "二つ目の池", "渡る", 3),
+    (1900, 2380, "烏の岸", "教える", 2),
+    (2380, 2900, "築山", "試す", 3),
+    (2900, 3290, "三つ目の池", "渡る", 3),
+    (3290, 3880, "山越え", "組み合わせ", 4),
+    (3880, 4330, "最後の池", "渡る", 3),
+    (4330, 4520, "ボス前", "休む", 1),
+)
+STAGE2 = StageDef("毛越寺", 5000, GROUND2, PLATFORMS2, thin_dango(ITEMS2, PLATFORMS2), (2170, T - 32), SPAWNS2, C.BGM_STAGE1, C.BGM_BOSS,
+                  lanterns=(("triple", 300), ("onigiri", 2310), ("onigiri", 4370)),   # 石灯籠: 入口（強化）・中間地点の先（回復）・ボスの前（回復）
                   sky="stage2/bg_sky.png", mid="stage2/bg_mid.png", tiles="stage2/",
-                  number=1, stele_x=130)   # ボスは、1面の泰衡（遊ぶ順で決まる）。絵が無いあいだは、1面の絵で代わりにする
+                  number=1, stele_x=130, zones=ZONES2)   # ボスは、1面の泰衡（遊ぶ順で決まる）。絵が無いあいだは、1面の絵で代わりにする
 # ---------------------------------------------------------------- 2面（高館）
 # 義経堂のある高台。北上川と衣川を見下ろす崖の道。夏の昼。高低差が大きく、遠くから撃たれる面（敵の絵・弓兵は、まだ無いので、いまは既存の敵）
 W3 = 6000
@@ -368,17 +440,14 @@ GROUND3 = (
     (1520, 1620, T - 96),       # 見晴らしの岩場（いちばん高い）
     (1620, 1720, T - 64),
     # 崖の切れ目2: 1720〜1830（幅110）。足場を使う
-    (1830, 1990, T - 32),
-    (1990, 2150, T - 48),
-    (2150, 2250, T - 16),
-    (2250, 2400, T),            # 低い谷（中間地点）
+    (1830, 1900, T - 32),
+    # 崖渡り: 1900〜2290（幅390）。地面が無い。足場3つを、跳んで渡る（敵は、狐火1つだけ。跳ぶのが主役の区画）
+    (2290, 2400, T),            # 渡った先の、低い谷
     # 崖の切れ目3: 2400〜2510（幅110）。足場を使う
     (2510, 2640, T - 32),
     (2640, 2760, T - 64),
     (2760, 2880, T - 80),       # 崖の上の高台
-    (2880, 3000, T - 48),
-    (3000, 3120, T - 16),
-    (3120, 3300, T),
+    (2880, 3300, T),            # 弁慶の間（中ボス）: 高台から降りた、平らな広場。弁慶は、右寄り（3190）に立っている
     (3300, 3420, T - 16),
     (3420, 3540, T - 32),
     (3540, 3680, T - 48),
@@ -395,17 +464,19 @@ PLATFORMS3 = (
     (1180, 1230, T - 60),                                      # 低い谷の上
     (1330, 1370, T - 80), (1430, 1470, T - 120),               # 見晴らしの岩場への足場
     (1750, 1800, T - 60),                                      # 切れ目2の真ん中
-    (2020, 2070, T - 90),
+    (1960, 2010, T - 36), (2075, 2115, T - 52), (2180, 2230, T - 40),     # 崖渡りの足場（間は60〜65。真ん中は、狭くて高い）
     (2290, 2340, T - 50),
     (2430, 2480, T - 44),                                      # 切れ目3の真ん中
     (2680, 2730, T - 110), (2780, 2830, T - 126),              # 高台の上
-    (3160, 3220, T - 62),
-    (3560, 3620, T - 90),
-    (3900, 3950, T - 110), (4100, 4150, T - 130),             # 後半の登りの上の道
+    (3560, 3620, T - 90),                                      # ここから、上の道（足場づたい。団子が多い）。下は、ふつうの登り
+    (3720, 3770, T - 70), (3840, 3890, T - 84), (4030, 4070, T - 100),
+    (3940, 3990, T - 92), (4100, 4150, T - 108),              # 後半の登りの上の道（下の地面から、ジャンプで届く高さ。上りは60まで）
     (4430, 4480, T - 76),                                     # 切れ目（4400〜4510）の真ん中
     (4600, 4650, T - 96),
     (5165, 5215, T - 40),                                     # 切れ目（5140〜5240）の真ん中
     (5300, 5350, T - 60),
+    # ボスの間の足場: 基衡は、跳びかからず、背も高い（地面からは、跳び越えられない）。追い詰められたら、足場から跳び越える
+    (5620, 5680, T - 52), (5830, 5890, T - 52),
 )
 ITEMS3 = (
     ("dango", 150, T - 14), ("dango", 180, T - 14), ("dango", 210, T - 14),
@@ -414,32 +485,52 @@ ITEMS3 = (
     ("onigiri", 1205, T - 78),
     ("dango", 1350, T - 98), ("dango", 1450, T - 138), ("leaf", 1570, T - 118),
     ("dango", 1775, T - 78),
-    ("dango", 2045, T - 108),
-    ("onigiri", 2200, T - 34),                       # 谷の手前
+    ("dango", 2095, T - 70),                         # 崖渡りの、真ん中の足場の上
+    ("onigiri", 2375, T - 14),                       # 渡りきった所
     ("dango", 2315, T - 68),
     ("dango", 2455, T - 62),
     ("dango", 2705, T - 128), ("dango", 2805, T - 144),
-    ("dango", 3190, T - 80),
-    ("dango", 3590, T - 108),
-    ("dango", 3925, T - 128), ("dango", 4125, T - 148), ("onigiri", 4300, T - 100),
+    ("dango", 3590, T - 108), ("dango", 3745, T - 88), ("dango", 3865, T - 102), ("dango", 4050, T - 118),
+    ("dango", 3965, T - 110), ("dango", 4125, T - 126), ("onigiri", 4300, T - 100),
     ("dango", 4455, T - 94), ("dango", 4625, T - 114),
     ("dango", 5190, T - 58), ("dango", 5325, T - 78),
     ("onigiri", 5440, T - 14),                       # ボスの場所の手前
 )
-SPAWNS3 = (   # 見晴らしのよい崖で、上の道から撃たれる面。弓兵・立ち往生ができるまでは、既存の敵を、高低差のある所に置く
-    ("ochimusha", 620), ("kitsunebi_low", 480), ("kitsunebi_high", 760), ("karasu", 900),
-    ("ochimusha", 1180), ("kitsunebi_low", 1250), ("karasu", 1400), ("ochimusha", 1560),
-    ("kitsunebi_high", 1700), ("karasu", 1850), ("kitsunebi_low", 2050), ("karasu", 2150),
-    ("ochimusha", 2290), ("kitsunebi_high", 2600), ("ochimusha", 2700), ("karasu", 2950),
-    ("kitsunebi_low", 3100), ("ochimusha", 3350), ("karasu", 3600),
-    ("ochimusha", 3950), ("kitsunebi_high", 4150), ("karasu", 4350), ("ochimusha", 4750),
-    ("kitsunebi_low", 4900), ("karasu", 5050), ("kitsunebi_high", 5250),
+GATES3 = ((2820, "benkei"),)    # 中間地点の手前の、弁慶の間（左端の x）。倒すと、先へ進める
+SPAWNS3 = (   # 区画（ZONES3）ごとに、かたまりで置く。区画と区画の間は、空ける（等間隔に、1体ずつ並べない）
+    ("yumihei", 740),                                                   # 弓兵の崖: 弓兵1体だけ。登りながら、矢を覚える
+    ("ochimusha", 1180), ("yumihei", 1340),                             # 谷: 落ち武者と戦う所を、先の段の上から撃たれる
+    ("karasu", 1470), ("yumihei", 1570), ("karasu", 1660),              # 見晴らしの岩場: 頂上の弓兵と、烏2羽（最初の山）
+    ("kitsunebi_high", 2150),                                           # 崖渡り: 足場の上を横切る狐火が1つだけ
+    ("kitsunebi_high", 2560), ("kitsunebi_low", 2600), ("yumihei", 2700),                       # 高台: 狐火をくぐって、弓兵へ
+    # 弁慶の間（GATES3）と、鳥居のまわりには、置かない
+    ("kitsunebi_high", 3700), ("kitsunebi_low", 3760), ("karasu", 3900),                        # 長い登り: 上の道（足場）と、下の道
+    ("kitsunebi_high", 4120), ("ochimusha", 4220), ("karasu", 4300),
+    ("ochimusha", 4560), ("karasu", 4620), ("yumihei", 4700),           # 頂上: いちばんの山。弓兵・落ち武者2・烏2・狐火
+    ("ochimusha", 4820), ("karasu", 4900), ("kitsunebi_low", 4950),
+    # ボス前（5140〜）には、置かない
 )
-STAGE3 = StageDef("高館", W3, GROUND3, PLATFORMS3, ITEMS3, (3200, T), SPAWNS3, C.BGM_STAGE1, C.BGM_BOSS,
+# 区画: (左端, 右端, 名前, 役目, ねらいの強さ)。tools/difficulty.py 2 で、実際の強さと比べる
+ZONES3 = (
+    (0, 440, "入口", "休む", 1),
+    (440, 800, "弓兵の崖", "教える", 2),
+    (800, 1420, "谷", "試す", 3),
+    (1420, 1830, "見晴らしの岩場", "組み合わせ", 4),
+    (1830, 2400, "崖渡り", "渡る", 3),
+    (2400, 2820, "高台", "組み合わせ", 4),
+    (2820, 3300, "弁慶の間", "見せ場", 5),
+    (3300, 3540, "鳥居", "休む", 1),
+    (3540, 4400, "長い登り", "試す", 3),
+    (4400, 5140, "頂上", "組み合わせ", 5),
+    (5140, 5520, "ボス前", "休む", 1),
+)
+STAGE3 = StageDef("高館", W3, GROUND3, PLATFORMS3, thin_dango(ITEMS3, PLATFORMS3), (3340, T - 16), SPAWNS3, C.BGM_STAGE1, C.BGM_BOSS,
+                  lanterns=(("triple", 300), ("onigiri", 3392), ("onigiri", 5400)),   # 石灯籠: 入口（強化）・中間地点の先（回復）・ボスの前（回復）
                   sky="stage3/bg_sky.png", mid="stage3/bg_mid.png", tiles="stage3/",
                   boss_title="enemies/boss2_title.png", boss_name="enemies/boss2_name.png",
                   talk_boss="talk_boss2.png", talk_tanuki="talk_tanuki2.png", number=2, stele_x=130,
                   boss_kind="boss2", boss_pattern=C.BOSS2_PATTERN,   # ボスは遊ぶ順で決まる（2面: 基衡）
+                  gates=GATES3, zones=ZONES3,
                   pit=(24, 52, 60))   # 崖の切れ目の底は、昼でも暗い谷（深い青緑）
 # ---------------------------------------------------------------- 4面（金色堂）
 # 堂の中。暗い所から、金色の光へ。いちばん長い面（総まとめ）。走る区間と、ボスの間を、交互に並べる:
@@ -477,6 +568,8 @@ PLATFORMS4 = (
     (6560, 6620, T - 80), (6700, 6760, T - 100), (6840, 6900, T - 80),
     (7400, 7450, T - 100), (7560, 7610, T - 132), (7780, 7830, T - 100),
     (8200, 8260, T - 70),
+    # 影の基衡の間（3300〜3780）の足場: 基衡は、地面からは跳び越えられない。追い詰められたら、足場から跳び越える
+    (3390, 3450, T - 52), (3620, 3680, T - 52),
 )
 ITEMS4 = (
     ("dango", 150, T - 14), ("dango", 180, T - 14), ("dango", 210, T - 14),
@@ -486,6 +579,7 @@ ITEMS4 = (
     ("onigiri", 1420, T - 14),                       # 影の間の手前
     ("dango", 2055, T - 94), ("dango", 2425, T - 108),
     ("dango", 2630, T - 58),
+    ("dango", 3025, T - 88),                         # 足場（3000〜3050）の上
     ("onigiri", 3240, T - 14),                       # 影の間の手前
     ("dango", 3925, T - 78), ("dango", 4085, T - 114), ("dango", 4225, T - 142), ("onigiri", 4725, T - 110),
     ("dango", 4930, T - 94),
@@ -495,20 +589,50 @@ ITEMS4 = (
     ("dango", 6590, T - 98), ("dango", 6730, T - 118), ("dango", 6870, T - 98),
     ("onigiri", 7030, T - 30),
     ("dango", 7175, T - 58), ("dango", 7425, T - 118), ("dango", 7585, T - 150), ("dango", 7805, T - 118),
-    ("onigiri", 8100, T - 30), ("onigiri", 8440, T - 14),   # 最後のボスの手前（回復が多い面）
+    ("onigiri", 8230, T - 88), ("onigiri", 8440, T - 14),   # 1つは、足場（8200〜8260）の上   # 最後のボスの手前（回復が多い面）
 )
-SPAWNS4 = (   # 堂の中は、敵が少なめ（主役は、ボス）。浮かぶ光の狐火が中心。蝶（金の蝶）の絵ができたら、狐火の一部を差し替える
-    ("kitsunebi_low", 520), ("kitsunebi_high", 700), ("ochimusha", 960), ("kitsunebi_high", 1130), ("karasu", 1350),
-    ("kitsunebi_low", 2120), ("ochimusha", 2350), ("kitsunebi_high", 2750), ("karasu", 2900), ("kitsunebi_low", 3150),
-    ("kitsunebi_high", 3900), ("ochimusha", 4150), ("karasu", 4350), ("kitsunebi_low", 4600), ("ochimusha", 4850),
-    ("kitsunebi_low", 5700), ("kitsunebi_high", 5900), ("ochimusha", 6150), ("karasu", 6450), ("kitsunebi_high", 6650),
-    ("kitsunebi_low", 6950), ("karasu", 7250), ("ochimusha", 7450), ("kitsunebi_high", 7650), ("karasu", 7900),
-    ("kitsunebi_low", 8000), ("ochimusha", 8250),
+SPAWNS4 = (   # 堂の中は、敵が少なめ（主役は、ボス）。区画（ZONES4）ごとに、かたまりで置く。ボスの間の手前は、空ける
+    ("kitsunebi_low", 520), ("kitsunebi_high", 560),                    # 灯の段: 狐火の対
+    ("ochimusha", 960), ("kitsunebi_high", 1130), ("karasu", 1180),     # 金の階
+    # 影・泰衡（1500〜1980）
+    ("kitsunebi_low", 2120), ("kitsunebi_high", 2180), ("ochimusha", 2300), ("karasu", 2420),   # 回廊
+    ("kitsunebi_high", 2750), ("karasu", 2900), ("kitsunebi_low", 2950),                        # 回廊の奥
+    # 影・基衡（3300〜3780）
+    ("kitsunebi_high", 3900), ("ochimusha", 3990), ("kitsunebi_low", 4100), ("ochimusha", 4230), ("karasu", 4350),   # 金の登り
+    ("kitsunebi_low", 4600), ("kitsunebi_high", 4640), ("ochimusha", 4830),                     # 下り
+    # 影・秀衡（5100〜5580）
+    ("kitsunebi_low", 5820), ("kitsunebi_high", 5900), ("ochimusha", 6200),                     # 奥の廊下
+    ("karasu", 6450), ("karasu", 6540), ("kitsunebi_high", 6650), ("kitsunebi_low", 6700),      # 灯の山: 飛ぶ敵だけが、まとまって来る
+    # 鳥居（6950）のまわりには、置かない
+    ("ochimusha", 7420), ("karasu", 7500), ("kitsunebi_high", 7560), ("ochimusha", 7660),       # 最後の登り: 道中の、いちばんの山
+    ("karasu", 7700), ("kitsunebi_low", 7800), ("ochimusha", 7900),
+    # 清衡の前（8080〜）には、置かない
 )
-STAGE4 = StageDef("金色堂", W4, GROUND4, PLATFORMS4, ITEMS4, (6950, T - 16), SPAWNS4, C.BGM_STAGE1, C.BGM_BOSS,
+# 区画: (左端, 右端, 名前, 役目, ねらいの強さ)。tools/difficulty.py 4 で、実際の強さと比べる
+ZONES4 = (
+    (0, 300, "入口", "休む", 1),
+    (300, 870, "灯の段", "試す", 2),
+    (870, 1340, "金の階", "試す", 3),
+    (1340, 1980, "影・泰衡", "見せ場", 5),
+    (1980, 2680, "回廊", "組み合わせ", 3),
+    (2680, 3160, "回廊の奥", "試す", 3),
+    (3160, 3780, "影・基衡", "見せ場", 5),
+    (3780, 4500, "金の登り", "組み合わせ", 4),
+    (4500, 5000, "下り", "試す", 3),
+    (5000, 5580, "影・秀衡", "見せ場", 5),
+    (5580, 6360, "奥の廊下", "試す", 3),
+    (6360, 6900, "灯の山", "組み合わせ", 3),
+    (6900, 7230, "鳥居", "休む", 2),
+    (7230, 8080, "最後の登り", "組み合わせ", 4),
+    (8080, 8520, "清衡の前", "休む", 1),
+)
+STAGE4 = StageDef("金色堂", W4, GROUND4, PLATFORMS4, thin_dango(ITEMS4, PLATFORMS4), (6950, T - 16), SPAWNS4, C.BGM_STAGE1, C.BGM_BOSS,
+                  lanterns=(("triple", 280), ("onigiri", 7090), ("onigiri", 8370)),   # 石灯籠: 入口（強化）・中間地点の先（回復）・ボスの前（回復）
                   sky="stage4/bg_sky.png", mid="stage4/bg_mid.png", tiles="stage4/",
                   boss_title="enemies/boss4_title.png", boss_name="enemies/boss4_name.png",
                   talk_boss="talk_boss4.png", talk_tanuki="talk_tanuki4.png", number=4, stele_x=130,
-                  boss_kind="boss4", pit=(30, 20, 8), gates=GATES4)   # 切れ目の底は、金色の暗がり
+                  boss_kind="boss4", pit=(30, 20, 8), gates=GATES4, zones=ZONES4, gilt=True,
+                  traps=((2720, 3140, 120, 300), (5640, 6230, 84, 260)))     # 回廊の奥（広い間隔で、覚える）・奥の廊下（狭い間隔）
+                    # 切れ目の底は、金色の暗がり
 
 STAGES = [STAGE2, STAGE3, STAGE1, STAGE4]   # 遊ぶ順番（毛越寺 → 高館 → 月見坂 → 金色堂）

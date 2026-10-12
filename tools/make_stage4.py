@@ -21,12 +21,31 @@ SKY_H = 300
 PILLARS = ((135, 235), (1145, 1245))      # 元絵の、柱の横の範囲（左・右）
 MID_W = 1500
 PILLAR_AT = (60, 380, 700, 1020, 1340)
+# 奥のものほど暗く、色を薄くする（明るさ, 色の濃さ）。金の背景が、手前の床・足場・敵と同じ明るさだと、見分けがつかない
+STONE_KEEP = 0.34    # 光る足場の厚み（元絵の、上から、この割合だけ使う）
+SHADE_SKY = (0.40, 0.70)
+SHADE_MID = (0.62, 0.85)
+SHADE_FILL = (0.55, 0.80)    # 床の中身（上端の金の列は、明るいまま＝乗れる場所の線）
+
+
+def shade(im, k):
+    """明るさを落として、色を薄くする（透明は、そのまま）"""
+    bright, sat = k
+    rgba = im.convert("RGBA")
+    px = rgba.load()
+    for y in range(rgba.height):
+        for x in range(rgba.width):
+            r, g, b, a = px[x, y]
+            m = (r * 3 + g * 6 + b) / 10
+            px[x, y] = tuple(max(0, min(255, round((m + (c - m) * sat) * bright))) for c in (r, g, b)) + (a,)
+    return rgba if im.mode == "RGBA" else rgba.convert("RGB")
 
 
 def make_sky(src, out):
     im = Image.open(src).convert("RGB")
     im = im.resize((round(im.width * SKY_H / im.height), SKY_H), Image.LANCZOS).crop((0, 0, round(im.width * SKY_H / im.height), 270))
     im = im.quantize(colors=56, method=Image.MEDIANCUT, dither=Image.NONE).convert("RGB")
+    im = shade(im, SHADE_SKY)
     im.save(out, optimize=True)
     return im.size
 
@@ -48,6 +67,7 @@ def make_mid(src, out):
     canvas = canvas.convert("RGBA")
     q = canvas.convert("RGB").quantize(colors=24, method=Image.MEDIANCUT, dither=Image.NONE).convert("RGBA")
     q.putalpha(canvas.getchannel("A"))
+    q = shade(q, SHADE_MID)
     q.save(out, optimize=True)
     return q.size
 
@@ -63,8 +83,9 @@ def make_tiles(src, out_dir):
     top = m3.fit_width(img, (x0, y0, x1, y0 + round((y1 - y0) * 0.78)), 32, 20)   # 床の上端: 金の蓮の文様の上のほう
     top.save(os.path.join(out_dir, "tile_01.png"))
     for i, k in {0: 2, 3: 3, 4: 5, 5: 6, 2: 8}.items():
-        m3.square_tile(img, bs[k]).save(os.path.join(out_dir, "tile_%02d.png" % i))
-    stones = [m3.stone(img, bs[4], 45, 0.7), m3.stone(img, bs[7], 48, 0.7)]
+        shade(m3.square_tile(img, bs[k]), SHADE_FILL).save(os.path.join(out_dir, "tile_%02d.png" % i))
+    # 足場は、薄い板にする（元絵の上の 1/3 だけ）。厚いと、幅 60 の足場で、高さが 50 近い箱になり、床に届いて、壁に見える
+    stones = [m3.stone(img, bs[4], 45, STONE_KEEP), m3.stone(img, bs[7], 48, STONE_KEEP)]
     stones.append(stones[0].transpose(Image.FLIP_LEFT_RIGHT))
     for i, s in enumerate(stones):
         s.save(os.path.join(out_dir, "stone_%d.png" % i))

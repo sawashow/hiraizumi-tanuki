@@ -1,12 +1,17 @@
 """コントローラ（ゲームパッド）の入力。挿すと、すぐ使える（起動したあとに挿しても、抜いて挿し直しても大丈夫）。
 Xbox・PlayStation・Switch Pro・8BitDo など、SDL が知っているコントローラは、ボタンの名前（A・B・X・Y）で、同じ割り当てになる。
 知らないコントローラは、汎用の割り当て（ボタン0・1・2・3、スティック、十字キー）で動かす。
-コントローラが使えない環境（ブラウザ版など）でも、ゲームは止めない。
+コントローラが使えない環境でも、ゲームは止めない。
+ブラウザ版は、汎用の割り当てで動かす（十字キーは、ボタン12〜15）。ブラウザは、ページを開いたあと、ボタンを一度押すまで、コントローラを見つけない。
 
 割り当て:  十字キー・左スティック＝移動／下＝しゃがむ    A＝ジャンプ（決定）    X＝刀    B・Y＝手裏剣    Start＝再開（決定）
 """
+import sys
+
 import pygame
 
+WEB = sys.platform == "emscripten"   # ブラウザ版（pygbag）で動いているか
+WEB_DPAD = {"up": 12, "down": 13, "left": 14, "right": 15}   # ブラウザの「標準の並び」での、十字キーのボタン番号
 DEADZONE = 0.45   # スティックを倒したとみなす量（0〜1）
 
 # 「どのボタンを押したら、何になるか」（押した瞬間）。A は、ジャンプと決定（再開）を兼ねる
@@ -128,6 +133,13 @@ class Pad:
                         out.add("right" if hx > 0 else "left")
                     if hy < 0:
                         out.add("down")
+                if WEB and j.get_numbuttons() >= 16:    # ブラウザ: 十字キーは、ボタン12〜15（上・下・左・右）で届く
+                    if j.get_button(WEB_DPAD["down"]):
+                        out.add("down")
+                    if j.get_button(WEB_DPAD["left"]):
+                        out.add("left")
+                    if j.get_button(WEB_DPAD["right"]):
+                        out.add("right")
             except Exception:
                 pass
         if "left" in out and "right" in out:    # 左右が同時なら、どちらも無効

@@ -14,7 +14,7 @@ import config as C
 from stage import STAGE1_LEGACY, STAGES
 from audio import DIR as AUDIO_DIR, Audio
 from gamepad import Pad
-from sprites import Assets, Boss, Boss2, Boss3, Boss4, Checkpoint, draw_zzz, HitEffect, Item, Player, Shuriken, SlashWave, Wave, make_enemy
+from sprites import Assets, Benkei, HillGust, Pillar, Boss, Boss2, Boss3, Boss4, Checkpoint, draw_zzz, HitEffect, Item, Lantern, Player, Shuriken, SlashWave, Wave, make_enemy
 
 ENEMY_SPAWNS = STAGE1_LEGACY.spawns       # 古い短い版の月見坂の敵の配置（動作テスト用）
 # 地面タイルの並べ方（石畳A・B・苔・落ち葉）。位置から決めるので、スクロールしても変わらない
@@ -50,6 +50,8 @@ class Game:
         self.map_len = 0.0
         self.sfx = []            # このフレームに鳴らす効果音（メインループが鳴らして、空にする）
         self.rng = random.Random()   # 落とし物の、くじ
+        self.level = C.LEVEL         # 難しさ（スタート画面で、左右で変える）
+        self._lr = 0                 # スタート画面で、前のフレームに押していた左右（押した瞬間だけ、切り替える）
         self.story_bgm = os.path.exists(os.path.join(AUDIO_DIR, C.BGM_STORY))   # 語りの曲があるか
         self.super_bgm = os.path.exists(os.path.join(AUDIO_DIR, C.BGM_SUPER))   # スーパータヌキの曲があるか
         self._enter_title(title)
@@ -82,7 +84,7 @@ class Game:
     def reset(self, stage_i=0):
         """stage_i の面を最初から（残機・スコア・中間地点も、初期値に戻す）"""
         self._set_stage(stage_i)
-        self.lives = C.LIVES
+        self.lives = self.L["lives"]
         self.score = 0
         self._begin_stage()
 
@@ -148,6 +150,7 @@ class Game:
         self.dango = 0
         self.intro_t = 0        # 面の名前を出してからのフレーム数（遊び始めてから数える）
         self.taken = set()          # 取ったアイテム（配置表の番号）
+        self.toro_broken = set()    # 壊した石灯籠（配置表の番号）。やられて再開しても、壊れたまま
         self.one_up_given = False
         self.checkpoint = Checkpoint(*self.stage.checkpoint, self.a)
         self.cp_state = None        # 中間地点を通ったときの (スコア, 団子の数, 取ったもの)
@@ -191,8 +194,13 @@ class Game:
         self.player.safe_x, self.player.safe_y = float(x), y
         if clear:
             self.player.invincible = C.INVINCIBLE_FRAMES
-        self.enemies = [make_enemy(kind, ex, self.a, self.terrain) for kind, ex in self.stage.spawns
-                        if abs(ex - x) > clear]
+        self.player.ammo = self.L["ammo"]
+        keep = round(self.L["keep"] * 10)       # 難しさ「やさしい」: 敵を間引く（何番目の敵を抜くかは、いつも同じ）
+        self.enemies = [make_enemy(kind, ex, self.a, self.terrain) for i, (kind, ex) in enumerate(self.stage.spawns)
+                        if abs(ex - x) > clear and (i * 7 + 3) % 10 < keep]
+        for e in self.enemies:                  # 難しさ「むずかしい」: 体力2以上の敵が、硬くなる（狐火と烏は、1発のまま）
+            if e.max_hp >= 2:
+                e.max_hp = e.hp = e.max_hp + self.L["enemy_hp"]
         self.shurikens = []
         self.throw_n = 0    # 手裏剣を投げた回数（1投げごとの番号に使う）
         self.boss = None    # ボス（ボスの場所に入ると、出てくる）
@@ -205,6 +213,8 @@ class Game:
         self.waves = []     # 敵の光波
         self.slashes = []   # 強化中の、主人公の光波
         self.items = [Item(kind, ix, iy, self.a, n) for n, (kind, ix, iy) in enumerate(self.stage.items) if n not in self.taken]
+        self.lanterns = [Lantern(kind, lx, self._floor_at(lx), self.a, n, broken=n in self.toro_broken)
+                         for n, (kind, lx) in enumerate(() if self._terrain_fixed else self.stage.lanterns)]   # テスト用の地形には、置かない
         self.effects = []
         self.cam_x = max(0, min(int(x) - C.BASE_W // 2, self.stage.width - C.BASE_W))
         self.over_t = 0   # やられてからの経過フレーム
@@ -244,6 +254,13 @@ class Game:
                     self.story, self.story_t, self.story_run = True, 0, 0
                     self.story_x = float(C.STORY_TANUKI["x"])
                 return
+            lr = ("right" in held) - ("left" in held)      # 左右で、難しさを選ぶ
+            if lr and lr != self._lr:
+                order = C.LEVEL_ORDER
+                self.level = order[max(0, min(order.index(self.level) + lr, len(order) - 1))]
+                self.lives = self.L["lives"]
+                self.sfx.append(C.SFX_TALK_HIGH)
+            self._lr = lr
             if {"restart", "attack", "jump"} & set(pressed):
                 self.start_t = C.TITLE_START
                 self.flash_t = 0
@@ -303,6 +320,7 @@ class Game:
             p.throw()
         p.update(held, self.stage.width, self.terrain)
         self._boss_area(p)
+        self._gimmicks(p)
         foes = self.enemies + ([self.boss] if self.boss else [])
         if p.release:   # 手裏剣（三方手裏剣なら、前・斜め上・斜め下の3つ）
             self.throw_n += 1
@@ -351,11 +369,25 @@ class Game:
                     s.alive = False
                     e.hit(C.SLASH["damage"])
                     self.effects.append(HitEffect(*s.rect.center, self.a))
+        # 刀・手裏剣・光波 → 石灯籠（壊すと、中の物が出る）
+        for lt in self.lanterns:
+            lt.update()
+            if not lt.active:
+                continue
+            broke = bool(sword and sword.colliderect(lt.rect))
+            for s in self.shurikens + self.slashes:
+                if not broke and s.alive and s.rect.colliderect(lt.rect):
+                    s.alive = False
+                    broke = True
+            if broke and lt.hit():
+                self.toro_broken.add(lt.idx)
+                self.effects.append(HitEffect(*lt.rect.center, self.a))
+                self.items.append(Item(lt.kind, lt.rect.centerx, lt.rect.centery, self.a, drop=True))
         # 倒した敵が、物を落とす（ボスは落とさない）
         for e in self.enemies:
             if e.dying and not getattr(e, "dropped", False):
                 e.dropped = True
-                kind = drop_kind(self.rng.random())
+                kind = getattr(e, "sure_drop", None) or drop_kind(self.rng.random() / self.L["drops"])    # 必ず落とす敵（立ち往生）もいる
                 if kind:
                     self.items.append(Item(kind, e.rect.centerx, e.rect.centery, self.a, drop=True))
         # アイテムを拾う
@@ -364,12 +396,9 @@ class Game:
                 it.alive = False
                 self.taken.add(it.idx)
                 if it.kind == "dango":
-                    self.score += C.SCORE_DANGO
+                    self.score += C.SCORE_DANGO      # 団子: 手裏剣を投げられる数が増える（持てる数まで）
                     self.dango += 1
-                    if self.dango >= self.stage.dango_total and not self.one_up_given:
-                        self.one_up_given = True    # 団子を全部取ると、残機が1つ増える
-                        self.lives += 1
-                        self.msg_t = 90
+                    p.ammo = min(C.AMMO["max"], p.ammo + C.AMMO["dango"])
                 elif it.kind == "onigiri":
                     if p.hp < C.PLAYER_HP:
                         p.hp = min(C.PLAYER_HP, p.hp + C.HEAL_ONIGIRI)
@@ -394,12 +423,23 @@ class Game:
             if push and w.alive and p.rect.colliderect(w.rect):
                 nx = self.terrain.push_x(p.px, p.px + w.dir * push, p.py, C.PLAYER_W / 2)
                 p.px = max(C.PLAYER_W / 2, min(nx, self.stage.width - C.PLAYER_W / 2))
+        # 立ち往生は、敵の矢や光波も、弾いて消す
+        for e in self.enemies:
+            if getattr(e, "solid", False):
+                for w in self.waves:
+                    if w.alive and not getattr(w, "push", 0) and w.rect.colliderect(e.rect):
+                        w.alive = False
+                        e.hit(0)
+                        if hasattr(w, "cut_effect"):
+                            self.effects.append(w.cut_effect())
         # 刀 → 光波（刀で斬ると消せる。手裏剣は通り抜ける）
         if sword:
             for w in self.waves:
                 if w.alive and getattr(w, "cuttable", True) and sword.colliderect(w.rect):
                     w.alive = False
                     self.effects.append(HitEffect(*w.rect.center, self.a))
+                    if hasattr(w, "cut_effect"):    # 矢は、折れて落ちる
+                        self.effects.append(w.cut_effect())
         # 光波 → 主人公（無敵のあいだは、すり抜ける）
         for w in self.waves:
             if w.alive and not getattr(w, "push", 0) and not p.untouchable and p.rect.colliderect(w.rect):
@@ -407,6 +447,16 @@ class Game:
                 p.take_damage(w.px, getattr(w, "damage", C.WAVE["damage"]))
         # 敵 → 主人公（踏んでも倒せない。触れるとダメージ）
         for e in foes:
+            if getattr(e, "clang", False):      # 立ち往生が、攻撃を弾いた
+                e.clang = False
+                self.sfx.append(C.SFX_CLANG)
+            if getattr(e, "solid", False):      # 立ち往生: ダメージは無い。来たほうへ、押し戻す（上に乗っても、横へ落とす）
+                if p.rect.colliderect(e.rect):
+                    half = (e.w + C.PLAYER_W) / 2
+                    side = -1 if p.px < e.cx else 1
+                    nx = self.terrain.push_x(p.px, e.cx + side * half, p.py, C.PLAYER_W / 2)
+                    p.px, p.vx = max(C.PLAYER_W / 2, min(nx, self.stage.width - C.PLAYER_W / 2)), 0.0
+                continue
             if e.active and p.rect.colliderect(e.rect):
                 if p.super_t and e is not self.boss:    # スーパータヌキ: 触れたザコ敵を、倒す（ボスには効かない）
                     e.hit(e.hp)
@@ -424,7 +474,7 @@ class Game:
             self.shake_t -= 1
         self.bar_t = max(0, min(C.BOSS_INTRO["bar_frames"], self.bar_t + (1 if self.boss_intro else -1)))
         self.enemies = [e for e in self.enemies if e.alive]
-        if self.boss and self.boss.dying and getattr(self.boss, "shadow", False):    # 影を倒した: 倒れて消えたら、先へ進める
+        if self.boss and self.boss.dying and getattr(self.boss, "midway", False):    # 影を倒した: 倒れて消えたら、先へ進める
             if not getattr(self.boss, "shadow_done", False):
                 self.boss.shadow_done = True
                 self.waves, self.shurikens, self.slashes = [], [], []
@@ -527,6 +577,39 @@ class Game:
         self.shake_t = max(0, self.shake_t - 1)
         self.bar_t = min(C.BOSS_INTRO["bar_frames"], self.bar_t + 1)
 
+    def _trap_spots(self, trap):
+        x0, x1, gap, _ = trap
+        return [x for x in range(x0, x1 + 1, gap) if self.terrain.height_at(x) is not None]
+
+    def _gimmicks(self, p):
+        """面の仕掛け（山おろし・光の柱の廊下）。主人公が近くにいる間だけ動く。ボスと戦っている間は、止まる"""
+        if self.boss_on or p.hp <= 0:
+            return
+        t = self.intro_t
+        for x0, x1, period in self.stage.winds:
+            if x0 - C.WIND["near"] <= p.px <= x1 and t % period == 0:
+                self.waves.append(HillGust(x1 - 10, -1, self.a, self.terrain, x1 - x0))
+        for trap in self.stage.traps:
+            x0, x1, _, period = trap
+            if x0 - C.TRAP["near"] <= p.px <= x1 + 60:
+                for k, x in enumerate(self._trap_spots(trap)):
+                    if t % period == k * C.TRAP["stagger"] % period:
+                        self.waves.append(Pillar(x, self.terrain.height_at(x), self.a))
+
+    def _draw_traps(self, screen, cam):
+        """光の柱が落ちる場所の、床の印（いつも見える。金の輪）"""
+        for trap in self.stage.traps:
+            for x in self._trap_spots(trap):
+                sx, y = x - cam, round(self.terrain.height_at(x))
+                if -20 < sx < C.BASE_W + 20:
+                    pygame.draw.ellipse(screen, (60, 36, 8), (sx - 12, y - 4, 24, 7))
+                    pygame.draw.ellipse(screen, (255, 244, 170), (sx - 10, y - 3, 20, 5), 1)
+
+    @property
+    def L(self):
+        """いまの難しさの数字（config.LEVELS）"""
+        return C.LEVELS[self.level]
+
     def _arena(self):
         """いま、戦っている（次に戦う）ボスの間"""
         arenas = self.stage.arenas
@@ -544,11 +627,14 @@ class Game:
             self.cam_x = max(0, min(p.rect.centerx - C.BASE_W // 2, ar["x0"]))   # ここから、右端まで流す
             cls = self._boss_class(ar["kind"])
             final = not ar["shadow"]
-            pattern = self.stage.boss_pattern if final else C.BOSS3_PATTERN if ar["kind"] == "boss3" else None
+            pattern = self.stage.boss_pattern if final else {"boss3": C.BOSS3_PATTERN, "benkei": C.BENKEI_PATTERN}.get(ar["kind"])
             self.boss = cls(ar["boss_x"], self.a, self.terrain.height_at(ar["boss_x"]), ar["x0"], ar["x1"],
                             quick=self.boss_state is not None or not final, end_x=ar["boss_x"], pattern=pattern)
+            self.boss.max_hp = self.boss.hp = max(1, round(self.boss.max_hp * self.L["boss_hp"]))
             if not final:
-                self.boss.make_shadow()
+                self.boss.midway = True     # 面の途中の相手（影のボス・中ボス）: 倒すと、先へ進める
+                if ar["kind"] != "benkei":
+                    self.boss.make_shadow()
             self.boss_state = (self.score, self.dango, frozenset(self.taken))
             self.boss_arena_i = self.arena_i
             if final:
@@ -564,7 +650,7 @@ class Game:
             p.vx = 0.0
 
     def _boss_class(self, kind):
-        return {"boss2": Boss2 if self.a.boss2 else Boss, "boss3": Boss3, "boss4": Boss4}.get(kind, Boss)
+        return {"boss2": Boss2 if self.a.boss2 else Boss, "boss3": Boss3, "boss4": Boss4, "benkei": Benkei}.get(kind, Boss)
 
     def _gate_cleared(self):
         """影を倒して、光になって消えた: 先へ進める。おにぎりが出て、やられたら、ここから再開する"""
@@ -613,6 +699,7 @@ class Game:
 
     # --- 描画 ---
     def draw(self, screen, font):
+        self._font = font
         if self.ending_screen:
             self._draw_ending_screen(screen)
             return
@@ -635,6 +722,9 @@ class Game:
         screen.blit(self.a.mid, (-mid_x, 0))
         self._draw_ground(screen, cam)
         self._draw_stele(screen, cam)
+        self._draw_traps(screen, cam)
+        for lt in self.lanterns:
+            lt.draw(screen, cam)
         for e in self.enemies:
             e.draw(screen, cam)
         end = self._end_phase() if self.end_ready else ("", 0)
@@ -690,6 +780,7 @@ class Game:
             self._draw_water(screen, cam)
         else:
             pygame.draw.rect(screen, self.stage.pit, (0, C.GROUND_Y, C.BASE_W, C.BASE_H - C.GROUND_Y))
+            self._draw_pit_haze(screen, cam)
         for x0, x1, top_y in self.terrain.ground:
             sx0, sx1 = max(x0 - cam, 0), min(x1 - cam, C.BASE_W)
             if sx1 <= sx0:
@@ -708,6 +799,10 @@ class Game:
         screen.set_clip(None)
         # 浮き足場（絵があれば、礎石などの絵。無ければ、地面の上端のタイルを横に並べる）
         for n, (x0, x1, top_y) in enumerate(self.terrain.platforms):
+            ledge = self.a.ledges.get(x1 - x0 + C.STONE_PAD * 2)
+            if ledge:       # 幅に合わせて作ってある、足場の絵（草の上の面に、足が少し沈む）
+                screen.blit(ledge, (x0 - C.STONE_PAD - cam, top_y - C.LEDGE_SINK))
+                continue
             if self.a.stones:
                 img = self._stone(n, x1 - x0 + C.STONE_PAD * 2)
                 screen.blit(img, (x0 - C.STONE_PAD - cam, top_y - 3))
@@ -754,6 +849,31 @@ class Game:
         img.set_alpha(alpha)
         screen.blit(img, (C.BASE_W // 2 - img.get_width() // 2, C.BASE_H // 2 - img.get_height() // 2 - 8))
 
+    def _draw_pit_haze(self, screen, cam):
+        """穴の上に、底の色の「もや」を、下ほど濃く重ねる。奥の絵（松・灯籠・柵）の足元を沈めて、そこに地面があるように見せない。
+        2ドットごとの段にして、ドット絵の粗さに合わせる"""
+        H = dict(C.PIT_HAZE, h=self.stage.haze or C.PIT_HAZE["h"])
+        key = (self.stage.pit, H["h"])
+        haze = self._stone_cache.get(key)
+        if haze is None:
+            haze = pygame.Surface((C.BASE_W, H["h"]), pygame.SRCALPHA)
+            for y in range(0, H["h"], H["step"]):
+                k = (y + H["step"]) / H["h"]
+                haze.fill(self.stage.pit + (min(255, round(255 * k ** H["curve"])),), (0, y, C.BASE_W, H["step"]))
+            self._stone_cache[key] = haze
+        g = self.terrain.ground
+        for (_, a, _), (b, _, _) in zip(g, g[1:]):
+            if b <= a or b - cam <= 0 or a - cam >= C.BASE_W:
+                continue
+            y, e = C.GROUND_Y - H["h"], H["edge"]
+            # 穴の両端は、外へ向かって、2段で薄くする（となりの地面が低いと、もやの切れ目が、縦の線に見えるため）
+            for x0, x1, alpha in ((a - 2 * e, a - e, 70), (a - e, a, 150), (a, b, 255), (b, b + e, 150), (b + e, b + 2 * e, 70)):
+                sx0, sx1 = max(x0 - cam, 0), min(x1 - cam, C.BASE_W)
+                if sx1 > sx0:
+                    haze.set_alpha(alpha)
+                    screen.blit(haze, (sx0, y), (0, 0, sx1 - sx0, H["h"]))
+            haze.set_alpha(255)
+
     def _draw_water(self, screen, cam):
         top0, top1, fill = self.a.water
         top = top0 if (self.frames // C.WATER_TICKS) % 2 == 0 else top1
@@ -783,13 +903,23 @@ class Game:
             pygame.draw.rect(screen, (252, 208, 40), (x + 1, 11, 40 * p.super_t // C.SUPER_FRAMES, 4))
         text = font.render("%06d" % self.score, False, C.TEXT)
         screen.blit(text, (C.BASE_W - text.get_width() - 8, 8))
+        # 団子のゲージ（手裏剣を投げられる数）。体力の赤い四角とは、形と色を変える（串に刺さった、丸い団子）
         dango = pygame.transform.scale(self.a.item["dango"], (4, 12))
-        screen.blit(dango, (8, 24))
-        screen.blit(font.render("%d/%d" % (self.dango, self.stage.dango_total), False, C.TEXT), (16, 26))
+        screen.blit(dango, (8, 23))
+        p = self.player
+        warn = p.empty_t and (p.empty_t // 4) % 2      # 無いのに投げようとした: 赤く点滅
+        pygame.draw.rect(screen, C.BLACK, (17, 28, C.AMMO["max"] * 7 + 3, 3))             # 串
+        pygame.draw.rect(screen, (200, 60, 60) if warn else (200, 170, 110), (18, 29, C.AMMO["max"] * 7 + 1, 1))
+        for i in range(C.AMMO["max"]):
+            cx = 22 + i * 7
+            have = i < p.ammo
+            pygame.draw.circle(screen, (200, 40, 40) if warn else C.BLACK, (cx, 29), 4)
+            color = ((248, 150, 180), (252, 244, 232), (150, 200, 110))[i % 3] if have else (56, 50, 64)   # 桃・白・緑の三色団子
+            pygame.draw.circle(screen, color, (cx, 29), 3 if have else 2)
         screen.blit(font.render("LIFE x%d" % max(self.lives, 0), False, C.TEXT), (C.BASE_W - 64, 24))
         if self.boss and self.boss.active and self.boss.intro_done:
             self._draw_boss_hp(screen, font)
-        if self.boss and self.boss.state == "pose" and not getattr(self.boss, "shadow", False):   # ボスの二つ名と名前（ゆっくり出て、ゆっくり消える）
+        if self.boss and self.boss.state == "pose" and not getattr(self.boss, "midway", False):   # ボスの二つ名と名前（ゆっくり出て、ゆっくり消える）
             t, total, fade = self.boss.st, self.boss.intro["pose"], C.BOSS_INTRO["name_fade"]
             delay = C.BOSS_NAME_DELAY if total > C.BOSS_NAME_DELAY * 3 else 0   # 短いときは、一度に出す
             for img, y, start in ((self.a.boss_title, C.BOSS_TITLE_Y, 0), (self.a.boss_name, C.BOSS_NAME_Y, delay)):
@@ -1003,6 +1133,16 @@ class Game:
         if landed >= 0 and (landed // (4 if self.start_t else 30)) % 2 == 0:   # 着いてから点滅（決定したあとは、速く）
             img = self.a.title_prompt
             screen.blit(img, (C.TITLE_PROMPT[0] - img.get_width() // 2, C.TITLE_PROMPT[1]))
+        font = getattr(self, "_font", None)
+        if landed >= 0 and font:      # 難しさ（左右で選ぶ）。端では、矢印を片方だけ出す
+            i = C.LEVEL_ORDER.index(self.level)
+            text = ("< " if i > 0 else "  ") + self.L["label"] + (" >" if i < len(C.LEVEL_ORDER) - 1 else "  ")
+            img = font.render(text, False, (255, 236, 150))
+            x, y = C.LEVEL_LABEL[0] - img.get_width() // 2, C.LEVEL_LABEL[1]
+            edge = font.render(text, False, C.BLACK)
+            for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                screen.blit(edge, (x + dx, y + dy))
+            screen.blit(img, (x, y))
 
     def _bolt(self):
         """稲妻の折れ線（本体, 枝）。雷ごとに形が変わる（同じ雷の間は、同じ形）"""
@@ -1126,9 +1266,13 @@ async def main():
     screen = pygame.Surface((C.BASE_W, C.BASE_H))
     clock = pygame.time.Clock()
     font = pygame.font.Font(None, 20)
-    game = Game(title=not {"boss", "cp", "s2"} & set(sys.argv[1:]))
-    if "s2" in sys.argv[1:]:     # 確認用: python main.py s2 で、2面から始める（スタート画面は出さない）
-        game.reset(1)
+    start = [int(a[1:]) for a in sys.argv[1:] if a in ("s2", "s3", "s4")]
+    for a in sys.argv[1:]:       # 確認用: python main.py easy（hard）で、その難しさで始める
+        if a in C.LEVELS:
+            C.LEVEL = a
+    game = Game(title=not (start or {"boss", "cp"} & set(sys.argv[1:])))
+    if start:     # 確認用: python main.py s2（s3・s4）で、その面から始める（スタート画面は出さない）
+        game.reset(start[0] - 1)
     if "cp" in sys.argv[1:]:     # 確認用: python main.py cp で、中間地点の手前から始める（スタート画面は出さない）
         game.player.px, game.player.py = float(game.stage.checkpoint[0] - 70), float(game.stage.checkpoint[1])
         game.enemies = [e for e in game.enemies if abs(e.cx - game.stage.checkpoint[0]) > 200]

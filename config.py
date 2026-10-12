@@ -9,6 +9,8 @@ FPS = 60
 
 STAGE_W = 4080   # 1面の長さ（最後の1画面ぶんが、ボスの場所）。遠景・中景は、この長さに合わせて、カメラの動きに比例して流れる
 GROUND_Y = 222   # 地面の上端（タイルの上端）
+# 穴の上に重ねる「もや」: 高さ h、step ドットごとの段、curve が大きいほど、上のほうが薄い（池のある面には、出さない）
+PIT_HAZE = dict(h=72, step=4, curve=1.6, edge=8)   # edge: 穴の両端の外へ、薄くしながら、はみ出す幅（×2段）
 FLOOR_Y = GROUND_Y + 4  # 足がつく高さ（地面の石の縁の中）
 
 # 色
@@ -36,6 +38,7 @@ JUMP_START = 0.7     # 左右を押しながら跳んだとき、跳んだ瞬間
 JUMP_BUFFER = 8      # ジャンプを、着地や振り終わりの少し前に押しても、覚えておいて、できるようになったらすぐ跳ぶフレーム数
 COYOTE = 5           # 足場の縁から出てしまっても、このフレーム数までは跳べる
 ATTACK_MOVE = 0.6    # 刀・手裏剣の動作中に、向いているほうを押し続けたときの速さ（最高速に掛ける）。止まらずに、動きにつながる
+SWORD_COOLDOWN = 14  # 刀を振り終わってから、次の刀を振れるまでのフレーム数（連打で、強くなりすぎないように。手裏剣や移動は、すぐできる）
 INPUT_BUFFER = 10    # 刀・手裏剣を、前の動作が終わる少し前に押しても、覚えておいて、終わったらすぐ出すフレーム数
 AIR_ACCEL = 0.18     # 空中で押したときの加速（逆向きでも約0.4秒で反転する）
 AIR_FRICTION = 0.02  # 空中で離したときの減速（勢いはほぼ保たれる）
@@ -94,7 +97,9 @@ OCHI = dict(w=20, h=40, hp=3, touch=1, speed=0.6, active=240, ready_dist=110, re
 KITSUNEBI = dict(w=14, h=14, hp=1, touch=1, speed=0.9, active=380, bob=12, period=90,
                  low=FLOOR_Y - 36, high=FLOOR_Y - 92)
 # 烏（カラス）: 横長で速い。近づくと羽ばたいて予告し、そのときの主人公の位置へ急降下する
-KARASU = dict(w=22, h=12, hp=1, touch=1, speed=3.5, active=240, telegraph=30, height=FLOOR_Y - 110)
+#   drop: 急降下で降りる深さ（待っている高さ → 地面に立つ主人公の胸のあたり）。主人公の高さに関係なく、いつも同じ
+#   min_dx: 急降下の、横の進みの下限（真下にいても、これより急な角度では落ちない）
+KARASU = dict(w=22, h=12, hp=1, touch=1, speed=3.5, active=240, telegraph=30, height=FLOOR_Y - 110, drop=92, min_dx=70)
 
 # 討伐難易度（仮。1〜10）: 体力・予告の短さ・攻撃のよけにくさ・倒す手間から、見積もる。遊んで直す。
 # 面の難易度（敵の密度＝敵の難易度の合計 ÷ 面の長さ(1000px)）を測るのに使う。tools/difficulty.py で、面ごとに表にする。
@@ -105,7 +110,23 @@ ENEMY_DIFFICULTY = {
     "tachiojo": 4, "oboro": 4,                          # 立ち往生・朧
     "ochimusha": 5, "yumihei": 5,                       # 落ち武者・弓兵
 }
-BOSS_DIFFICULTY = {"boss": 6, "boss2": 7, "boss3": 8, "boss4": 9}   # 泰衡・基衡・秀衡・清衡
+BOSS_DIFFICULTY = {"boss": 6, "boss2": 7, "boss3": 8, "boss4": 9, "benkei": 5}   # 泰衡・基衡・秀衡・清衡・弁慶（中ボス）
+# 面の出来を測るときの物差し（tools/difficulty.py）。面を区画（stage.py の zones。無ければ window ごと）に分けて、単調な所を見つける
+#   level: 区画の強さ（敵の難易度の合計＋穴×hole_cost。500px あたりに直す）を、1〜5 の段に分ける境目
+#   same_run: 同じ敵が、これ以上続いたら注意 / flat: 平らな道が、これより長く続いたら注意（px）
+#   empty: 敵も穴も物も無い区間が、これより長ければ注意（px） / combo: 違う種類の敵と一緒に出る敵の割合が、これより低ければ注意
+#   near: 「一緒に出る」とみなす距離（px。画面の半分）
+#   spacing: 敵の間隔のばらつき（標準偏差÷平均）が、これより小さければ注意（等間隔に並べただけ）
+#   group / grouped: group 以内に、ほかの敵がいる敵の割合が、grouped より低ければ注意（1体ずつ順番に出るだけ）
+#   crowd: 1画面に入る敵が、いちばん多い所でも、これより少なければ注意（見せ場が無い）
+#   jump: 穴を越える1回のジャンプの難しさ。必要な距離 ÷ 届く距離（全速で跳んだとき）が、この境目を超えるごとに、1 → 2 → 3 → 4
+#   narrow: 着地する足場の幅が、これより狭ければ、＋1 / edge: 穴のふちから、この距離より近い敵は、＋1（跳ぶのを邪魔する）
+MAP_CHECK = dict(window=500, level=(3, 7, 11, 16), jump=(0.45, 0.65, 0.8), narrow=45, edge=100, same_run=4, flat=600, empty=320, combo=0.35, near=240,
+                 spacing=0.6, group=110, grouped=0.4, crowd=5, gimmick=4)     # gimmick: 仕掛け（山おろし・光の柱）の強さ（500px あたり）
+# 面の仕掛け: 山おろし（風）は、主人公が near より近くにいる間だけ吹く。光の柱の廊下は、stagger フレームずつ遅れて、左から順に落ちる
+WIND = dict(near=300)
+TRAP = dict(near=320, stagger=22)
+ZONE_ROLES = ("教える", "試す", "組み合わせ", "渡る", "休む", "見せ場")     # 区画の役目（渡る = 敵は少なく、跳んで進むのが主役）
 # 面ごとの目標（面の番号 → 敵の密度, ボスの難易度）。許す幅は、密度の ±DENSITY_TOLERANCE
 STAGE_TARGET = {1: (8, 6), 2: (14, 7), 3: (20, 8), 4: (10, 9)}
 DENSITY_TOLERANCE = 0.25
@@ -115,17 +136,23 @@ ENEMY_FRAMES = {
     "ochimusha": {"walk": 4, "stance": 3, "swing": 2, "death": 3},
     "kitsunebi": {"flicker": 4, "death": 4},
     "karasu": {"flap": 4, "dive": 2, "death": 2},
-    "boss3": {"walk": 3, "stance": 3, "swing": 2, "death": 3},   # 秀衡（tools/make_boss3.py）
-    "boss4": {"idle": 3, "cast": 3, "death": 3},   # 清衡: 浮いて座る・数珠を飛ばす・光になって消える（tools/make_boss4.py）
+    # 泰衡（tools/make_boss1.py）: 歩く・立ち・高い構え・振る・かがむ・跳ぶ・やられ（のけぞる・倒れる）
+    "boss": {"walk": 4, "stance": 3, "high": 2, "swing": 2, "crouch": 2, "leap": 2, "death": 3},
+    "yumihei": {"idle": 2, "draw": 3, "shoot": 2, "death": 3},   # 弓兵（tools/make_poses.py）
+    "tachiojo": {"stand": 2},                                    # 立ち往生（動かない。倒せない）
+    "boss3": {"walk": 4, "stance": 3, "low": 2, "high": 2, "swing": 2, "crouch": 2, "leap": 2, "death": 3},   # 秀衡（tools/make_boss3.py）。low = 低い構え
+    "boss4": {"idle": 1, "pray": 2, "cast": 2, "spread": 2, "hold": 1, "roar": 2, "death": 3},   # 清衡: 浮いて座る・数珠を飛ばす・光になって消える（tools/make_boss4.py）
 }
 # w,h = 枠の大きさ / ax = 枠の中の、体の中心の左右位置 / ay = 足元（bottom）か中心（center）の上下位置
 ENEMY_ART = {
     "ochimusha": dict(w=62, h=51, ax=31, ay=51, mode="bottom"),
     "kitsunebi": dict(w=16, h=18, ax=8, ay=9, mode="center"),
     "karasu": dict(w=42, h=25, ax=21, ay=12, mode="center"),
-    "boss3": dict(w=108, h=107, ax=54, ay=107, mode="bottom"),   # 秀衡（足元が、枠の下端）
-    "boss4": dict(w=79, h=64, ax=39, ay=32, mode="center"),     # 清衡（絵の中心が、体の中心）
-    "boss": dict(w=124, h=102, ax=62, ay=102, mode="bottom"),   # 仮の絵: 落ち武者を2倍にしたもの
+    "yumihei": dict(w=49, h=48, ax=24, ay=48, mode="bottom"),
+    "tachiojo": dict(w=42, h=88, ax=16, ay=88, mode="bottom"),   # いつも左向き（絵を反転して出す）。体の中心は、薙刀のぶん、枠の左寄り
+    "boss3": dict(w=116, h=115, ax=58, ay=114, mode="bottom"),   # 秀衡（枠の下端の1ドットは、縁取り）
+    "boss4": dict(w=112, h=89, ax=60, ay=89, mode="bottom"),    # 清衡（蓮の台座の下端が、枠の下端。横は、台座の中心）
+    "boss": dict(w=144, h=107, ax=72, ay=107, mode="bottom"),   # 泰衡（足元が、枠の下端）
     "boss2": dict(w=120, h=77, ax=60, ay=77, mode="bottom"),    # 基衡: 霧の下端が、地面より3ドット下に来る
 }
 # 基衡のコマ（assets/images/enemies/boss2_名前.png。左向き。tools/make_boss2.py が作る）
@@ -134,7 +161,16 @@ BOSS2_FRAMES = ("idle_0", "idle_1", "idle_2", "walk_0", "walk_1", "fan_up", "fan
 
 # 落ち武者の光波（刀を振ると、前方の地面すれすれを飛ぶ。ジャンプでよけるか、刀で消せる。手裏剣は通り抜ける）
 WAVE_FRAMES = 3
-WAVE = dict(w=4, h=14, speed=1.1, range=140, damage=1, dy=-9, ticks=7)
+# 立ち往生（弁慶の亡霊）: 動かない。倒せない。ダメージも与えない。敵の矢や光波を弾く「矢よけ」（うしろに隠れられる）。
+#   触れると、手前へ押し戻される。刀・手裏剣は、白く光って弾かれる。
+#   飛び越えて進む。当たり判定（h）は、見た目（体の高さ 約60）より低くして、地面からのジャンプ（高さ72）で、余裕をもって越えられるようにする
+TACHIOJO = dict(w=24, h=48, hp=2, touch=0, flash=10, breath=44, fade=26, drop="onigiri")
+# 弓兵: 動かない。近づくと弓を引き（draw_frames が予告）、主人公をねらって、矢をまっすぐ撃つ。矢は、刀で斬って消せる（手裏剣は、通り抜ける）
+#   active: 気づく距離（横）。reach_y: 気づく高さの差。bow_y: 矢が出る高さ（足元から）。max_angle: ねらえる角度（水平から、上下に）
+YUMI = dict(w=18, h=40, hp=2, touch=1, active=300, reach_y=150, draw_frames=42, shoot_frames=24, cooldown=150, first_wait=30,
+            bow_y=27, max_angle=38)
+ARROW = dict(w=12, h=6, speed=2.5, range=360, damage=1, break_frames=18)
+WAVE = dict(w=4, h=14, speed=1.1, range=140, damage=1, dy=-17, ticks=7)   # dy: 光波の中心の高さ（足元から。絵の下端が、地面に付く高さ）
 
 # ボス（1面は、四代の藤原泰衡。見た目は、落ち武者）: 最後の1画面に入ると、上から降ってくる。画面はそこで止まり、倒すとクリア
 # 動きは「歩く → 構えて光波」を2回、そのあと「かがんで跳びかかり」の繰り返し（1面のボスなので、攻撃は1つずつ）。
@@ -197,7 +233,14 @@ SUPER_FRAMES = 480              # スーパータヌキの長さ（8秒）
 SUPER_SPEED = 1.5               # 速さの倍率（最高速と、加速）
 SUPER_WARN = 90                 # 残りがこのフレーム数になったら、光り方が変わる（もうすぐ切れる合図）
 # 敵を倒したとき、落とす物と、その確率（残りは、何も落とさない）。ボスは落とさない
-DROPS = (("onigiri", 0.14), ("leaf", 0.12), ("triple", 0.12), ("super", 0.06))
+# 石灯籠（道ばたにあり、刀・手裏剣・光波で壊すと、中の物が出る）。絵は tools/make_enemy.py で作る（元絵は prop_toro.jpg）
+#   w, h: 当たり判定。flicker: 火のゆらぎの1コマの長さ。break_ticks: 壊れる動きの1コマの長さ。ax: 絵の枠の、足元の中心（左から）
+TORO = dict(w=22, h=34, flicker=9, break_ticks=5, ax=21, shard_vx=1.6, shard_vy=-3.4, shard_life=34)
+DROPS = (("onigiri", 0.12), ("leaf", 0.07), ("triple", 0.07), ("dango", 0.18))
+# 手裏剣は、数に限りがある（悪魔城ドラキュラのサブウェポンと同じ扱い）。数は「団子」で持つ。刀は、いくらでも振れる
+#   max: 持てる数。start: 面の始まり・やられて再開したときの数。dango: 団子1つで増える数。cost: 1投げで減る数（三方手裏剣も、1投げで1）
+#   empty: 団子が無いのに投げようとしたとき、団子のゲージを赤く点滅させるフレーム数
+AMMO = dict(max=12, start=6, dango=1, cost=1, empty=24)
 DROP_LIFE = 540                 # 落とし物が消えるまでのフレーム数（最後の2秒は点滅）
 DROP_HOP = -2.6                 # 落とし物が出たときの、上向きの速さ（少し跳ねて、地面に落ちる）
 DROP_GRAVITY = 0.22
@@ -208,7 +251,7 @@ SLASH_FRAMES = 3
 BGM_STAGE1 = "bgm_stage1.ogg"  # 1面の曲。曲名は「Clash of the Iron Fan」
 BGM_STORY = "bgm_story.ogg"    # 始まりの語りの間（おとなしい曲）。曲名は「Evening at the Border Post」。ファイルが無ければ、無音
 BGM_BOSS = "bgm_boss.ogg"      # ボスと戦っている間。曲名は「Crimson Temple Breach」（くり返せるように、終わりの締めを切ってある）
-BGM_SUPER = "bgm_super.ogg"    # スーパータヌキの間（短くて、勢いのある曲）。ファイルが無ければ、面の曲のまま
+BGM_SUPER = "bgm_super.ogg"    # スーパータヌキの間（勢いのある曲）。曲名は「Seven Blades High」。ファイルが無ければ、面の曲のまま
 BGM_VOLUME = 0.5
 BGM_VOLUMES = {BGM_STORY: 0.4}   # 曲ごとの音量（書いていない曲は BGM_VOLUME）。語りの曲は、少し小さく
 SFX_THUNDER = "sfx_thunder.ogg"   # 雷鳴（スタート画面）
@@ -216,7 +259,8 @@ SFX_SWORD = "sfx_sword.ogg"       # 刀を抜く「ジャキン」（スター�
 SFX_CHECKPOINT = "sfx_checkpoint.ogg"   # 中間地点を通ったときの音（琴のような音階に、鈴の余韻）
 SFX_TALK_LOW = "sfx_talk_low.ogg"     # せりふの字が出るときの「ピッ」（ボス。低い）
 SFX_TALK_HIGH = "sfx_talk_high.ogg"   # 同じ（タヌキ侍。高い）
-SFX_VOLUME = {SFX_THUNDER: 0.3, SFX_SWORD: 0.3, SFX_CHECKPOINT: 0.22, SFX_TALK_LOW: 0.07, SFX_TALK_HIGH: 0.07}   # 効果音の大きさ（抑えめ）。音は tools/make_sfx.py で作る
+SFX_CLANG = "sfx_clang.ogg"           # 刀や手裏剣が、弾かれる音（立ち往生）
+SFX_VOLUME = {SFX_CLANG: 0.2, SFX_THUNDER: 0.3, SFX_SWORD: 0.3, SFX_CHECKPOINT: 0.22, SFX_TALK_LOW: 0.07, SFX_TALK_HIGH: 0.07}   # 効果音の大きさ（抑えめ）。音は tools/make_sfx.py で作る
 BGM_FADE_MS = 1200      # やられたとき、曲が消えていくまでの時間
 
 # スタート画面: 絵（assets/images/title.png、480×270）の上に、題名を重ねる。Enter（Z・Space でも）で始まる。
@@ -287,6 +331,7 @@ STORY_PROMPT = (350, 216)   # 「PUSH ENTER KEY」の、左右の中心と上端
 # 面の名前の表示（面の始まりに、縦書きで出す）: 少し待って → 現れる → 見せる → 消える（フレーム数）
 STAGE_TITLE = dict(wait=20, fade_in=25, hold=120, fade_out=35)
 STELE_Y = 2           # 石碑を、地面に少し埋める（足元から）
+LEDGE_SINK = 4        # 足場の絵（ledge_幅.png）を、足の高さより、上にずらす量（草の葉先のぶん）
 STONE_PAD = 5         # 礎石の足場の絵を、足場の幅より、左右にはみ出させる分
 
 # 池（水面の絵がある面）
@@ -295,6 +340,17 @@ WATER_TICKS = 30      # 水面が、もう1コマに切り替わるまでのフ�
 
 # 残機・中間地点
 LIVES = 3
+# 難しさ（スタート画面で、左右で選ぶ。起動のときに easy・hard と書いても選べる）。面の形は変えず、数字だけを変える
+#   keep: 置く敵の割合（1 より小さいと、決まった敵を間引く） / enemy_hp: 体力が2以上の敵（落ち武者・弓兵）の体力に、足す数
+#   boss_hp: ボス・中ボスの体力の倍率 / drops: 敵が物を落とす確率の倍率 / ammo: 面の始まりの団子 / lives: 残機
+LEVELS = {
+    "easy": dict(label="EASY", keep=0.7, enemy_hp=0, boss_hp=0.75, drops=1.5, ammo=10, lives=5),
+    "normal": dict(label="NORMAL", keep=1.0, enemy_hp=0, boss_hp=1.0, drops=1.0, ammo=6, lives=LIVES),
+    "hard": dict(label="HARD", keep=1.0, enemy_hp=1, boss_hp=1.3, drops=0.6, ammo=4, lives=2),
+}
+LEVEL_ORDER = ("easy", "normal", "hard")
+LEVEL = "normal"        # 最初に選ばれている難しさ
+LEVEL_LABEL = (150, 252)    # スタート画面の、難しさの表示（左右の中心と上端）
 RESPAWN_AT = 215        # 倒れてから、中間地点で再開するまでのフレーム数（残機が残っているとき）
 RESPAWN_CLEAR = 160     # 再開した場所から、この距離までの敵は置かない（再開してすぐ、ぶつからないように）
 CHECKPOINT_W = 24       # 中間地点（鳥居）に触れる範囲の幅
@@ -326,16 +382,37 @@ BOSS2_RAGE_PATTERN = "TPWP"
 # （歩く → 構える → 薙刀を振って光波、3回に1回、跳びかかり）だが、間合いが長く、光波が速くて遠くまで届く。
 # 光波の高さの順は、「低・高」を、交互に薙ぎ分ける
 BOSS3 = dict(BOSS, w=34, h=88, hp=30, speed=0.55, near=90, wave_speed=2.3, wave_range=520, high_bottom=34,
-             rage_walk_frames=46, rage_recover_frames=40)
+             rage_walk_frames=46, rage_recover_frames=40,
+             combo=2, rage_combo=3, combo_ready=26)   # 光波を、続けて撃つ（ふだん2発、体力が半分で3発）。2発目からは、構えが短い
 BOSS3_PATTERN = "LHLLHH"
+# 高館の中ボス（弁慶の亡霊「立ち往生」）。道の真ん中に立って、動かない。どこから斬っても、効く（特別な決まりは無い）。
+#   離れていると: 薙刀を薙いで、光波を飛ばす（低い = 跳ぶ / 高い = しゃがむ）
+#   近づくと（near より内側）: 突き。速いが、thrust_range までしか届かない（下がるか、跳ぶ）
+#   攻撃のあとに隙がある。体力が半分になると、光波を2発続け、間が短くなる。倒すと、光になって消える
+BENKEI = dict(BOSS, w=24, h=60, hp=14, speed=0.0, near=80, wave_speed=2.0, wave_range=460, high_bottom=34,
+              walk_frames=70, rage_walk_frames=44, recover_frames=64, rage_recover_frames=44,
+              combo=1, rage_combo=2, combo_ready=26,
+              thrust_ready=34, thrust_speed=4.2, thrust_range=90, fade=44, breath=44)
+BENKEI_PATTERN = "LHLLH"
 # 4面のボス（初代・清衡）。地面から少し浮いて、座ったまま動く。数珠の玉を、高さを変えて飛ばす（低い・真ん中・高い）。
 # 玉は、刀で消せる。体力が半分になると、玉の数が増え、間が短くなる
-BOSS4 = dict(w=30, h=44, hp=36, touch=1, speed=0.7, near=110, gravity=0.3, hover=12,
+BOSS4 = dict(w=44, h=72, hp=36, bob=2, touch=1, speed=0.7, near=110, gravity=0.3, hover=12,
              walk_frames=80, rage_walk_frames=52, recover_frames=60, rage_recover_frames=40,
-             ready=36, fire_at=8, cast_frames=44, gap=14)
+             ready=36, fire_at=8, cast_frames=44, gap=14,
+             ring_ready=44, pillar_frames=78, warp_out=22, warp_in=26, warp_dist=150, warp_min=90, roar=56)
+# 攻撃の順（くり返す）。beads=数珠の玉 / pillar=光の柱 / ring=数珠の輪 / warp=転移（すぐ次の攻撃に移る）
+BOSS4_CYCLE = ("beads", "pillar", "warp", "beads", "ring", "pillar", "warp", "ring")
+BOSS4_RAGE_CYCLE = ("beads", "pillar", "ring", "warp", "pillar", "beads", "warp", "ring")   # 怒ったあと（最初に、転移が入る）
+# 光の柱: warn=予告の長さ / beam=柱が出ている長さ / spread=柱の間隔（主人公の足元を中心に並ぶ。間に立てる幅） / stagger=外側の柱が遅れるフレーム数
+PILLAR = dict(w=20, warn=54, rage_warn=42, beam=16, damage=1, count=3, rage_count=5, spread=64, stagger=8)
+# 数珠の輪: 清衡のまわり radius の所に count 個の玉が出て、八方へ飛ぶ。横へ飛ぶ玉は、しゃがめば当たらない高さ
+RING = dict(count=8, radius=40, speed=1.9, rage_speed=2.3, range=200)
+# 後光: 半径 r（怒ると rage_r）、光の筋 rays 本（長い・短いを交互）、spin=回る速さ、dy=体の中心から上へずらす量
+HALO = dict(r=44, rage_r=54, rays=16, ray_long=16, ray_short=8, spin=0.012, dy=8, roar_grow=10,
+            color=(255, 214, 90), rage_color=(255, 132, 56))
 BOSS4_VOLLEYS = ("LMH", "HML", "MHL", "LHM")          # 玉の高さの順（L=低い / M=真ん中 / H=高い）。くり返す
 BOSS4_RAGE_VOLLEYS = ("LMHML", "HLMLH", "MHLHM")
 BEAD = dict(w=8, h=8, speed=2.2, rage_speed=2.7, range=360, damage=1, low=10, mid=26, high=44, ticks=6)   # 高さは、地面から
-GUST = dict(w=26, h=34, speed=1.5, range=150, push=2.2, ticks=5)    # 扇の風（押す速さは、最高速より小さい。押されながらでも、進める）
-FAN = dict(w=16, h=16, speed=1.7, range=170, damage=1, y=40, spin=9)   # 投げた扇（y=地面からの高さ）。往路のあと、同じ速さで戻る
+GUST = dict(w=34, h=40, speed=1.5, range=150, push=2.2, ticks=7, lead=10, sink=2)    # 扇の風（押す速さは、最高速より小さい。押されながらでも、進める）
+FAN = dict(w=16, h=16, speed=1.7, range=170, damage=1, y=40, spin=9, turn=18)   # 投げた扇（y=地面からの高さ）。往路のあと、turn フレーム止まって白く光り（戻る予告）、同じ速さで戻る
 PETAL = dict(w=7, h=7, count=4, spread=34, warn=44, speed=2.6, top=-12, damage=1, stagger=10)   # 花びらの雨

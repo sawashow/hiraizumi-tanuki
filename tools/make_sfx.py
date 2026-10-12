@@ -97,6 +97,22 @@ def checkpoint(rate=44100, seconds=2.0):
     return out, rate
 
 
+def clang(rate=44100, seconds=0.28):
+    """弾かれる音: 石を打ったような、短くて硬い「カン」。高い音が、すぐ消える"""
+    rnd = random.Random(11)
+    n = int(rate * seconds)
+    partials = [(1568, 1.0, 22), (2349, 0.6, 28), (3520, 0.45, 34), (5274, 0.25, 44)]   # (高さHz, 強さ, 消える速さ)
+    out, low = [], 0.0
+    for i in range(n):
+        t = i / rate
+        v = sum(a * math.exp(-t * d) * math.sin(2 * math.pi * f * t) for f, a, d in partials)
+        noise = rnd.uniform(-1, 1)
+        low += (noise - low) * 0.4
+        v += (noise - low) * math.exp(-t * 90) * 0.8        # 当たった瞬間の、硬い音
+        out.append(v * min(1.0, i / 8))
+    return out, rate
+
+
 def talk(freq, rate=22050, seconds=0.05):
     """せりふの字が1文字出るときの音: 短い四角い波（昔のゲームの、しゃべる音）"""
     n = int(rate * seconds)
@@ -114,5 +130,6 @@ if __name__ == "__main__":
     save(os.path.join(out_dir, "sfx_thunder.wav"), *thunder())
     save(os.path.join(out_dir, "sfx_sword.wav"), *sword())
     save(os.path.join(out_dir, "sfx_checkpoint.wav"), *checkpoint())
+    save(os.path.join(out_dir, "sfx_clang.wav"), *clang())
     save(os.path.join(out_dir, "sfx_talk_low.wav"), *talk(330))
     save(os.path.join(out_dir, "sfx_talk_high.wav"), *talk(660))
