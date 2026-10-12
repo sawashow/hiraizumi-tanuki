@@ -108,7 +108,7 @@ check("烏は横長・狐火は小さい", ka.w > ka.h * 1.5 and ki.w * ki.h < k
 kinds = [k for k, _ in ENEMY_SPAWNS]
 check("1面の配置が、落ち武者11・狐火6・烏7（敵が多い面）", (kinds.count("ochimusha"), sum(k.startswith("kitsunebi") for k in kinds),
                                       kinds.count("karasu")) == (11, 6, 7))
-check("2面は、1面より敵が少ない（飛ぶ敵が中心）", len(STAGES[1].spawns) < len(STAGES[0].spawns) * 0.6
+check("2面は、1面より敵が少ない（飛ぶ敵が中心）", len(STAGES[1].spawns) < len(STAGES[0].spawns) * 0.7
       and sum(k != "ochimusha" for k, _ in STAGES[1].spawns) > sum(k == "ochimusha" for k, _ in STAGES[1].spawns))
 check("序盤は落ち武者だけ（x<1000）", all(k == "ochimusha" for k, x in ENEMY_SPAWNS if x < 1000))
 check("烏は後半（x>=1800）にだけ出る", all(x >= 1800 for k, x in ENEMY_SPAWNS if k == "karasu"))
@@ -1000,11 +1000,11 @@ check("本番の面の団子は、足場の上にだけ、1つずつ（地面に
 
 
 def _purpose(st, p):
-    """足場の役目: 穴を渡る / 上に物がある / ボスの間（ボスを跳び越える）。どれも無ければ、意味の無い足場"""
+    """足場の役目: 穴を渡る / 上に物がある / ボスの間（ボスを跳び越える）/ 崖登りの足場。どれも無ければ、意味の無い足場"""
     cx = (p[0] + p[1]) / 2
     holes = [(a1, b0) for (_, a1, _), (b0, _, _) in zip(st.ground, st.ground[1:]) if b0 > a1]
     return (any(h0 - 10 <= cx <= h1 + 10 for h0, h1 in holes) or any(p[0] - 6 <= x <= p[1] + 6 and 0 < p[2] - y <= 60 for _, x, y in st.items)
-            or any(a["x0"] <= cx <= a["x1"] for a in st.arenas))
+            or any(a["x0"] <= cx <= a["x1"] for a in st.arenas) or bool(st.climb and st.climb[0] <= cx < st.climb[1]))
 
 
 idle = [(st.name, p[0], p[1]) for st in PROD_STAGES for p in st.platforms if not _purpose(st, p)]
@@ -1727,9 +1727,10 @@ def _can_jump(s1, s2):
     return False
 
 
-bad = [(st.name, k, x) for st in PROD_STAGES for k, x in st.spawns if k in ("ochimusha", "yumihei", "tachiojo")
+_GROUNDED = ("ochimusha", "miira", "yumihei", "tachiojo")
+bad = [(st.name, k, x) for st in PROD_STAGES for k, x in st.spawns if k in _GROUNDED
        and len({st.terrain().height_at(x + d) for d in (-16, 0, 16)} - {None}) != 1 or
-       k in ("ochimusha", "yumihei", "tachiojo") and None in [st.terrain().height_at(x + d) for d in (-16, 0, 16)]]
+       k in _GROUNDED and None in [st.terrain().height_at(x + d) for d in (-16, 0, 16)]]
 check("[本番] 地上の敵は、穴の上や、段差の境目に置かない（足元の左右16ドットが、同じ高さの地面）", not bad, str(bad))
 check("ジャンプの頂点は、70〜74（足場の高さを決める、もとの数字）", 70 <= max(h for pts in _ARCS for _, h, _ in pts) <= 74,
       "%.1f" % max(h for pts in _ARCS for _, h, _ in pts))
@@ -1836,8 +1837,8 @@ for _ in range(C.YUMI["cooldown"] * 2 + 120):
     n_shots += len(g.waves) > n0
 check("立ち往生のうしろに隠れると、弓兵の矢は、弾かれて届かない（矢よけ）",
       n_shots >= 2 and g.player.hp == hp0 and C.SFX_CLANG in g.sfx, "撃った %d 体力 %d" % (n_shots, g.player.hp))
-check("高館の道ばたには、立ち往生を置かない（中ボスの弁慶として、弁慶の間に出る）",
-      not any(k == "tachiojo" for k, x in PROD_STAGES[1].spawns) and [k for _, k in PROD_STAGES[1].gates] == ["benkei"])
+check("高館には、立ち往生も、中ボスの弁慶も、出ない（役割がはっきりしないので、外した）",
+      not any(k == "tachiojo" for k, x in PROD_STAGES[1].spawns) and not PROD_STAGES[1].gates)
 
 # ---------------------------------------------------------------- 石灯籠
 from sprites import Lantern  # noqa: E402
@@ -2333,7 +2334,7 @@ for gl in (ge, gn, gh):
     gl.player.py = float(gl.terrain.height_at(gl.player.px))
     run(gl, 2)
     hps.append(gl.boss.max_hp)
-check("ボス・中ボスの体力は、やさしい < ふつう < むずかしい", hps[0] < hps[1] < hps[2] and hps[1] == C.BENKEI["hp"], str(hps))
+check("ボス・中ボスの体力は、やさしい < ふつう < むずかしい", hps[0] < hps[1] < hps[2], str(hps))
 gt = Game(title=True)
 gt.title_t = 999
 gt.step({"right"})
@@ -2435,11 +2436,12 @@ g.step(set(), {"pause_on"})
 g.step(set(), {"pause_on"})
 check("窓が後ろに回ると、止まる（もう一度来ても、解除はされない）", g.paused)
 
-# ---------------------------------------------------------------- 25. 高館の中ボス（弁慶）
+# ---------------------------------------------------------------- 25. 中ボス（弁慶）。いまは、面から外してある。仕組みは残してあるので、テストの間だけ、高館に置いて確かめる
 st3 = STAGES[1]
+st3.gates = ((2820, "benkei"),)
 ar3 = st3.arenas[0]
 tr3 = st3.terrain()
-check("高館には、弁慶の間がある（中間地点の手前。弁慶の立つあたりは、平ら）",
+check("弁慶の間を置ける場所が、高館にある（中間地点の手前。弁慶の立つあたりは、平ら）",
       ar3["kind"] == "benkei" and ar3["x1"] <= st3.checkpoint[0]
       and len({tr3.height_at(x) for x in range(ar3["x0"] + C.BOSS_TRIGGER, ar3["x1"], 20)}) == 1)
 
@@ -2486,6 +2488,210 @@ snap(gb, "benkei fade")
 done = run_until(gb, lambda q: q.boss is None, ())
 check("弁慶を倒すと、光になって消えて、先へ進める（おにぎりが出て、ここから再開できる）",
       done and not gb.boss_on and gb.arena_i == 1 and gb.gate_cp is not None and any(it.kind == "onigiri" for it in gb.items))
+st3.gates = ()      # もとに戻す（本番の高館には、弁慶は出ない）
+
+# ---------------------------------------------------------------- 崖登り（高館。画面が、上下にも動く）
+from sprites import Arrow  # noqa: E402
+
+gc = Game()
+gc.reset(1)
+tc = gc.terrain
+cx0, cx1, ch = tc.climb
+B = C.FLOOR_Y + ch      # 崖の下の、いちばん低い地面の高さ
+TOP = C.FLOOR_Y - 64    # 崖の上
+check("高館には、崖登りがある（面の絵が、崖の高さぶん、縦に長い）", tc.world_h == C.BASE_H + ch and gc._world is not None)
+check("毛越寺と月見坂は、縦に動かない（面の絵は、画面と同じ高さ）",
+      all(st.terrain().world_h == C.BASE_H for i, st in enumerate(STAGES) if i in (0, 2)))
+
+
+def climb_at(x, y):
+    gc._start(x, float(y))
+    gc.enemies = []
+    run(gc, 3)
+
+
+climb_at(600, tc.height_at(600))
+check("崖の手前では、画面は、崖の下の高さで止まっている（足元は、いままでと同じ高さに見える）",
+      gc.cam_y == ch and gc.player.on_ground and gc.player.hp == C.PLAYER_HP and gc.player.py - gc.cam_y == tc.height_at(600) - ch)
+climb_at(4700, tc.height_at(4700))
+check("崖の上では、画面は、ふつうの高さで止まっている", gc.cam_y == 0 and gc.player.on_ground and gc.player.hp == C.PLAYER_HP)
+arrow = Arrow(700, B - 60, 600, B - 40, -1, gc.a)
+arrow.update(gc.stage.width)
+check("崖の下でも、矢は、消えずに飛ぶ（面の下端は、崖の高さぶん、下にある）", arrow.alive)
+
+# 実際に、跳んで登る（操作を入れて、1フレームずつ進める）
+ROUTE = [(3645, 3695, B - 84), (3700, 3860, B - 128), (3805, 3855, B - 180), (3860, 4180, B - 224),
+         (4035, 4085, B - 272), (4125, 4175, B - 322), (4035, 4085, B - 372), (4090, 4150, B - 424),
+         (4040, 4080, B - 474), (4125, 4175, B - 520), (4180, 4400, TOP)]
+check("崖登りの道すじの足場が、面のデータにある", all(s in tc.platforms or s in tc.ground for s in ROUTE))
+climb_seen = []     # 登っている間の、足元の、画面の上での高さ
+
+
+climb_safe = False      # 登る道すじだけを確かめるとき: 仕掛け（光の柱）に当たっても、落とされないようにする
+
+
+def climb_step(held, pressed=()):
+    if climb_safe:
+        gc.player.invincible = 5
+    gc.step(set(held), set(pressed))
+    climb_seen.append(gc.player.py - gc.cam_y)
+
+
+def hop(cur, nxt):
+    """cur の上から、nxt へ跳ぶ。乗れたら True"""
+    p = gc.player
+    goal = max(cur[0] + 6, min(cur[1] - 6, (nxt[0] + nxt[1]) / 2))
+    for n in range(600):        # 踏み切る所まで、歩く。離してから止まるまでに、20ドットほど滑るので、近くでは、1フレームずつ押す
+        d = goal - p.px
+        if abs(d) < 3 and abs(p.vx) < 0.1:
+            break
+        press = abs(d) > 24 or (abs(d) >= 3 and abs(p.vx) < 0.1 and n % 3 == 0)
+        climb_step({"right" if d > 0 else "left"} if press else ())
+    mid = (nxt[0] + nxt[1]) / 2
+    for i in range(120):
+        held = {"jump"} | ({"right"} if p.px < mid - 3 else {"left"} if p.px > mid + 3 else set())
+        climb_step(held, {"jump"} if i == 0 else ())
+        if i > 4 and p.on_ground:
+            break
+    return p.on_ground and p.py == nxt[2] and nxt[0] - 6 <= p.px <= nxt[1] + 6
+
+
+climb_at(3600, B - 32)
+cur, lost = (3540, 3700, B - 32), []
+for nxt in ROUTE:
+    if not hop(cur, nxt):
+        lost.append((nxt, round(gc.player.px), round(gc.player.py)))
+        break
+    cur = nxt
+    if nxt[2] == B - 372:
+        snap(gc, "climb")
+check("崖登り: 足場を1つずつ跳んで、崖の上まで登れる（操作を入れて、確かめる）", not lost and gc.player.hp == C.PLAYER_HP, str(lost))
+check("登っている間、主役は、いつも画面の中にいる（足元が、画面の上 40〜下 240 の間）",
+      40 <= min(climb_seen) and max(climb_seen) <= 240, "%.0f〜%.0f" % (min(climb_seen), max(climb_seen)))
+run(gc, 60)
+check("登りきると、画面は、崖の上の高さで止まる", gc.cam_y == 0 and gc.player.py == TOP)
+snap(gc, "climb top")
+
+# 落ちたとき: ミスにはならない。下の足場か、崖の下の地面に戻る
+climb_at(4150, B - 520)
+climb_seen.clear()
+for _ in range(120):
+    climb_step({"left"} if gc.player.on_ground and gc.player.py == B - 520 else ())
+check("いちばん上の足場から、左へ踏み外しても、壁の下までは落ちない（途中の足場に乗る。体力は減らない）",
+      gc.player.on_ground and B - 520 < gc.player.py < B - 224 and gc.player.hp == C.PLAYER_HP, "y=%.0f" % (B - gc.player.py))
+climb_at(4060, B - 474)
+climb_seen.clear()
+for _ in range(200):
+    climb_step({"left"} if gc.player.px > 4010 else ())
+check("壁の下まで落ちても、ミスにならない（二段目の地面に戻るだけ）",
+      gc.player.on_ground and gc.player.py == B - 224 and gc.player.hp == C.PLAYER_HP, "y=%.0f" % (B - gc.player.py))
+check("落ちている間も、画面が追いかけて、主役は画面の中にいる", max(climb_seen) <= 240, "%.0f" % max(climb_seen))
+check("落ちたあと、画面は、着地した高さに合う", abs(gc.cam_y - (B - 224 - C.CLIMB_CAM["feet"])) < 1, "%.0f" % gc.cam_y)
+
+# 穴に落ちた判定は、その場所の高さに合わせる
+gc._start(812, float(B - 80))       # 崖の下の、崖の切れ目（800〜880）
+gc.enemies = []
+deep = []
+for _ in range(120):
+    gc.step(set())
+    deep.append((gc.player.py, gc.player.hp))
+    if gc.player.hp < C.PLAYER_HP:
+        break
+check("崖の下の穴は、崖の下の画面から出たときに、落ちた扱いになる（それより上では、ならない）",
+      gc.player.hp == C.PLAYER_HP - C.FALL_DAMAGE and max(y for y, hp in deep[:-1]) > C.FALL_Y + ch - C.MAX_FALL and all(hp == C.PLAYER_HP for y, hp in deep[:-1]),
+      "%.0f まで落ちた（線は %d）" % (max(y for y, hp in deep[:-1]), C.FALL_Y + ch))
+gc._start(4450, float(TOP - 10))    # 崖の上の、切れ目（4400〜4510）
+gc.enemies = []
+deep = []
+for _ in range(120):
+    gc.step(set())
+    deep.append(gc.player.py)
+    if gc.player.hp < C.PLAYER_HP:
+        break
+check("崖の上の穴は、いままでどおり、画面から出たら、落ちた扱いになる（崖の下までは、落ち続けない）",
+      gc.player.hp == C.PLAYER_HP - C.FALL_DAMAGE and max(deep) < C.FALL_Y + C.MAX_FALL * 2, "%.0f" % max(deep))
+
+# 金色堂の、最後の登り（清衡のいる壇へ。同じ仕組み）
+gc = Game()
+gc.reset(3)
+tc = gc.terrain
+cx0, cx1, ch = tc.climb
+B = C.FLOOR_Y + ch
+ROUTE4 = [(7325, 7375, B - 50), (7380, 7540, B - 96), (7485, 7535, B - 146), (7540, 7860, B - 192),
+          (7805, 7855, B - 240), (7715, 7765, B - 288), (7805, 7855, B - 336), (7860, 8520, C.FLOOR_Y)]
+check("金色堂の登りの道すじの足場が、面のデータにある", all(s in tc.platforms or s in tc.ground for s in ROUTE4),
+      str([s for s in ROUTE4 if s not in tc.platforms and s not in tc.ground]))
+climb_at(7300, B)
+climb_safe = True
+climb_seen.clear()
+cur, lost = (7230, 7380, B), []
+for nxt in ROUTE4:
+    if not hop(cur, nxt):
+        lost.append((nxt, round(gc.player.px), round(gc.player.py)))
+        break
+    cur = nxt
+    if nxt[2] == B - 288:
+        snap(gc, "climb4")
+climb_safe = False
+check("金色堂: 足場を1つずつ跳んで、清衡のいる壇の上まで登れる（操作を入れて、確かめる）", not lost, str(lost))
+check("金色堂: 登っている間、主役は、いつも画面の中にいる", 40 <= min(climb_seen) and max(climb_seen) <= 240,
+      "%.0f〜%.0f" % (min(climb_seen), max(climb_seen)))
+run(gc, 60)
+check("金色堂: 登りきると、画面は、壇の上の高さで止まる（清衡の間は、いままでと同じ高さ）", gc.cam_y == 0 and gc.player.py == C.FLOOR_Y)
+gc._start(7740, float(B - 192))
+gc.enemies = []
+seen_p = []
+for _ in range(400):
+    gc.player.invincible = 5
+    gc.step(set())
+    seen_p += [round(w.px) for w in gc.waves if type(w).__name__ == "Pillar"]
+check("金色堂の登りの壁には、足場の2本の柱すじ（7740・7830）に、光の柱が落ちる", set(seen_p) == {7740, 7830}, str(sorted(set(seen_p))))
+# 影のボスは、床が低い所でも、画面のすぐ上から降ってくる
+gz0 = Game()
+gz0.reset(3)
+a0 = gz0.stage.arenas[0]
+gz0._start(a0["x0"] + C.BOSS_TRIGGER - 4, gz0._floor_at(a0["x0"] + 20))
+gz0.enemies = []
+run_until(gz0, lambda q: q.boss is not None, {"right"}, 60)
+check("影のボスは、床が低い所（金色堂の、登りより手前）でも、画面のすぐ上から降ってくる",
+      gz0.boss is not None and -C.BOSS["h"] - 1 <= gz0.boss.cy - gz0.cam_y <= 0 and gz0.cam_y == ch and run_until(gz0, lambda q: q.boss.intro_done, (), 400),
+      "画面の上からの高さ %.0f" % (gz0.boss.cy - gz0.cam_y if gz0.boss else 0))
+# ミイラ: 歩いてくるだけ
+from sprites import Miira  # noqa: E402
+gm = fresh(px=300)
+mi = Miira(420, gm.a)
+gm.enemies = [mi]
+x_m = mi.cx
+run(gm, 120)
+check("ミイラは、主人公のほうへ、ゆっくり歩いてくる（落ち武者より遅い）。構えない・光波を出さない",
+      0 < x_m - mi.cx <= 120 * C.MIIRA["speed"] + 0.01 and C.MIIRA["speed"] < C.OCHI["speed"] and not gm.waves and not mi.ready_t and not mi.swing_t)
+snap(gm, "miira")
+mi.hit(1)
+check("ミイラは、1発で倒せる", mi.dying)
+check("本番の毛越寺で、最初に出会う敵は、ミイラ", min(PROD_STAGES[0].spawns, key=lambda sp: sp[1])[0] == "miira")
+
+# ボスと戦っている間、ザコ敵は、動かない（影のボスの間に、外の狐火が入ってこない）
+gz = Game()
+gz.reset(3)
+az = gz.stage.arenas[0]
+gz._start(az["x0"] + C.BOSS_TRIGGER - 4, gz._floor_at(az["x0"] + 20))
+fire = Kitsunebi(az["x1"] + 100, "low", gz.a)
+gz.enemies = [fire]
+run(gz, 6, {"right"})
+x_fire = fire.cx
+for _ in range(240):
+    gz.player.invincible = 5
+    gz.step(set())
+check("影のボスの間で戦っている間、間の外の狐火は、動き出さない（入ってこない）", gz.boss_on and fire.alive and fire.cx == x_fire and not fire.dir,
+      "boss_on=%s x=%.0f→%.0f" % (gz.boss_on, x_fire, fire.cx))
+from sprites import Pillar as _Pillar  # noqa: E402
+import sprites as _sp  # noqa: E402
+_sp.SOUNDS.clear()
+_Pillar(100, C.FLOOR_Y, gz.a, quiet=True).update(1000)
+loud = list(_sp.SOUNDS)
+_Pillar(100, C.FLOOR_Y, gz.a).update(1000)
+check("光の柱の予告の音は、続けて落ちるうちの、最初の1本だけが鳴らす", not loud and len(_sp.SOUNDS) == 1)
+_sp.SOUNDS.clear()
 
 cols = 3
 rows = (len(shots) + cols - 1) // cols

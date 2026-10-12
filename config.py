@@ -93,6 +93,10 @@ HIT_STUN = 8     # 攻撃を受けたとき動きが止まるフレーム数
 
 # 落ち武者（地上の歩兵）: 大きく、遅く、体力が多い。近づくと一度止まって構える
 OCHI = dict(w=20, h=40, hp=3, touch=1, speed=0.6, active=240, ready_dist=110, ready_frames=30, swing_frames=26, wave_at=6, cooldown=120, turn_frames=150, patrol=40)
+# ミイラ（亡者）: ゆっくり歩いて近づくだけ。攻撃はしない（触れると、ダメージ）。体力1。最初に出会う、いちばん弱い敵。
+# 動きは、落ち武者と同じ仕組み（ready_dist=0 で、構えない）
+MIIRA = dict(w=18, h=40, hp=1, touch=1, speed=0.4, active=260, ready_dist=0, ready_frames=1, swing_frames=1, wave_at=0, cooldown=0,
+             turn_frames=120, patrol=30)
 # 狐火（浮遊する炎）: 小さく、空中を上下に揺れながら横に進む。高さは低め・高めの2通り
 KITSUNEBI = dict(w=14, h=14, hp=1, touch=1, speed=0.9, active=380, bob=12, period=90,
                  low=FLOOR_Y - 36, high=FLOOR_Y - 92)
@@ -105,6 +109,7 @@ KARASU = dict(w=22, h=12, hp=1, touch=1, speed=3.5, active=240, telegraph=30, he
 # 面の難易度（敵の密度＝敵の難易度の合計 ÷ 面の長さ(1000px)）を測るのに使う。tools/difficulty.py で、面ごとに表にする。
 # 配置表の種類名（kitsunebi_low など）は、「_」より前で引く。まだ無い敵も、先に決めておく（assets/敵コンセプト.md）
 ENEMY_DIFFICULTY = {
+    "miira": 1,                                         # ミイラ（歩いてくるだけ）
     "kitsunebi": 2, "karakasa": 2, "kocho": 2,          # 狐火・唐傘小僧・金の蝶
     "karasu": 3, "koi": 3, "natsukusa": 3,              # 烏・鯉の怨霊・夏草の亡者
     "tachiojo": 4, "oboro": 4,                          # 立ち往生・朧
@@ -134,6 +139,7 @@ DENSITY_TOLERANCE = 0.25
 # 敵の絵（assets/images/enemies/種類_動き_番号.png）。コマ数と、枠の中の基準位置（変換ツールが表示する値）
 ENEMY_FRAMES = {
     "ochimusha": {"walk": 4, "stance": 3, "swing": 2, "death": 3},
+    "miira": {"walk": 4, "death": 3},
     "kitsunebi": {"flicker": 4, "death": 4},
     "karasu": {"flap": 4, "dive": 2, "death": 2},
     # 泰衡（tools/make_boss1.py）: 歩く・立ち・高い構え・振る・かがむ・跳ぶ・やられ（のけぞる・倒れる）
@@ -144,8 +150,11 @@ ENEMY_FRAMES = {
     "boss4": {"idle": 1, "pray": 2, "cast": 2, "spread": 2, "hold": 1, "roar": 2, "death": 3},   # 清衡: 浮いて座る・数珠を飛ばす・光になって消える（tools/make_boss4.py）
 }
 # w,h = 枠の大きさ / ax = 枠の中の、体の中心の左右位置 / ay = 足元（bottom）か中心（center）の上下位置
+# 絵がまだ無い敵の、代わりの絵: 種類 → (借りる種類, 塗り替える色)。assets/images/enemies/種類_*.png を置けば、そちらを使う
+ENEMY_STANDIN = {}      # 例: {"種類": ("ochimusha", (236, 222, 180))}。ミイラは、2026-10-12 に、絵ができた
 ENEMY_ART = {
     "ochimusha": dict(w=62, h=51, ax=31, ay=51, mode="bottom"),
+    "miira": dict(w=47, h=42, ax=23, ay=42, mode="bottom"),      # ミイラ（tools/make_miira.py）
     "kitsunebi": dict(w=16, h=18, ax=8, ay=9, mode="center"),
     "karasu": dict(w=42, h=25, ax=21, ay=12, mode="center"),
     "yumihei": dict(w=49, h=48, ax=24, ay=48, mode="bottom"),
@@ -278,7 +287,7 @@ SFX_GAME = dict(
     dango=0.16, heal=0.22, power=0.22, **{"break": 0.22},                                                    # 拾う・壊す
     die=0.18, wave=0.16, cut=0.18, caw=0.16, dive=0.16, draw=0.14, arrow=0.18, snap=0.18,                    # ザコ敵
     thud=0.3, boss_wave=0.22, leap=0.2, boss_hit=0.22, boss_die=0.32, roar=0.3, thrust=0.22,                 # ボス
-    fan=0.18, gust=0.2, petal=0.14, bead=0.16, ring=0.22, charge=0.2, pillar_warn=0.18, beam=0.24, warp=0.2, warp_in=0.2,
+    fan=0.18, gust=0.2, petal=0.14, bead=0.16, ring=0.22, charge=0.2, pillar_warn=0.09, beam=0.12, warp=0.2, warp_in=0.2,
     select=0.14, clear=0.26, gameover=0.26,                                                                  # 画面
 )
 SFX = {k: "sfx_%s.ogg" % k for k in SFX_GAME}
@@ -388,6 +397,9 @@ CHECKPOINT_FX = 100     # 中間地点を通ったときの演出のフレーム
 
 # 穴に落ちたとき
 FALL_Y = BASE_H + 40   # 足元がこの高さ（画面の下）を超えたら、落ちたことにする
+# 崖登り（縦に進む区画。stage.py の climb）: 画面が、上下にも動く。跳ぶたびには動かさず、着地した高さを、画面の feet の高さに合わせる。
+# 足元が、画面の top より上・bottom より下に出そうなときだけ、すぐ追いかける（落ちたとき）
+CLIMB_CAM = dict(feet=190, speed=4, top=70, bottom=230)
 FALL_DAMAGE = 2
 
 # ゲームオーバー

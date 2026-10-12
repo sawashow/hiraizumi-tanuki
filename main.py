@@ -83,6 +83,9 @@ class Game:
         self.stage = STAGES[i]
         self.a.load_stage(self.stage)
         self.terrain = self._terrain_fixed or self.stage.terrain()
+        # 崖登りのある面は、面の高さぶんの絵に描いて、見えている所だけを、画面に写す（描く側は、縦の位置を気にしなくて済む）
+        sprites.WORLD_H = self.terrain.world_h
+        self._world = pygame.Surface((C.BASE_W, sprites.WORLD_H)) if sprites.WORLD_H > C.BASE_H else None
 
     def _floor_at(self, x):
         return float(self.terrain.height_at(x) or C.FLOOR_Y)
@@ -223,9 +226,37 @@ class Game:
                          for n, (kind, lx) in enumerate(() if self._terrain_fixed else self.stage.lanterns)]   # テスト用の地形には、置かない
         self.effects = []
         self.cam_x = max(0, min(int(x) - C.BASE_W // 2, self.stage.width - C.BASE_W))
+        self.land_y = float(y)      # 最後に立っていた高さ（崖登りで、画面の高さを決める）
+        self.cam_y = float(self._cam_y_target())
         self.over_t = 0   # やられてからの経過フレーム
         self.dead = False
         self.msg_t = 0    # 「1UP!」を出している残りフレーム
+
+    def _cam_y_target(self):
+        """画面の上端の高さ。崖登りの区画の中だけ、着地した高さに合わせて、上下に動く。手前は崖の下、先は崖の上で、動かない"""
+        climb = self.terrain.climb
+        if not climb:
+            return 0
+        x0, x1, h = climb
+        p, K = self.player, C.CLIMB_CAM
+        if p.px < x0:
+            return h
+        if p.px >= x1:
+            return 0
+        return max(0, min(h, self.land_y - K["feet"]))
+
+    def _move_cam_y(self):
+        climb = self.terrain.climb
+        if not climb:
+            return
+        p, K = self.player, C.CLIMB_CAM
+        if p.on_ground:
+            self.land_y = p.py
+        d = self._cam_y_target() - self.cam_y
+        self.cam_y += max(-K["speed"], min(K["speed"], d))
+        if climb[0] <= p.px < climb[1]:     # 落ちたとき・高く跳んだときは、足元が画面から出ないように、すぐ追いかける
+            self.cam_y = max(p.py - K["bottom"], min(p.py - K["top"], self.cam_y))
+            self.cam_y = max(0, min(climb[2], self.cam_y))
 
     # --- 1フレーム進める。held は押している間のキー、pressed はこのフレームに押したキー ---
     @property
@@ -374,6 +405,8 @@ class Game:
         if p.slash:
             self.slashes.append(SlashWave(*p.slash_spawn(), self.a))
         for e in foes:
+            if self.boss_on and e is not self.boss and not e.dying:    # ボスと戦っている間、ザコ敵は、動かない（間の外から、狐火や矢が入ってこないように）
+                continue
             e.update(p.rect, self.stage.width, self.terrain)
             spawned = getattr(e, "spawned", None)
             if spawned:
@@ -552,6 +585,7 @@ class Game:
                 self.cam_x, self.cam_ease = target, False
         elif self.cam_x < self._arena()["x0"]:
             self.cam_x = min(self._arena()["x0"], self.cam_x + C.BOSS_CAM_SPEED)
+        self._move_cam_y()
 
     def _end_phase(self):
         """寸劇の、いまの場面と、その場面に入ってからのフレーム数。
@@ -656,7 +690,7 @@ class Game:
             if x0 - C.TRAP["near"] <= p.px <= x1 + 60:
                 for k, x in enumerate(self._trap_spots(trap)):
                     if t % period == k * C.TRAP["stagger"] % period:
-                        self.waves.append(Pillar(x, self.terrain.height_at(x), self.a))
+                        self.waves.append(Pillar(x, self.terrain.height_at(x), self.a, quiet=k > 0))     # 予告の音は、一巡りに1回だけ
 
     def _draw_traps(self, screen, cam):
         """光の柱が落ちる場所の、床の印（いつも見える。金の輪）"""
@@ -701,7 +735,7 @@ class Game:
             self.boss_arena_i = self.arena_i
             if final:
                 self.enemies = []   # 最後のボスの間では、ザコ敵は、ここですべて消える
-            else:                   # 影の間では、その間と、まわりの敵だけが消える（先の敵は、そのまま）
+            else:                   # 影の間では、その間と、まわりの敵だけが消える（先の敵は、そのまま。戦っている間は、動かない）
                 self.enemies = [e for e in self.enemies if not (ar["x0"] - 120 <= e.cx <= ar["x1"] + 60)]
             self.waves = []
         if self.boss_on and p.px < ar["x0"] + C.PLAYER_W / 2:
@@ -793,38 +827,43 @@ class Game:
             screen.blit(self.a.title_bg, (0, 0))
             self._draw_title(screen, dim=False)
             return
-        cam = self.cam_x
+        cam, cy = self.cam_x, round(self.cam_y) if self._world else 0
+        world = self._world or screen       # 崖登りのある面は、縦に長い絵に描く（cy が、見えている範囲の上端）
+        world.set_clip(pygame.Rect(0, cy, C.BASE_W, C.BASE_H))
         span = self.stage.width - C.BASE_W
         # 奥の層ほどゆっくり動く（画像の余りの幅をカメラの移動量に割り振る）
         sky_x = round(cam * (self.a.sky.get_width() - C.BASE_W) / span)
         mid_x = round(cam * (self.a.mid.get_width() - C.BASE_W) / span)
-        screen.blit(self.a.sky, (-sky_x, 0))
-        screen.blit(self.a.mid, (-mid_x, 0))
-        self._draw_ground(screen, cam)
-        self._draw_stele(screen, cam)
-        self._draw_traps(screen, cam)
+        world.blit(self.a.sky, (-sky_x, cy))
+        world.blit(self.a.mid, (-mid_x, cy))
+        self._draw_ground(world, cam)
+        self._draw_stele(world, cam)
+        self._draw_traps(world, cam)
         for lt in self.lanterns:
-            lt.draw(screen, cam)
+            lt.draw(world, cam)
         for e in self.enemies:
-            e.draw(screen, cam)
+            e.draw(world, cam)
         end = self._end_phase() if self.end_ready else ("", 0)
         if self.boss and end[0] == "fade":
-            self._draw_boss_fade(screen, cam, end[1])
+            self._draw_boss_fade(world, cam, end[1])
         elif self.boss:
-            self.boss.draw(screen, cam)
+            self.boss.draw(world, cam)
         for s in self.shurikens:
-            s.draw(screen, cam)
+            s.draw(world, cam)
         for w in self.waves:
-            w.draw(screen, cam)
+            w.draw(world, cam)
         for s in self.slashes:
-            s.draw(screen, cam)
+            s.draw(world, cam)
         for it in self.items:
-            it.draw(screen, cam)
-        self.checkpoint.draw(screen, cam)
-        self.player.draw(screen, cam)
+            it.draw(world, cam)
+        self.checkpoint.draw(world, cam)
+        self.player.draw(world, cam)
         for fx in self.effects:
-            fx.draw(screen, cam)
-        self.checkpoint.draw_fx(screen, cam)
+            fx.draw(world, cam)
+        self.checkpoint.draw_fx(world, cam)
+        world.set_clip(None)
+        if world is not screen:
+            screen.blit(world, (0, -cy))
         if self.title:     # スタート画面: 1面の始まりの景色の上に、題名を出す（体力などは出さない）
             self._draw_title(screen)
             return
@@ -841,13 +880,13 @@ class Game:
             self._draw_dim(screen)
         if end[0] == "boss" and self.boss:
             r = self.boss.rect
-            self._draw_bubble(screen, self.a.talk_boss, r.centerx - cam, r.bottom - C.TALK_BOSS_Y, self._talk_shown(*end))
+            self._draw_bubble(screen, self.a.talk_boss, r.centerx - cam, r.bottom - cy - C.TALK_BOSS_Y, self._talk_shown(*end))
         elif end[0] == "reply":
             r = self.player.rect
             if self.stage.thought:
-                self._draw_thought(screen, r.centerx - cam, r.top - 2, self._talk_shown(*end))
+                self._draw_thought(screen, r.centerx - cam, r.top - cy - 2, self._talk_shown(*end))
             else:
-                self._draw_bubble(screen, self.a.talk_tanuki, r.centerx - cam, r.top - 4, self._talk_shown(*end))
+                self._draw_bubble(screen, self.a.talk_tanuki, r.centerx - cam, r.top - cy - 4, self._talk_shown(*end))
         self._draw_hud(screen, font)
         self._draw_stage_title(screen)
         if self.player.hp <= 0:
@@ -874,35 +913,42 @@ class Game:
     def _draw_ground(self, screen, cam):
         tiles = self.a.tiles
         top = tiles[1]
+        view = screen.get_clip()    # 見えている範囲（崖登りのある面では、縦に長い絵の一部）
         # 穴の底は暗くしておく（地面のない所は、ここが見える）
         if self.a.water:   # 池の水面（穴の中。地面は、このあとで上から描くので、すき間にだけ見える）
             self._draw_water(screen, cam)
         else:
-            pygame.draw.rect(screen, self.stage.pit, (0, C.GROUND_Y, C.BASE_W, C.BASE_H - C.GROUND_Y))
-            deep = self.stage.pit_deep
-            if deep:    # 下へ行くほど、深い色にする（8ドットごとの段）。明るい霞の谷が、のっぺりした白い帯に見えないように
+            # 崖登りのある面は、崖の手前と先とで、穴の底の高さが違う（手前は、崖の高さぶん、低い）
+            edge = max(0, min(C.BASE_W, self.terrain.climb[1] - cam)) if self.terrain.climb else 0
+            for bx0, bx1 in ((0, edge), (edge, C.BASE_W)):
+                if bx1 <= bx0:
+                    continue
+                y0 = C.GROUND_Y + self.terrain.depth_at(bx0 + cam)
+                pygame.draw.rect(screen, self.stage.pit_deep or self.stage.pit, (bx0, y0, bx1 - bx0, max(0, view.bottom - y0)))
+                deep = self.stage.pit_deep
                 n = (C.BASE_H - C.GROUND_Y + 7) // 8
-                for k in range(n):
+                for k in range(n if deep else 0):    # 下へ行くほど、深い色にする（8ドットごとの段）。明るい霞の谷が、のっぺりした白い帯に見えないように
                     u = (k + 1) / n
                     color = tuple(round(a + (b - a) * u) for a, b in zip(self.stage.pit, deep))
-                    pygame.draw.rect(screen, color, (0, C.GROUND_Y + k * 8, C.BASE_W, 8))
+                    pygame.draw.rect(screen, color, (bx0, y0 + k * 8, bx1 - bx0, 8))
             self._draw_pit_haze(screen, cam)
         for x0, x1, top_y in self.terrain.ground:
             sx0, sx1 = max(x0 - cam, 0), min(x1 - cam, C.BASE_W)
             if sx1 <= sx0:
                 continue
             tile_y = top_y - (C.FLOOR_Y - C.GROUND_Y)   # 地面の上端のタイルの高さ
-            screen.set_clip(pygame.Rect(sx0, 0, sx1 - sx0, C.BASE_H))   # 区間の端で、タイルを切る
+            screen.set_clip(pygame.Rect(sx0, view.y, sx1 - sx0, view.h))   # 区間の端で、タイルを切る
             for i in range(max(x0, cam) // 32, (min(x1, cam + C.BASE_W) - 1) // 32 + 1):
                 x = i * 32 - cam
                 screen.blit(top, (x, tile_y))
-                row = 0
                 y = tile_y + top.get_height()
-                while y < C.BASE_H:
+                row = max(0, (view.y - y) // 32)       # 見えている所より上の段は、飛ばす（高い崖は、縦に長い）
+                y += row * 32
+                while y < view.bottom:
                     screen.blit(tiles[FILL_PATTERN[(i * 7 + row * 5) % len(FILL_PATTERN)]], (x, y))
                     y += 32
                     row += 1
-        screen.set_clip(None)
+        screen.set_clip(view)
         # 浮き足場（絵があれば、礎石などの絵。無ければ、地面の上端のタイルを横に並べる）
         for n, (x0, x1, top_y) in enumerate(self.terrain.platforms):
             ledge = self.a.ledges.get(x1 - x0 + C.STONE_PAD * 2)
@@ -913,10 +959,10 @@ class Game:
                 img = self._stone(n, x1 - x0 + C.STONE_PAD * 2)
                 screen.blit(img, (x0 - C.STONE_PAD - cam, top_y - 3))
                 continue
-            screen.set_clip(pygame.Rect(x0 - cam, 0, x1 - x0, C.BASE_H))
+            screen.set_clip(pygame.Rect(x0 - cam, view.y, x1 - x0, view.h))
             for tx in range(x0, x1, 32):
                 screen.blit(top, (tx - cam, top_y - (C.FLOOR_Y - C.GROUND_Y)))
-        screen.set_clip(None)
+        screen.set_clip(view)
 
     def _stone(self, n, width):
         """n 番目の足場の、礎石の絵（足場の幅に合わせて、横に伸ばす。一度作ったら、使い回す）"""
@@ -971,7 +1017,7 @@ class Game:
         for (_, a, _), (b, _, _) in zip(g, g[1:]):
             if b <= a or b - cam <= 0 or a - cam >= C.BASE_W:
                 continue
-            y, e = C.GROUND_Y - H["h"], H["edge"]
+            y, e = C.GROUND_Y + self.terrain.depth_at(a) - H["h"], H["edge"]
             # 穴の両端は、外へ向かって、2段で薄くする（となりの地面が低いと、もやの切れ目が、縦の線に見えるため）
             for x0, x1, alpha in ((a - 2 * e, a - e, 70), (a - e, a, 150), (a, b, 255), (b, b + e, 150), (b + e, b + 2 * e, 70)):
                 sx0, sx1 = max(x0 - cam, 0), min(x1 - cam, C.BASE_W)
@@ -1033,7 +1079,7 @@ class Game:
                 screen.blit(img, (C.BASE_W // 2 - img.get_width() // 2, y))
         if self.msg_t:   # 団子を全部取った
             screen.blit(self.a.oneup, (self.player.rect.centerx - self.cam_x - self.a.oneup.get_width() // 2,
-                                       self.player.rect.top - 28 - (90 - self.msg_t) // 4))
+                                       self.player.rect.top - (round(self.cam_y) if self._world else 0) - 28 - (90 - self.msg_t) // 4))
 
     def _draw_story(self, screen):
         """始まりの語り: 暗い画面の上を、文章が下から上へ流れ（1回だけ）、下にタヌキ侍がいる"""
