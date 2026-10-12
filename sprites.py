@@ -222,6 +222,13 @@ class Assets:
         self.sky = pick(stage.sky, STAGE1.sky)
         self.mid = pick(stage.mid, STAGE1.mid)
         d = stage.tiles
+        # 崖登りのある面: 縦に長い空と、崖の岩肌のタイル（あれば、使う）
+        tall = stage.sky.replace(".png", "_tall.png")
+        if getattr(stage, "climb", None) and os.path.exists(os.path.join(IMG, tall)):
+            self.sky = _load(tall)
+        self.cliff = []
+        while getattr(stage, "climb", None) and os.path.exists(os.path.join(IMG, f"{d}cliff_{len(self.cliff)}.png")):
+            self.cliff.append(_load(f"{d}cliff_{len(self.cliff)}.png"))
         self.tiles = [pick(f"{d}tile_{i:02d}.png", f"tile_{i:02d}.png") for i in range(6)]
         self.stage_title = _load(f"stage_title_{stage.number}.png") if os.path.exists(os.path.join(IMG, f"stage_title_{stage.number}.png")) else None
         self.stele = _load(f"stele_{stage.number}.png") if os.path.exists(os.path.join(IMG, f"stele_{stage.number}.png")) else None

@@ -86,6 +86,9 @@ class Game:
         # 崖登りのある面は、面の高さぶんの絵に描いて、見えている所だけを、画面に写す（描く側は、縦の位置を気にしなくて済む）
         sprites.WORLD_H = self.terrain.world_h
         self._world = pygame.Surface((C.BASE_W, sprites.WORLD_H)) if sprites.WORLD_H > C.BASE_H else None
+        # 崖の壁の左端（崖の上の地面が、始まる所）。崖の上の中景は、ここより右にだけ出す
+        climb = self.terrain.climb
+        self._wall_x = min((g[0] for g in self.terrain.ground if g[0] >= climb[0] and g[2] <= C.FLOOR_Y), default=climb[1]) if climb else 0
 
     def _floor_at(self, x):
         return float(self.terrain.height_at(x) or C.FLOOR_Y)
@@ -395,6 +398,7 @@ class Game:
             p.throw()
         p.update(held, self.stage.width, self.terrain)
         self._boss_area(p)
+        self.terrain.tick(self.intro_t)     # 消える光の足場
         self._gimmicks(p)
         foes = self.enemies + ([self.boss] if self.boss else [])
         if p.release:   # 手裏剣（三方手裏剣なら、前・斜め上・斜め下の3つ）
@@ -421,6 +425,8 @@ class Game:
         self.checkpoint.update()
         for s in self.shurikens:
             s.update(self.stage.width)
+            if not -C.SHURIKEN_W <= s.px - self.cam_x <= C.BASE_W + C.SHURIKEN_W:     # 画面の端まで飛ぶ。画面の外の敵には、当たらない
+                s.alive = False
 
         # 刀 → 敵（1振りにつき、同じ敵に1回だけ）
         sword = p.sword_rect()
@@ -834,8 +840,20 @@ class Game:
         # 奥の層ほどゆっくり動く（画像の余りの幅をカメラの移動量に割り振る）
         sky_x = round(cam * (self.a.sky.get_width() - C.BASE_W) / span)
         mid_x = round(cam * (self.a.mid.get_width() - C.BASE_W) / span)
-        world.blit(self.a.sky, (-sky_x, cy))
-        world.blit(self.a.mid, (-mid_x, cy))
+        climb = self.terrain.climb if self._world else None
+        extra = self.a.sky.get_height() - C.BASE_H      # 縦に長い空: 崖の下では、絵の下の端を見せ、登るにつれて、上へ移る
+        world.blit(self.a.sky, (-sky_x, cy - (round(extra * cy / climb[2]) if climb and extra > 0 else extra)))
+        if climb:   # 中景は、画面より遅く動く。崖の下の中景は、登ると下へ沈み、崖の上の中景は、崖より右にだけ、上から降りてくる
+            f = C.CLIMB_BG["mid"] if self.stage.mid_follow is None else self.stage.mid_follow
+            wall = max(0, min(C.BASE_W, self._wall_x - cam))
+            view = world.get_clip()
+            for x0, x1, off in ((0, wall, round((climb[2] - cy) * f)), (wall, C.BASE_W, -round(cy * f))):
+                if x1 > x0 and abs(off) < C.BASE_H:
+                    world.set_clip(pygame.Rect(x0, cy, x1 - x0, C.BASE_H))
+                    world.blit(self.a.mid, (-mid_x, cy + off))
+            world.set_clip(view)
+        else:
+            world.blit(self.a.mid, (-mid_x, cy))
         self._draw_ground(world, cam)
         self._draw_stele(world, cam)
         self._draw_traps(world, cam)
@@ -918,12 +936,14 @@ class Game:
         if self.a.water:   # 池の水面（穴の中。地面は、このあとで上から描くので、すき間にだけ見える）
             self._draw_water(screen, cam)
         else:
+            # 穴の所だけを塗る（前は、画面の幅いっぱいに塗っていて、いちばん低い地面の、草の葉先のすき間から、穴の色が、線になって見えた）。
             # 崖登りのある面は、崖の手前と先とで、穴の底の高さが違う（手前は、崖の高さぶん、低い）
-            edge = max(0, min(C.BASE_W, self.terrain.climb[1] - cam)) if self.terrain.climb else 0
-            for bx0, bx1 in ((0, edge), (edge, C.BASE_W)):
+            g = self.terrain.ground
+            for (_, a, _), (b, _, _) in zip(g, g[1:]):
+                bx0, bx1 = max(0, a - cam), min(C.BASE_W, b - cam)
                 if bx1 <= bx0:
                     continue
-                y0 = C.GROUND_Y + self.terrain.depth_at(bx0 + cam)
+                y0 = C.GROUND_Y + self.terrain.depth_at(a)
                 pygame.draw.rect(screen, self.stage.pit_deep or self.stage.pit, (bx0, y0, bx1 - bx0, max(0, view.bottom - y0)))
                 deep = self.stage.pit_deep
                 n = (C.BASE_H - C.GROUND_Y + 7) // 8
@@ -945,7 +965,10 @@ class Game:
                 row = max(0, (view.y - y) // 32)       # 見えている所より上の段は、飛ばす（高い崖は、縦に長い）
                 y += row * 32
                 while y < view.bottom:
-                    screen.blit(tiles[FILL_PATTERN[(i * 7 + row * 5) % len(FILL_PATTERN)]], (x, y))
+                    if self.a.cliff and row >= C.CLIMB_BG["cliff_rows"]:       # 高い崖の壁は、岩肌のタイルで埋める
+                        screen.blit(self.a.cliff[C.CLIFF_PATTERN[(i * 7 + row * 5) % len(C.CLIFF_PATTERN)] % len(self.a.cliff)], (x, y))
+                    else:
+                        screen.blit(tiles[FILL_PATTERN[(i * 7 + row * 5) % len(FILL_PATTERN)]], (x, y))
                     y += 32
                     row += 1
         screen.set_clip(view)
@@ -963,6 +986,20 @@ class Game:
             for tx in range(x0, x1, 32):
                 screen.blit(top, (tx - cam, top_y - (C.FLOOR_Y - C.GROUND_Y)))
         screen.set_clip(view)
+        # 消える光の足場: 乗れる間は、明るい金の板。消える前は、点滅。消えている間も、うすい枠を出す（どこに出るかが、分かるように）
+        for n, b in enumerate(self.terrain.blinks):
+            x0, x1, top_y = b[:3]
+            r = pygame.Rect(x0 - C.STONE_PAD - cam, top_y - 3, x1 - x0 + C.STONE_PAD * 2, 11)
+            if r.right < 0 or r.left > C.BASE_W:
+                continue
+            state = self.terrain.blink_state(b, self.intro_t)
+            if state == "off" or (state == "warn" and (self.intro_t // 4) % 2):
+                pygame.draw.rect(screen, (120, 86, 24), r, 1)
+                continue
+            pygame.draw.rect(screen, (96, 60, 8), r.inflate(2, 2))
+            pygame.draw.rect(screen, (255, 214, 96), r)
+            pygame.draw.rect(screen, (255, 250, 214), (r.x + 1, r.y + 1, r.w - 2, 3))
+            pygame.draw.rect(screen, (214, 150, 40), (r.x + 1, r.bottom - 3, r.w - 2, 2))
 
     def _stone(self, n, width):
         """n 番目の足場の、礎石の絵（足場の幅に合わせて、横に伸ばす。一度作ったら、使い回す）"""

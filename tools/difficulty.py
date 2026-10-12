@@ -81,7 +81,7 @@ def hole_jumps(stage):
     for (g1, g2) in zip(stage.ground, stage.ground[1:]):
         if g2[0] <= g1[1]:
             continue
-        nodes = [g1] + sorted(p for p in stage.platforms if g1[1] - 20 <= (p[0] + p[1]) / 2 <= g2[0] + 20) + [g2]
+        nodes = [g1] + sorted(p for p in stage.footholds if g1[1] - 20 <= (p[0] + p[1]) / 2 <= g2[0] + 20) + [g2]
         best = {0: (0, 0, 999.0)}
         for j in range(1, len(nodes)):
             for i in range(j):
@@ -111,7 +111,7 @@ def climb_jumps(stage):
     for g1, g2 in zip(stage.ground, stage.ground[1:]):
         if g2[0] != g1[1] or g1[2] - g2[2] <= JUMP_MAX:
             continue
-        mid = sorted((p for p in stage.platforms if g1[0] <= (p[0] + p[1]) / 2 < g2[0] and g2[2] < p[2] < g1[2]), key=lambda p: -p[2])
+        mid = sorted((p for p in stage.footholds if g1[0] <= (p[0] + p[1]) / 2 < g2[0] and g2[2] < p[2] < g1[2]), key=lambda p: -p[2])
         nodes = [g1] + mid + [g2]
         best = {0: (0, 0, 999.0, g1[1])}
         for j in range(1, len(nodes)):
@@ -154,6 +154,7 @@ def measure(stage, x0, x1):
     steps = sum(1 for (_, a1, t1), (b0, _, t2) in zip(stage.ground, stage.ground[1:]) if a1 == b0 and t1 != t2 and x0 <= b0 < x1)
     gates = [k for x, k in stage.gates if x0 <= x + C.BASE_W // 2 < x1]
     gim = sum(max(0, min(x1, w[1]) - max(x0, w[0])) for w in list(stage.winds) + list(stage.traps)) * M["gimmick"] / 500
+    jump += sum(1 for b in stage.blinks if x0 <= b[0] < x1)     # 消える光の足場: 間合いを計るぶん、1つにつき ＋1
     raw = foes + jump + gim + sum(C.BOSS_DIFFICULTY.get(k, 6) * 4 for k in gates)
     raw = raw * 500 / max(1, x1 - x0)
     return dict(kinds=kinds, holes=len(hs), climbs=sum(c[3] for c in cs), steps=steps, jump=jump, foes=foes, gates=gates, raw=raw, level=level_of(raw),
@@ -269,7 +270,7 @@ def warnings(stage, secs):
     return out
 
 
-NAMES = {"winds": "山おろし（風）", "traps": "光の柱の廊下", "pond": "池の飛び石", "benkei": "中ボス・弁慶", "climb": "崖登り（画面が上へ動く）",
+NAMES = {"blinks": "消える光の足場", "winds": "山おろし（風）", "traps": "光の柱の廊下", "pond": "池の飛び石", "benkei": "中ボス・弁慶", "climb": "崖登り（画面が上へ動く）",
          "boss": "影・泰衡", "boss2": "影・基衡", "boss3": "影・秀衡"}
 
 
@@ -277,7 +278,7 @@ def elements(stage):
     """その面に出てくる「もの」の一覧（敵の種類・仕掛け・途中のボス）。面ごとの、新しさを見るのに使う"""
     out = [base(k) for k, _ in sorted(stage.spawns, key=lambda s: s[1])]
     out += [NAMES[k] for _, k in stage.gates]
-    out += [NAMES[n] for n in ("winds", "traps", "climb") if getattr(stage, n)]
+    out += [NAMES[n] for n in ("winds", "traps", "climb", "blinks") if getattr(stage, n)]
     if max(holes(stage), default=0) >= 130:
         out.append(NAMES["pond"])
     return list(dict.fromkeys(out))
