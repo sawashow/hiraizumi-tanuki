@@ -502,7 +502,7 @@ HALO = dict(r=44, rage_r=54, rays=16, ray_long=16, ray_short=8, spin=0.012, dy=8
             color=(255, 214, 90), rage_color=(255, 132, 56))
 BOSS4_VOLLEYS = ("LMH", "HML", "MHL", "LHM")          # 玉の高さの順（L=低い / M=真ん中 / H=高い）。くり返す
 BOSS4_RAGE_VOLLEYS = ("LMHML", "HLMLH", "MHLHM")
-BEAD = dict(w=8, h=8, speed=1.9, rage_speed=2.2, range=360, damage=1, low=10, mid=26, high=44, ticks=6)   # 高さは、地面から
+BEAD = dict(w=12, h=12, cut_pad=10, speed=1.9, rage_speed=2.2, range=360, damage=1, low=10, mid=26, high=44, ticks=6)   # 高さは、地面から
 GUST = dict(w=34, h=40, speed=1.5, range=150, push=2.2, ticks=7, lead=10, sink=2, alpha=110)    # 扇の風（押す速さは、最高速より小さい。押されながらでも、進める。alpha: 風の絵の濃さ 0〜255。薄くして、うしろが見えるように）
 FAN = dict(w=16, h=16, speed=1.7, range=170, damage=1, y=40, spin=9, turn=18)   # 投げた扇（y=地面からの高さ）。往路のあと、turn フレーム止まって白く光り（戻る予告）、同じ速さで戻る
 PETAL = dict(w=7, h=7, count=4, spread=34, warn=44, speed=2.6, top=-12, damage=1, stagger=10)   # 花びらの雨

@@ -1671,7 +1671,7 @@ class Boss4(Boss):
                     a = 2 * math.pi * k / R["count"]
                     snd("ring")
                     self.spawned.append(Bead(self.cx + math.cos(a) * R["radius"], self.cy + math.sin(a) * R["radius"], 1, self.a,
-                                             math.cos(a) * sp, vy=math.sin(a) * sp, floor=self._ground(), reach=R["range"]))
+                                             math.cos(a) * sp, vy=math.sin(a) * sp, floor=self._ground(), reach=R["range"], ring=True))
                 self._set("recover")
         elif s == "pillar_ready":              # 手を上げている間に、柱が落ちる
             if self.st >= P["pillar_frames"]:
@@ -1886,11 +1886,12 @@ class Boss2(Boss):
 
 class Bead:
     """数珠の玉: 決まった高さを、まっすぐ飛ぶ。刀で消せる。当たるとダメージ"""
-    cuttable = True
     damage = C.BEAD["damage"]
 
-    def __init__(self, x, y, direction, assets, speed=None, vy=0.0, floor=None, reach=None):
+    def __init__(self, x, y, direction, assets, speed=None, vy=0.0, floor=None, reach=None, ring=False):
         self.a = assets
+        self.ring = ring                          # 数珠の輪の玉: 斬れない（よける）。まっすぐ飛ぶ玉は、斬れる（金色）
+        self.cuttable = not ring
         self.px, self.py = float(x), float(y)
         self.dir = direction
         self.speed = speed or C.BEAD["speed"]     # 横の速さ（数珠の輪の玉は、負にもなる）
@@ -1916,10 +1917,21 @@ class Bead:
 
     def draw(self, surface, cam_x):
         x, y = round(self.px) - cam_x, round(self.py)
-        r = 4 if (self.t // C.BEAD["ticks"]) % 2 else 3      # 脈打つ
+        pulse = (self.t // C.BEAD["ticks"]) % 2
+        if self.ring:       # よける玉: 赤黒く、とげがある
+            r = 4 + pulse
+            for k in range(8):
+                a = k * math.pi / 4 + self.t * 0.1
+                pygame.draw.line(surface, (40, 8, 24), (x, y), (x + round(math.cos(a) * (r + 3)), y + round(math.sin(a) * (r + 3))), 2)
+            pygame.draw.circle(surface, (24, 4, 16), (x, y), r + 1)
+            pygame.draw.circle(surface, (196, 28, 56), (x, y), r)
+            pygame.draw.circle(surface, (255, 150, 150), (x - 1, y - 1), 1)
+            return
+        r = 5 + pulse       # 斬る玉: 大きな金色。白い光の縁
+        pygame.draw.circle(surface, (255, 252, 230), (x, y), r + 2, 1)
         pygame.draw.circle(surface, (150, 96, 8), (x, y), r + 1)
         pygame.draw.circle(surface, (252, 212, 64), (x, y), r)
-        pygame.draw.circle(surface, (255, 250, 214), (x - 1, y - 1), 1)
+        pygame.draw.circle(surface, (255, 250, 214), (x - 2, y - 2), 2)
 
 
 class Pillar:
