@@ -2247,6 +2247,8 @@ def make_enemy(kind, x, assets=None, terrain=None):
 
 
 class Shuriken:
+    throw_id = None     # 何回目の投げか（Game が付ける。三方手裏剣の3つは、同じ番号。無ければ、1つずつ別の投げ）
+
     def __init__(self, x, y, direction, assets, vy=0.0):
         self.a = assets
         self.px, self.py = float(x), float(y)

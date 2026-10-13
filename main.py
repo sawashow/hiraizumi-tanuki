@@ -566,7 +566,7 @@ class Game:
             for e in foes:
                 if s.alive and e.active and s.rect.colliderect(e.rect):
                     s.alive = False
-                    tid = getattr(s, "throw_id", None)
+                    tid = s.throw_id
                     if tid is None or e.last_throw != tid:   # 1投げにつき、同じ敵に当たるのは1つだけ（残りは、消えるだけ）
                         e.last_throw = tid
                         e.hit(C.SHURIKEN_DAMAGE)
