@@ -205,6 +205,7 @@ class Assets:
         self.roll_cars = [c for c in (opt(n) for n in R["cars"]) if c]
         self.roll_road, self.roll_zebra = opt(R["road"]), opt(R["zebra"])
         self.thanks_bg = opt(C.THANKS_BG)
+        self.story_bg = opt(C.STORY_BG)
         self.roll_bosses = [[opt(n) for n in names] for names in C.ROLL_BOSSES]       # 「しゅつえん」のボス（動く）。1つでも絵が無ければ、出さない
         if not all(all(f) for f in self.roll_bosses):
             self.roll_bosses = []
