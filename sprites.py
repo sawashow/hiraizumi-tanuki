@@ -1652,14 +1652,15 @@ class Boss4(Boss):
                 self._set("cast")
         elif s == "cast":                      # 数珠を向けて、玉を、ひとつずつ飛ばす
             heights = self._volley()
-            k = (self.st - P["fire_at"]) // P["gap"]
-            if self.st >= P["fire_at"] and (self.st - P["fire_at"]) % P["gap"] == 0 and 0 <= k < len(heights):
+            gap = P["rage_gap" if self.rage else "gap"]     # 玉と玉の間: 刀を振って、次を振れるまで（約38フレーム）に、ほぼ合わせる。続けて来ても、1つずつ斬れる
+            k = (self.st - P["fire_at"]) // gap
+            if self.st >= P["fire_at"] and (self.st - P["fire_at"]) % gap == 0 and 0 <= k < len(heights):
                 B = C.BEAD
                 y = self._ground() - B[{"L": "low", "M": "mid", "H": "high"}[heights[k]]]
                 snd("bead")
                 self.spawned.append(Bead(self.cx + self.facing * (self.w / 2 + 10), y, self.facing, self.a,
                                          B["rage_speed"] if self.rage else B["speed"]))
-            if self.st >= P["cast_frames"] + P["gap"] * (len(heights) - 1):
+            if self.st >= P["cast_frames"] + gap * (len(heights) - 1):
                 self.volley += 1
                 self._set("recover")
         elif s == "ring_ready":                # まわりに、玉の輪が出る（予告）。終わりに、八方へ飛ぶ

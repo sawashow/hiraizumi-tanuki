@@ -488,7 +488,7 @@ BENKEI_PATTERN = "LHLLH"
 # 玉は、刀で消せる。体力が半分になると、玉の数が増え、間が短くなる
 BOSS4 = dict(w=44, h=72, hp=36, bob=2, touch=1, speed=0.7, near=110, gravity=0.3, hover=12,
              walk_frames=80, rage_walk_frames=52, recover_frames=60, rage_recover_frames=40,
-             ready=36, fire_at=8, cast_frames=44, gap=14,
+             ready=36, fire_at=8, cast_frames=44, gap=36, rage_gap=30,
              ring_ready=44, pillar_frames=78, warp_out=22, warp_in=26, warp_dist=150, warp_min=90, roar=56)
 # 攻撃の順（くり返す）。beads=数珠の玉 / pillar=光の柱 / ring=数珠の輪 / warp=転移（すぐ次の攻撃に移る）
 BOSS4_CYCLE = ("beads", "pillar", "warp", "beads", "ring", "pillar", "warp", "ring")
@@ -502,7 +502,7 @@ HALO = dict(r=44, rage_r=54, rays=16, ray_long=16, ray_short=8, spin=0.012, dy=8
             color=(255, 214, 90), rage_color=(255, 132, 56))
 BOSS4_VOLLEYS = ("LMH", "HML", "MHL", "LHM")          # 玉の高さの順（L=低い / M=真ん中 / H=高い）。くり返す
 BOSS4_RAGE_VOLLEYS = ("LMHML", "HLMLH", "MHLHM")
-BEAD = dict(w=8, h=8, speed=2.2, rage_speed=2.7, range=360, damage=1, low=10, mid=26, high=44, ticks=6)   # 高さは、地面から
+BEAD = dict(w=8, h=8, speed=1.9, rage_speed=2.2, range=360, damage=1, low=10, mid=26, high=44, ticks=6)   # 高さは、地面から
 GUST = dict(w=34, h=40, speed=1.5, range=150, push=2.2, ticks=7, lead=10, sink=2, alpha=110)    # 扇の風（押す速さは、最高速より小さい。押されながらでも、進める。alpha: 風の絵の濃さ 0〜255。薄くして、うしろが見えるように）
 FAN = dict(w=16, h=16, speed=1.7, range=170, damage=1, y=40, spin=9, turn=18)   # 投げた扇（y=地面からの高さ）。往路のあと、turn フレーム止まって白く光り（戻る予告）、同じ速さで戻る
 PETAL = dict(w=7, h=7, count=4, spread=34, warn=44, speed=2.6, top=-12, damage=1, stagger=10)   # 花びらの雨
