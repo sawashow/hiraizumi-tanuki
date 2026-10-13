@@ -2182,6 +2182,10 @@ check("駒は、待ってから、道を歩いていく", pos0 == C.MAP_PADS[1] 
 run(gm, int(gm.map_len / C.MAP_WALK_SPEED) + 5)
 pos2, _, arr2 = gm._map_pos()
 check("歩ききると、高館に着く", arr2 and pos2 == C.MAP_PADS[2] and gm.map_on, "%s on=%s t=%d len=%.0f" % (pos2, gm.map_on, gm.map_t, gm.map_len))
+# 分かれ道と高館の間は、行き（毛越寺→高館）と帰り（高館→月見坂）で、同じ道。金の上に、帰りの白い点が、重なっていた
+shared = [kind for (x, y), kind in gm._map_dot_kinds() if x > C.MAP_JUNCTION[0] + 4]
+check("高館に着くと、分かれ道から高館までの道も、金になる（白い点が残らない）", bool(shared) and set(shared) == {"gold"}, str(sorted(set(shared))))
+check("高館から先（月見坂へ）の道は、白のまま", "white" in {kind for (x, y), kind in gm._map_dot_kinds() if x < C.MAP_JUNCTION[0] - 8 and y < C.MAP_JUNCTION[1] - 8})
 run(gm, C.MAP_HOLD + 5)
 check("着いて少し待つと、ひとりでに、ゲームが始まる", not gm.map_on and gm.stage.name == "高館" and 0 < gm.frames < C.MAP_HOLD)
 gm.player.hp, gm.lives = 0, 3
