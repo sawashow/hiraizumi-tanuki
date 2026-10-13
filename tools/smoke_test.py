@@ -2525,6 +2525,11 @@ safe = all(not q.rect.colliderect(me) for _ in range(q.warn - 1) if q.update(480
 q.update(480)
 q.update(480)
 check("光の柱は、予告の間は当たらない。落ちてくると当たる。刀では消せない", safe and q.rect.colliderect(me) and not q.cuttable)
+# 予告は、1秒以上（60フレーム）。前は 0.9秒・怒ると 0.7秒で、発生が早すぎて、よけづらかった。清衡は、柱が落ちきるまで、手を上げている
+_PL = C.PILLAR
+check("光の柱の予告は、1秒以上ある（怒ったあとも）", _PL["warn"] >= 72 and _PL["rage_warn"] >= 60, "%d / %d" % (_PL["warn"], _PL["rage_warn"]))
+check("清衡は、光の柱が落ちきるまで、次の動きに移らない",
+      C.BOSS4["pillar_frames"] >= max(_PL["warn"] + _PL["stagger"] * (_PL["count"] // 2), _PL["rage_warn"] + _PL["stagger"] * (_PL["rage_count"] // 2)) + _PL["beam"])
 b4.spawned.clear()
 b4._set("ring_ready")
 for _ in range(C.BOSS4["ring_ready"]):

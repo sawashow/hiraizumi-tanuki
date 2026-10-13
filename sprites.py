@@ -1986,7 +1986,8 @@ class Bead(Shot):
 
 
 class Pillar(Shot):
-    """光の柱（清衡）: 床に、光る印と、細い光の筋が出る（予告）。そのあと、上から、太い光の柱が落ちる。刀では消せない。印の間に立てば、当たらない"""
+    """光の柱（清衡）: 落ちる場所に、柱と同じ太さの、うすい光と、床の印が出る（予告。だんだん濃くなり、落ちる直前は、速く点滅する）。
+    そのあと、上から、太い光の柱が落ちる。刀では消せない。うすい光の間に立てば、当たらない"""
     cuttable = False
     damage = C.PILLAR["damage"]
 
@@ -1997,6 +1998,7 @@ class Pillar(Shot):
         self.warn = warn or C.PILLAR["warn"]
         self.t = -delay       # 0になるまで、まだ出ない
         self.alive = True
+        self._glow = None     # 予告の、うすい光の絵（描くときに作って、使い回す）
 
     @property
     def active(self):
@@ -2023,14 +2025,20 @@ class Pillar(Shot):
             return
         L = C.PILLAR
         x, floor = round(self.px) - cam_x, round(self.floor)
-        if not self.active:     # 予告: 床の印（だんだん柱の太さまで広がる。点滅）と、細い光の筋（終わりが近いほど、濃い）
-            w = 8 + (L["w"] + 4 - 8) * self.t // self.warn
-            col = (255, 250, 214) if (self.t // 4) % 2 else (255, 196, 64)
-            pygame.draw.ellipse(surface, C.BLACK, (x - w // 2 - 1, floor - 5, w + 2, 9))
-            pygame.draw.ellipse(surface, col, (x - w // 2, floor - 4, w, 7))
-            line = pygame.Surface((2, floor), pygame.SRCALPHA)
-            line.fill((255, 236, 150, 50 + 150 * self.t // self.warn))
-            surface.blit(line, (x - 1, 0))
+        if not self.active:     # 予告: 柱と同じ太さの、うすい光（だんだん濃くなる。両端に、縁の線）と、床の印。落ちる直前は、速く点滅
+            w, u = L["w"], self.t / self.warn
+            last = self.warn - self.t <= L["flash"]
+            blink = (self.t // (2 if last else 5)) % 2
+            if self._glow is None:
+                self._glow = pygame.Surface((w, floor), pygame.SRCALPHA)
+            self._glow.fill((255, 226, 120, round(28 + 78 * u) + (50 if last and blink else 0)))
+            edge = (255, 246, 196, round(110 + 120 * u))
+            pygame.draw.rect(self._glow, edge, (0, 0, 1, floor))
+            pygame.draw.rect(self._glow, edge, (w - 1, 0, 1, floor))
+            surface.blit(self._glow, (x - w // 2, 0))
+            col = (255, 250, 214) if blink else (255, 196, 64)
+            pygame.draw.ellipse(surface, C.BLACK, (x - w // 2 - 3, floor - 5, w + 6, 9))
+            pygame.draw.ellipse(surface, col, (x - w // 2 - 2, floor - 4, w + 4, 7))
             return
         k = self.t - self.warn
         w = L["w"] if k < L["beam"] - 4 else L["w"] // 2        # 終わりは、細くなって消える
