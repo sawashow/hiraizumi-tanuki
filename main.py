@@ -323,88 +323,10 @@ class Game:
             self._step_map(set(pressed))
             return
         if self.story:      # 始まりの語り: 決定のキーを押すまで、続く。押すと、タヌキ侍が気づいて、右へ駆け抜けて、ゲームが始まる
-            T = C.STORY_TANUKI
-            self.story_t += 1
-            if self.story_run:
-                self.story_run += 1
-                if self.story_run > self.story_wake:    # 気づいた（飛び起きた）あと、走り出す
-                    self.story_x += T["run_speed"]
-                if self.story_x > C.BASE_W + T["head_x"]:
-                    self.story = False
-                    if self.use_map:
-                        self._open_map()
-            elif self.story_t > C.STORY_SKIP_WAIT and {"restart", "attack", "jump"} & set(pressed):
-                self.story_wake = T["wake"] if self.story_asleep else T["notice"]
-                self.story_woke = self.story_asleep     # 眠っていたか（飛び起きる動きにする）
-                self.story_run = 1
+            self._step_story(pressed)
             return
         if self.title:      # スタート画面: 止めておく。Enter（刀・ジャンプのキーでも）で、刀の音が鳴って始まる
-            self.title_t += 1
-            if self.flash_t:
-                self.flash_t -= 1
-            if self.start_t:
-                self.start_t -= 1
-                if not self.start_t:
-                    self.title = False
-                    self.story, self.story_t, self.story_run = True, 0, 0
-                    self.story_x = float(C.STORY_TANUKI["x"])
-                return
-            # 決定のキー（上キーは、ジャンプと同じキーなので、上を押している間のジャンプは、決定にしない）
-            decide = bool({"restart", "attack"} & set(pressed)) or ("jump" in pressed and "up" not in held)
-            lr = ("right" in held) - ("left" in held)
-            ud = ("down" in held) - ("up" in held)
-            step_lr, step_ud = (lr if lr != self._lr else 0), (ud if ud != self._ud else 0)   # 押した瞬間だけ
-            self._lr, self._ud = lr, ud
-            if self.howto:      # 操作説明: 決定で、メニューに戻る
-                if decide:
-                    self.howto = False
-                    self.sfx.append(C.SFX["decide"])
-                return
-            if not self.menu_on:
-                if decide:      # 1回目の決定: メニューを開く
-                    self.menu_on, self.menu_page, self.menu_i = True, "main", 0
-                    self.sfx.append(C.SFX["decide"])
-                    return
-            else:
-                rows, S = C.MENU["pages"][self.menu_page], C.MENU["steps"]
-                if step_ud:     # 上下で、項目を選ぶ（選ぶ音）
-                    self.menu_i = (self.menu_i + step_ud) % len(rows)
-                    self.sfx.append(C.SFX["cursor"])
-                row = rows[self.menu_i]
-                turn = step_lr or (1 if decide and row == "level" else 0)     # LEVEL は、決定でも、次へ送れる（端まで行ったら、最初へ戻る）
-                if turn and row == "level":
-                    order = C.LEVEL_ORDER
-                    i = order.index(self.level) + turn
-                    self.level = order[i % len(order) if not step_lr else max(0, min(i, len(order) - 1))]
-                    self.lives = self.L["lives"]
-                    self.sfx.append(C.SFX["cursor"])
-                elif step_lr and row == "music":
-                    self.vol_bgm = max(0, min(S, self.vol_bgm + step_lr))
-                    self.sfx.append(C.SFX["cursor"])
-                elif step_lr and row == "sound":
-                    self.vol_sfx = max(0, min(S, self.vol_sfx + step_lr))
-                    self.sfx.append(C.SFX["cursor"])       # 変えた音量で、鳴る（大きさを、耳で確かめられる）
-                if decide and row == "story":           # 始める
-                    self.start_t = C.TITLE_START
-                    self.flash_t = 0
-                    self.sfx.append(C.SFX_SWORD)
-                    return
-                if decide and row == "option":
-                    self.menu_page, self.menu_i = "option", 0
-                    self.sfx.append(C.SFX["decide"])
-                elif decide and row == "back":
-                    self.menu_page, self.menu_i = "main", C.MENU["pages"]["main"].index("option")
-                    self.sfx.append(C.SFX["decide"])
-                elif decide and row == "howto" and self.a.howto:
-                    self.howto = True
-                    self.sfx.append(C.SFX["decide"])
-                    return
-            if self.title_t == self.thunder_at:                       # 稲光
-                self.flash_t = C.TITLE_FLASH
-            elif self.title_t == self.thunder_at + C.THUNDER_DELAY:   # 少し遅れて、雷鳴
-                self.sfx.append(C.SFX_THUNDER)
-                self.thunder_n += 1
-                self.thunder_at += C.TITLE_THUNDER[self.thunder_n % len(C.TITLE_THUNDER)]
+            self._step_title(held, pressed)
             return
         if self.ending_screen:   # エンディング: 暗い所から明るくなる。しばらくして、Enter で、スタート画面へ戻る
             self.ending_t += 1
@@ -417,44 +339,13 @@ class Game:
             self._step_roll(set(pressed))
             return
         if self.thanks:     # 姫を助ける場面: 歩いてきて、礼の文が出る。Enter で、文を全部出す → エンドロールへ
-            self.thanks_t += 1
-            n = self._thanks_shown()
-            if 0 < n <= sum(len(s) for s in C.THANKS["lines"]) and self._thanks_typed != n and n % 2:
-                self.sfx.append(C.SFX_TALK_HIGH)
-            self._thanks_typed = n
-            if self.thanks_t == self._thanks_at("hop"):
-                self.sfx.append(C.SFX["heal"])
-            if {"restart", "attack", "jump"} & set(pressed):
-                if self.thanks_t < self._thanks_at("done"):
-                    self.thanks_t = self._thanks_at("done")     # 途中で押すと、文を全部出す
-                elif self.thanks_t >= self._thanks_at("done") + C.THANKS["wait"]:
-                    self.thanks = False
-                    self._start_roll()
+            self._step_thanks(pressed)
             return
         if self.cleared:    # クリア: 止めて、結果を出す。Enter で最初から（スタート画面があれば、そこへ戻る）
-            self.clear_t += 1
-            if "restart" in pressed and self.clear_t >= C.CLEAR_WAIT:
-                if self.stage_i + 1 < len(STAGES):
-                    self.advance()
-                elif self.use_title:    # 最後の面: 姫を助ける場面へ（そのあと、エンディングの絵）
-                    self.thanks, self.thanks_t, self._thanks_typed = True, 0, 0
-                else:
-                    self.reset()
-                    self._enter_title(self.use_title)
+            self._step_cleared(pressed)
             return
         if p.hp <= 0:
-            if not self.dead:
-                self.dead = True
-                self.lives -= 1
-                if self.lives <= 0:
-                    self.sfx.append(C.SFX["gameover"])
-            self.over_t += 1
-            p.defeat_t = self.over_t
-            if self.lives > 0:
-                if self.over_t >= C.RESPAWN_AT:
-                    self.respawn()
-            elif "restart" in pressed and self.over_t >= C.GAMEOVER_WAIT:
-                self.reset(self.stage_i)   # ゲームオーバーは、いまの面を最初から（残機は戻る）
+            self._step_dead(p, pressed)
             return
         if self.ending:     # ボスを倒したあとの寸劇（動かせない。時間も止まる）
             self._step_ending(set(pressed))
@@ -532,6 +423,135 @@ class Game:
 
         self._follow_cam(p)
         self._move_cam_y()
+
+    def _step_story(self, pressed):
+        """始まりの語りの場面（step から呼ぶ）。"""
+        T = C.STORY_TANUKI
+        self.story_t += 1
+        if self.story_run:
+            self.story_run += 1
+            if self.story_run > self.story_wake:    # 気づいた（飛び起きた）あと、走り出す
+                self.story_x += T["run_speed"]
+            if self.story_x > C.BASE_W + T["head_x"]:
+                self.story = False
+                if self.use_map:
+                    self._open_map()
+        elif self.story_t > C.STORY_SKIP_WAIT and {"restart", "attack", "jump"} & set(pressed):
+            self.story_wake = T["wake"] if self.story_asleep else T["notice"]
+            self.story_woke = self.story_asleep     # 眠っていたか（飛び起きる動きにする）
+            self.story_run = 1
+
+    def _step_title(self, held, pressed):
+        """スタート画面とメニュー（step から呼ぶ）。"""
+        self.title_t += 1
+        if self.flash_t:
+            self.flash_t -= 1
+        if self.start_t:
+            self.start_t -= 1
+            if not self.start_t:
+                self.title = False
+                self.story, self.story_t, self.story_run = True, 0, 0
+                self.story_x = float(C.STORY_TANUKI["x"])
+            return
+        # 決定のキー（上キーは、ジャンプと同じキーなので、上を押している間のジャンプは、決定にしない）
+        decide = bool({"restart", "attack"} & set(pressed)) or ("jump" in pressed and "up" not in held)
+        lr = ("right" in held) - ("left" in held)
+        ud = ("down" in held) - ("up" in held)
+        step_lr, step_ud = (lr if lr != self._lr else 0), (ud if ud != self._ud else 0)   # 押した瞬間だけ
+        self._lr, self._ud = lr, ud
+        if self.howto:      # 操作説明: 決定で、メニューに戻る
+            if decide:
+                self.howto = False
+                self.sfx.append(C.SFX["decide"])
+            return
+        if not self.menu_on:
+            if decide:      # 1回目の決定: メニューを開く
+                self.menu_on, self.menu_page, self.menu_i = True, "main", 0
+                self.sfx.append(C.SFX["decide"])
+                return
+        else:
+            rows, S = C.MENU["pages"][self.menu_page], C.MENU["steps"]
+            if step_ud:     # 上下で、項目を選ぶ（選ぶ音）
+                self.menu_i = (self.menu_i + step_ud) % len(rows)
+                self.sfx.append(C.SFX["cursor"])
+            row = rows[self.menu_i]
+            turn = step_lr or (1 if decide and row == "level" else 0)     # LEVEL は、決定でも、次へ送れる（端まで行ったら、最初へ戻る）
+            if turn and row == "level":
+                order = C.LEVEL_ORDER
+                i = order.index(self.level) + turn
+                self.level = order[i % len(order) if not step_lr else max(0, min(i, len(order) - 1))]
+                self.lives = self.L["lives"]
+                self.sfx.append(C.SFX["cursor"])
+            elif step_lr and row == "music":
+                self.vol_bgm = max(0, min(S, self.vol_bgm + step_lr))
+                self.sfx.append(C.SFX["cursor"])
+            elif step_lr and row == "sound":
+                self.vol_sfx = max(0, min(S, self.vol_sfx + step_lr))
+                self.sfx.append(C.SFX["cursor"])       # 変えた音量で、鳴る（大きさを、耳で確かめられる）
+            if decide and row == "story":           # 始める
+                self.start_t = C.TITLE_START
+                self.flash_t = 0
+                self.sfx.append(C.SFX_SWORD)
+                return
+            if decide and row == "option":
+                self.menu_page, self.menu_i = "option", 0
+                self.sfx.append(C.SFX["decide"])
+            elif decide and row == "back":
+                self.menu_page, self.menu_i = "main", C.MENU["pages"]["main"].index("option")
+                self.sfx.append(C.SFX["decide"])
+            elif decide and row == "howto" and self.a.howto:
+                self.howto = True
+                self.sfx.append(C.SFX["decide"])
+                return
+        if self.title_t == self.thunder_at:                       # 稲光
+            self.flash_t = C.TITLE_FLASH
+        elif self.title_t == self.thunder_at + C.THUNDER_DELAY:   # 少し遅れて、雷鳴
+            self.sfx.append(C.SFX_THUNDER)
+            self.thunder_n += 1
+            self.thunder_at += C.TITLE_THUNDER[self.thunder_n % len(C.TITLE_THUNDER)]
+
+    def _step_thanks(self, pressed):
+        """姫を助ける場面（step から呼ぶ）。"""
+        self.thanks_t += 1
+        n = self._thanks_shown()
+        if 0 < n <= sum(len(s) for s in C.THANKS["lines"]) and self._thanks_typed != n and n % 2:
+            self.sfx.append(C.SFX_TALK_HIGH)
+        self._thanks_typed = n
+        if self.thanks_t == self._thanks_at("hop"):
+            self.sfx.append(C.SFX["heal"])
+        if {"restart", "attack", "jump"} & set(pressed):
+            if self.thanks_t < self._thanks_at("done"):
+                self.thanks_t = self._thanks_at("done")     # 途中で押すと、文を全部出す
+            elif self.thanks_t >= self._thanks_at("done") + C.THANKS["wait"]:
+                self.thanks = False
+                self._start_roll()
+
+    def _step_cleared(self, pressed):
+        """面をクリアしたあとの、結果の画面（step から呼ぶ）。"""
+        self.clear_t += 1
+        if "restart" in pressed and self.clear_t >= C.CLEAR_WAIT:
+            if self.stage_i + 1 < len(STAGES):
+                self.advance()
+            elif self.use_title:    # 最後の面: 姫を助ける場面へ（そのあと、エンディングの絵）
+                self.thanks, self.thanks_t, self._thanks_typed = True, 0, 0
+            else:
+                self.reset()
+                self._enter_title(self.use_title)
+
+    def _step_dead(self, p, pressed):
+        """やられたあと: 残機があれば復活、なければゲームオーバー（step から呼ぶ）。"""
+        if not self.dead:
+            self.dead = True
+            self.lives -= 1
+            if self.lives <= 0:
+                self.sfx.append(C.SFX["gameover"])
+        self.over_t += 1
+        p.defeat_t = self.over_t
+        if self.lives > 0:
+            if self.over_t >= C.RESPAWN_AT:
+                self.respawn()
+        elif "restart" in pressed and self.over_t >= C.GAMEOVER_WAIT:
+            self.reset(self.stage_i)   # ゲームオーバーは、いまの面を最初から（残機は戻る）
 
     def _hit_foes(self, p, foes, sword):
         """主人公の攻撃（刀・手裏剣・光波）が、敵に当たる（step から呼ぶ）。"""
