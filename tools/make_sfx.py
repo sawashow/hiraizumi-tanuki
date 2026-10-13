@@ -232,6 +232,8 @@ GAME_SOUNDS = {
     "warp_in": lambda: tone(260, 1700, 0.34, "sine", 0.9, 2, vib=0.20, vib_hz=42),
     # 画面
     "select": lambda: tone(880, 990, 0.05, "square", 0.7, 16, duty=0.3),
+    "cursor": lambda: tone(1320, 1320, 0.035, "square", 0.8, 26, duty=0.25),                      # メニューで、上下・左右に動かす（短い「ピ」）
+    "decide": lambda: notes((988, 1319), 0.06, 0.12, "square", 0.8, 9),                             # メニューで、決定する（上がる2音「ピロン」）
     "clear": lambda: mix(notes((523, 659, 784, 1047, 784, 1047, 1319), 0.11, 0.30, "square", 0.7, 5),
                          notes((262, 330, 392, 523, 392, 523, 659), 0.11, 0.30, "tri", 0.6, 5)),
     "gameover": lambda: mix(notes((392, 370, 330, 294, 262, 196), 0.22, 0.42, "tri", 0.9, 3.5),

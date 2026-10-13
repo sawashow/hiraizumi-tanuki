@@ -45,6 +45,7 @@ class Game:
         self.pause_t = 0
         self.thanks = False          # いま、姫を助ける場面（THANK YOU TANUKI!）を出している
         self.thanks_t = 0
+        self.roll = False            # いま、エンドロール（平泉の道を歩く場面）を出している
         self.ending_screen = False   # いま、エンディング画面を出している
         self.ending_t = 0
         self.map_on = False      # いま、地図を出している
@@ -58,6 +59,8 @@ class Game:
         self._songs = {}             # 曲のファイルが、あるか（名前 → あるか）
         self.level = C.LEVEL         # 難しさ（スタート画面で、左右で変える）
         self._lr = 0                 # スタート画面で、前のフレームに押していた左右（押した瞬間だけ、切り替える）
+        self._ud = 0                 # 同じく、上下
+        self.vol_bgm = self.vol_sfx = C.MENU["steps"]    # 曲と効果音の音量（0〜steps。スタート画面のメニューで変える）
         self.story_bgm = os.path.exists(os.path.join(AUDIO_DIR, C.BGM_STORY))   # 語りの曲があるか
         self.super_bgm = os.path.exists(os.path.join(AUDIO_DIR, C.BGM_SUPER))   # スーパータヌキの曲があるか
         self._enter_title(title)
@@ -70,6 +73,10 @@ class Game:
         self.thunder_at = C.TITLE_THUNDER[0]   # 次の稲光のフレーム
         self.flash_t = 0         # 稲光で光っている残りフレーム
         self.start_t = 0         # 決定してから、始まるまでの残りフレーム
+        self.menu_on = False     # スタート画面で、メニューを開いている
+        self.menu_i = 0          # 選んでいる項目
+        self.menu_page = "main"  # メニューの画面（main = STORY・OPTION・HOW TO PLAY / option = 難しさ・音量）
+        self.howto = False       # 操作説明を出している
         self.story = False       # いま、始まりの語りを流している
         self.story_t = 0
         self.story_run = 0       # 決定してからのフレーム数（タヌキ侍が気づいて、駆け抜けている）
@@ -265,7 +272,7 @@ class Game:
     @property
     def can_pause(self):
         """ポーズできるのは、面を遊んでいる間だけ（スタート画面・語り・地図・寸劇・結果・やられた画面では、できない）"""
-        return not (self.title or self.story or self.map_on or self.thanks or self.ending_screen or self.cleared
+        return not (self.title or self.story or self.map_on or self.thanks or self.roll or self.ending_screen or self.cleared
                     or self.ending or self.player.hp <= 0)
 
     def step(self, held, pressed=()):
@@ -311,18 +318,56 @@ class Game:
                     self.story, self.story_t, self.story_run = True, 0, 0
                     self.story_x = float(C.STORY_TANUKI["x"])
                 return
-            lr = ("right" in held) - ("left" in held)      # 左右で、難しさを選ぶ
-            if lr and lr != self._lr:
-                order = C.LEVEL_ORDER
-                self.level = order[max(0, min(order.index(self.level) + lr, len(order) - 1))]
-                self.lives = self.L["lives"]
-                self.sfx.append(C.SFX["select"])
-            self._lr = lr
-            if {"restart", "attack", "jump"} & set(pressed):
-                self.start_t = C.TITLE_START
-                self.flash_t = 0
-                self.sfx.append(C.SFX_SWORD)
+            # 決定のキー（上キーは、ジャンプと同じキーなので、上を押している間のジャンプは、決定にしない）
+            decide = bool({"restart", "attack"} & set(pressed)) or ("jump" in pressed and "up" not in held)
+            lr = ("right" in held) - ("left" in held)
+            ud = ("down" in held) - ("up" in held)
+            step_lr, step_ud = (lr if lr != self._lr else 0), (ud if ud != self._ud else 0)   # 押した瞬間だけ
+            self._lr, self._ud = lr, ud
+            if self.howto:      # 操作説明: 決定で、メニューに戻る
+                if decide:
+                    self.howto = False
+                    self.sfx.append(C.SFX["decide"])
                 return
+            if not self.menu_on:
+                if decide:      # 1回目の決定: メニューを開く
+                    self.menu_on, self.menu_page, self.menu_i = True, "main", 0
+                    self.sfx.append(C.SFX["decide"])
+                    return
+            else:
+                rows, S = C.MENU["pages"][self.menu_page], C.MENU["steps"]
+                if step_ud:     # 上下で、項目を選ぶ（選ぶ音）
+                    self.menu_i = (self.menu_i + step_ud) % len(rows)
+                    self.sfx.append(C.SFX["cursor"])
+                row = rows[self.menu_i]
+                turn = step_lr or (1 if decide and row == "level" else 0)     # LEVEL は、決定でも、次へ送れる（端まで行ったら、最初へ戻る）
+                if turn and row == "level":
+                    order = C.LEVEL_ORDER
+                    i = order.index(self.level) + turn
+                    self.level = order[i % len(order) if not step_lr else max(0, min(i, len(order) - 1))]
+                    self.lives = self.L["lives"]
+                    self.sfx.append(C.SFX["cursor"])
+                elif step_lr and row == "music":
+                    self.vol_bgm = max(0, min(S, self.vol_bgm + step_lr))
+                    self.sfx.append(C.SFX["cursor"])
+                elif step_lr and row == "sound":
+                    self.vol_sfx = max(0, min(S, self.vol_sfx + step_lr))
+                    self.sfx.append(C.SFX["cursor"])       # 変えた音量で、鳴る（大きさを、耳で確かめられる）
+                if decide and row == "story":           # 始める
+                    self.start_t = C.TITLE_START
+                    self.flash_t = 0
+                    self.sfx.append(C.SFX_SWORD)
+                    return
+                if decide and row == "option":
+                    self.menu_page, self.menu_i = "option", 0
+                    self.sfx.append(C.SFX["decide"])
+                elif decide and row == "back":
+                    self.menu_page, self.menu_i = "main", C.MENU["pages"]["main"].index("option")
+                    self.sfx.append(C.SFX["decide"])
+                elif decide and row == "howto" and self.a.howto:
+                    self.howto = True
+                    self.sfx.append(C.SFX["decide"])
+                    return
             if self.title_t == self.thunder_at:                       # 稲光
                 self.flash_t = C.TITLE_FLASH
             elif self.title_t == self.thunder_at + C.THUNDER_DELAY:   # 少し遅れて、雷鳴
@@ -337,7 +382,10 @@ class Game:
                 self.reset()
                 self._enter_title(self.use_title)
             return
-        if self.thanks:     # 姫を助ける場面: 歩いてきて、礼の文が出る。Enter で、文を全部出す → エンディングの絵へ
+        if self.roll:       # エンドロール
+            self._step_roll(set(pressed))
+            return
+        if self.thanks:     # 姫を助ける場面: 歩いてきて、礼の文が出る。Enter で、文を全部出す → エンドロールへ
             self.thanks_t += 1
             n = self._thanks_shown()
             if 0 < n <= sum(len(s) for s in C.THANKS["lines"]) and self._thanks_typed != n and n % 2:
@@ -350,11 +398,7 @@ class Game:
                     self.thanks_t = self._thanks_at("done")     # 途中で押すと、文を全部出す
                 elif self.thanks_t >= self._thanks_at("done") + C.THANKS["wait"]:
                     self.thanks = False
-                    if self.a.ending_image:
-                        self.ending_screen, self.ending_t = True, 0
-                    else:
-                        self.reset()
-                        self._enter_title(self.use_title)
+                    self._start_roll()
             return
         if self.cleared:    # クリア: 止めて、結果を出す。Enter で最初から（スタート画面があれば、そこへ戻る）
             self.clear_t += 1
@@ -788,7 +832,7 @@ class Game:
         始まりの語りの間は、語りの曲（無ければ、無音）。ゲームが始まると、1面の曲。
         ボスが降ってくるまでは静かにして、着地したときに、ボスの曲を始める"""
         story = C.BGM_STORY if self.story_bgm else None
-        if self.ending_screen or self.thanks:
+        if self.ending_screen or self.thanks or self.roll:
             return self._song(C.BGM_ENDING) or story
         if self.title:
             return self._song(C.BGM_TITLE)
@@ -819,6 +863,9 @@ class Game:
         self._font = font
         if self.thanks:
             self._draw_thanks(screen, font)
+            return
+        if self.roll:
+            self._draw_roll(screen)
             return
         if self.ending_screen:
             self._draw_ending_screen(screen)
@@ -967,6 +1014,8 @@ class Game:
                 while y < view.bottom:
                     if self.a.cliff and row >= C.CLIMB_BG["cliff_rows"]:       # 高い崖の壁は、岩肌のタイルで埋める
                         screen.blit(self.a.cliff[C.CLIFF_PATTERN[(i * 7 + row * 5) % len(C.CLIFF_PATTERN)] % len(self.a.cliff)], (x, y))
+                    elif self.stage.fill_rows:      # 段ごとに、決まったタイル（堂の中の床: 朱の帯の下に、黒漆）
+                        screen.blit(tiles[self.stage.fill_rows[min(row, len(self.stage.fill_rows) - 1)]], (x, y))
                     else:
                         screen.blit(tiles[FILL_PATTERN[(i * 7 + row * 5) % len(FILL_PATTERN)]], (x, y))
                     y += 32
@@ -1274,13 +1323,8 @@ class Game:
                 screen.blit(img, (C.BASE_W // 2 - full.get_width() + off, y + off))
         done = self._thanks_at("done")
         if t >= done + K["dream"]:      # 礼を言われている間も、タヌキ侍は、食べ物のことを考えている（おにぎりと団子が、かわるがわる浮かぶ）
-            bx, by = round(x) + 4, K["floor"] - img.get_height() - 26
-            white, edge = (244, 244, 252), (16, 10, 24)
-            for cx, cy, r in ((round(x) + 10, K["floor"] - img.get_height() - 3, 1), (round(x) + 8, K["floor"] - img.get_height() - 9, 2)):
-                pygame.draw.circle(screen, edge, (cx, cy), r + 2)
-                pygame.draw.circle(screen, white, (cx, cy), r)
-            for color, pad in ((edge, 2), (white, 0)):
-                pygame.draw.ellipse(screen, color, (bx - 17 - pad, by - 12 - pad, 34 + pad * 2, 24 + pad * 2))
+            # 頭のてっぺんの高さから、上へ置く（前は、ここで、礼の文の絵の高さを使っていて、雲が、頭に重なっていた）
+            bx, by = self._cloud(screen, round(x), K["floor"] - C.THOUGHT["head"], 36, 26)
             food = self.a.item[("onigiri", "dango")[((t - done - K["dream"]) // K["dream_swap"]) % 2]]
             screen.blit(food, (bx - food.get_width() // 2, by - food.get_height() // 2))
         if t >= done + 10 and self.a.thanks_sub:
@@ -1289,6 +1333,154 @@ class Game:
         if t >= done + K["wait"] and ((t - done) // 30) % 2 == 0:
             hint = self.a.title_prompt
             screen.blit(hint, (C.BASE_W // 2 - hint.get_width() // 2, C.BASE_H - 22))
+
+    # ---------------------------------------------------------------- エンドロール
+    def _start_roll(self):
+        self.roll, self.roll_t = True, 0
+        self.roll_x = 0.0           # 景色が流れた距離
+        self.roll_state = "walk"    # walk（歩く）/ stop（止まって、車を待つ）/ look（右・左を見る）/ cross（渡る）
+        self.roll_st = 0            # いまの動きに入ってからのフレーム数
+        self.roll_side = 0          # いま、どちらの歩道にいるか（0 = 奥 / 1 = 手前）
+        self.roll_n = 0             # 渡った回数
+        self.roll_car = None        # 走っている車: [x, 向き, 絵の番号]
+
+    def _roll_done(self):
+        """文字が、流れきったか"""
+        R = C.ROLL
+        h = self.a.credits.get_height() if self.a.credits else 0
+        return self.roll_t * R["scroll"] >= h + R["window"][1] - R["window"][0]
+
+    def _end_roll(self):
+        self.roll = False
+        if self.a.ending_image:
+            self.ending_screen, self.ending_t = True, 0
+        else:
+            self.reset()
+            self._enter_title(self.use_title)
+
+    def _step_roll(self, pressed):
+        R = C.ROLL
+        self.roll_t += 1
+        self.roll_st += 1
+        if {"restart", "attack", "jump"} & pressed and self.roll_t >= R["skip"]:    # 決定のキーで、飛ばせる
+            self._end_roll()
+            return
+        car = self.roll_car
+        if car:
+            car[0] += car[1] * R["car_speed"]
+            if not -60 < car[0] < R["view_w"] + 60:
+                self.roll_car = None
+        st = self.roll_state
+        if st == "walk":
+            self.roll_x += R["speed"]
+            if self._roll_done() and self.roll_st >= R["tail"]:     # 文字が流れきったら、歩いている所で、絵に替わる
+                self._end_roll()
+            elif self.roll_x + R["x"] >= (self.roll_n + 1) * R["every"] and not self._roll_done():
+                self.roll_state, self.roll_st = "stop", 0           # 横断歩道に着いた: 止まる
+        elif st == "stop":
+            if self.roll_st == R["car_wait"]:                       # 車が来る（1回ごとに、右から・左から）
+                d = -1 if self.roll_n % 2 == 0 else 1
+                self.roll_car = [float(R["view_w"] + 50 if d < 0 else -50), d, self.roll_n]
+            elif self.roll_st > R["car_wait"] and self.roll_car is None:
+                self.roll_state, self.roll_st = "look", 0           # 車が通りすぎた: 右・左を見る
+        elif st == "look":
+            if self.roll_st >= R["look"] * 3:
+                self.roll_state, self.roll_st = "cross", 0
+                self.sfx.append(C.SFX["decide"])
+        elif st == "cross":
+            if self.roll_st >= R["cross"]:
+                self.roll_side ^= 1
+                self.roll_n += 1
+                self.roll_state, self.roll_st = "walk", 0
+
+    def _draw_roll(self, full):
+        """左半分の枠に、二人が歩く場面。右半分の暗い地に、エンドロールの文字"""
+        R, t = C.ROLL, self.roll_t
+        VW = R["view_w"]
+        screen = full.subsurface((0, 0, VW, C.BASE_H))      # 左の枠（この中だけに描かれる）
+        top, bottom = R["road"]
+        scroll = round(self.roll_x)
+        # 景色（絵があれば、横にくり返して流す。無ければ、空と山と、金色堂の影を、図形で描く）
+        bg = self.a.roll_bg
+        if bg:
+            x = -(scroll // 2) % bg.get_width() - bg.get_width()
+            while x < VW:
+                screen.blit(bg, (x, top - 22 - bg.get_height()))
+                x += bg.get_width()
+            screen.fill((120, 190, 240), (0, 0, VW, max(0, top - 22 - bg.get_height())))
+        else:
+            screen.fill((120, 190, 240))
+            for k in range(-1, 4):      # 遠くの山
+                hx = k * 220 - (scroll // 4) % 220
+                pygame.draw.polygon(screen, (92, 150, 110), [(hx, top - 22), (hx + 110, top - 92), (hx + 220, top - 22)])
+            for k in range(-1, 3):      # 堂の影（ゆっくり流れる）
+                hx = k * 300 - (scroll // 2) % 300 + 60
+                pygame.draw.rect(screen, (150, 120, 60), (hx, top - 62, 70, 40))
+                pygame.draw.polygon(screen, (110, 84, 40), [(hx - 12, top - 62), (hx + 35, top - 86), (hx + 82, top - 62)])
+        # 奥の歩道・車道・手前の歩道
+        screen.fill((196, 196, 188), (0, top - 22, VW, 22))
+        screen.fill((150, 150, 144), (0, top - 3, VW, 3))
+        screen.fill((74, 76, 86), (0, top, VW, bottom - top))
+        screen.fill((196, 196, 188), (0, bottom, VW, C.BASE_H - bottom))
+        screen.fill((228, 228, 220), (0, bottom, VW, 3))
+        mid = (top + bottom) // 2
+        for x in range(-(scroll % 48), VW, 48):       # 車道の真ん中の線
+            screen.fill((226, 226, 200), (x, mid - 1, 24, 2))
+        for n in range(self.roll_n - 1, self.roll_n + 3):   # 横断歩道（白い帯を、車道の幅いっぱいに並べる）
+            zx = (n + 1) * R["every"] - scroll - R["zebra"] // 2 + (R["hime_dx"] // 2)
+            if -R["zebra"] < zx < VW:
+                screen.fill((74, 76, 86), (zx, mid - 2, R["zebra"], 4))
+                for y in range(top + 3, bottom - 4, 9):
+                    screen.fill((238, 238, 232), (zx, y, R["zebra"], 5))
+        # 二人の位置と向き
+        st, k = self.roll_state, self.roll_st
+        ya, yb = (R["far"], R["near"]) if self.roll_side == 0 else (R["near"], R["far"])
+        feet = ya + (yb - ya) * min(1.0, k / R["cross"]) if st == "cross" else ya
+        walking = st in ("walk", "cross")
+        right = True
+        if st == "look":        # 右 → 左 → 右、と見る
+            right = (k // R["look"]) % 2 == 0
+        frame = C.WALK[(t // C.WALK_TICKS) % len(C.WALK)] if walking else C.IDLE[0]
+        tanuki = self.a.player[right][frame]
+        if self.a.hime_walk:        # 歩く絵。立っている間は、両足をそろえたコマ（大きさが、歩く絵と同じ）
+            hime = self.a.hime_walk[(t // 9) % len(self.a.hime_walk) if walking else 1]
+        else:
+            hime = self.a.hime[0]
+        hime = pygame.transform.flip(hime, True, False) if right else hime       # 姫の絵は、左向き
+        bob = 1 if walking and not self.a.hime_walk and (t // 8) % 2 else 0     # 歩く絵が無い間は、小さく上下させる
+        things = [(feet, tanuki, R["x"] - tanuki.get_width() // 2, 0), (feet, hime, R["x"] + R["hime_dx"] - hime.get_width() // 2, bob)]
+        car = self.roll_car
+        if car:
+            cy = mid + 12 if car[1] < 0 else mid + 22        # 車の足元（左へ走る車は、奥の車線）
+            img = self.a.roll_cars[car[2] % len(self.a.roll_cars)] if self.a.roll_cars else None
+            if img:
+                img = img if car[1] < 0 else pygame.transform.flip(img, True, False)    # 車の絵は、左向き
+            else:           # 絵が無い間の、仮の車
+                img = pygame.Surface((64, 30), pygame.SRCALPHA)
+                body = ((214, 70, 60), (70, 130, 214), (240, 240, 240))[car[2] % 3]
+                pygame.draw.rect(img, (20, 20, 28), (0, 8, 64, 18))
+                pygame.draw.rect(img, body, (1, 9, 62, 16))
+                pygame.draw.rect(img, (20, 20, 28), (12, 0, 38, 12))
+                pygame.draw.rect(img, (170, 214, 240), (14, 2, 34, 9))
+                for wx in (14, 50):
+                    pygame.draw.circle(img, (20, 20, 28), (wx, 25), 5)
+                    pygame.draw.circle(img, (150, 150, 150), (wx, 25), 2)
+            things.append((cy, img, round(car[0]) - img.get_width() // 2, 0))
+        for fy, img, x, up in sorted(things, key=lambda th: th[0]):     # 奥の物から描く
+            screen.blit(img, (x, round(fy) - img.get_height() - up))
+        # 右半分: 暗い地に、エンドロールの文字（下から上へ）
+        full.fill((10, 8, 22), (VW, 0, C.BASE_W - VW, C.BASE_H))
+        full.fill((214, 168, 72), (VW, 0, 1, C.BASE_H))
+        full.fill((60, 44, 20), (VW + 1, 0, 1, C.BASE_H))
+        if self.a.credits:
+            w0, w1 = R["window"]
+            full.set_clip(pygame.Rect(VW + 2, w0, C.BASE_W - VW - 2, w1 - w0))
+            full.blit(self.a.credits, (VW + (C.BASE_W - VW - self.a.credits.get_width()) // 2 + 1, w1 - round(t * R["scroll"])))
+            full.set_clip(None)
+        if t < 40:      # 暗い所から、明るくなる
+            fade = pygame.Surface((C.BASE_W, C.BASE_H))
+            fade.set_alpha(255 - 255 * t // 40)
+            full.blit(fade, (0, 0))
 
     def _draw_ending_screen(self, screen):
         """エンディング: 暗い所から、ゆっくり明るくなる。しばらくして、「PUSH ENTER KEY」が点滅する"""
@@ -1390,19 +1582,63 @@ class Game:
         k = min(1.0, max(0.0, (self.title_t - C.TITLE_DROP_WAIT) / C.TITLE_DROP)) if landed < 0 else 1.0
         y = -logo.get_height() + (C.TITLE_LOGO[1] + logo.get_height()) * (1 - (1 - k) ** 3)   # 最後に減速
         screen.blit(logo, (C.TITLE_LOGO[0] - logo.get_width() // 2, round(C.TITLE_LOGO[1] if landed >= 0 else y)))
-        if landed >= 0 and (landed // (4 if self.start_t else 30)) % 2 == 0:   # 着いてから点滅（決定したあとは、速く）
+        font = getattr(self, "_font", None)
+        if self.howto and self.a.howto:
+            img = self.a.howto
+            screen.blit(img, ((C.BASE_W - img.get_width()) // 2, (C.BASE_H - img.get_height()) // 2))
+        elif self.menu_on and font:
+            self._draw_menu(screen, font)
+        elif landed >= 0 and (landed // 30) % 2 == 0:   # 着いてから点滅
             img = self.a.title_prompt
             screen.blit(img, (C.TITLE_PROMPT[0] - img.get_width() // 2, C.TITLE_PROMPT[1]))
-        font = getattr(self, "_font", None)
-        if landed >= 0 and font:      # 難しさ（左右で選ぶ）。端では、矢印を片方だけ出す
-            i = C.LEVEL_ORDER.index(self.level)
-            text = ("< " if i > 0 else "  ") + self.L["label"] + (" >" if i < len(C.LEVEL_ORDER) - 1 else "  ")
-            img = font.render(text, False, (255, 236, 150))
-            x, y = C.LEVEL_LABEL[0] - img.get_width() // 2, C.LEVEL_LABEL[1]
-            edge = font.render(text, False, C.BLACK)
+
+    def _draw_menu(self, screen, font):
+        """スタート画面のメニュー。main = STORY / OPTION / HOW TO PLAY。option = LEVEL（難しさ）/ MUSIC・SOUND（音量）/ BACK。
+        どの行も、題名と同じ中心（cx）に、中央ぞろえで出す（右の大きなタヌキ侍に、掛からない幅）。選んでいる行は、金色で、左右に印"""
+        M = C.MENU
+        gold, grey = (255, 236, 150), (176, 176, 190)
+        option = self.menu_page == "option"
+
+        def text(s, x, y, color):
+            edge = font.render(s, False, C.BLACK)
             for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
                 screen.blit(edge, (x + dx, y + dy))
-            screen.blit(img, (x, y))
+            screen.blit(font.render(s, False, color), (x, y))
+
+        if option:      # 画面の見出し
+            head = "- OPTION -"
+            text(head, M["cx"] - font.size(head)[0] // 2, M["y"] - M["head"], (214, 168, 72))
+        gap = M["row_option"] if option else M["row"]
+        for n, row in enumerate(M["pages"][self.menu_page]):
+            y = M["y"] + n * gap
+            on = n == self.menu_i
+            color = gold if on else grey
+            if on and row == "story" and self.start_t and (self.start_t // 4) % 2:      # 決定したあとは、STORY が速く点滅する
+                continue
+            label, value, boxes = M["label"][row], "", None
+            if row == "level":
+                i = C.LEVEL_ORDER.index(self.level)
+                value = ("< " if i > 0 else "  ") + self.L["label"] + (" >" if i < len(C.LEVEL_ORDER) - 1 else "  ")
+            elif row in ("music", "sound"):
+                boxes = self.vol_bgm if row == "music" else self.vol_sfx
+            lw = font.size(label)[0]
+            vw = font.size(value)[0] if value else (M["steps"] * 10 - 2 if boxes is not None else 0)
+            w = lw + (M["gap"] + vw if vw else 0)
+            x = M["cx"] - w // 2
+            text(label, x, y, color)
+            if value:
+                text(value, x + lw + M["gap"], y, color)
+            elif boxes is not None:     # 音量は、四角の数で出す
+                for k in range(M["steps"]):
+                    r = pygame.Rect(x + lw + M["gap"] + k * 10, y + 2, 8, 9)
+                    pygame.draw.rect(screen, C.BLACK, r.inflate(2, 2))
+                    pygame.draw.rect(screen, color if k < boxes else (56, 56, 64), r)
+            if on:      # 選んでいる印（行の左右に、三角。少し、揺れる）
+                d = (self.title_t // 12) % 2
+                for px, sgn in ((x - 8 - d, 1), (x + w + 7 + d, -1)):
+                    pts = [(px - 3 * sgn, y + 2), (px - 3 * sgn, y + 10), (px + 2 * sgn, y + 6)]
+                    pygame.draw.polygon(screen, C.BLACK, [(a + dx, b2 + dy) for (a, b2), (dx, dy) in zip(pts, ((-sgn, -1), (-sgn, 1), (sgn, 0)))])
+                    pygame.draw.polygon(screen, gold, pts)
 
     def _bolt(self):
         """稲妻の折れ線（本体, 枝）。雷ごとに形が変わる（同じ雷の間は、同じ形）"""
@@ -1444,23 +1680,39 @@ class Game:
         """考えごとの吹き出し（返事の代わり）。頭の上に、小さな丸が2つ出て、その先に雲がふくらみ、中に、食べ物が1つずつ浮かぶ。
         ボスが何を言っても、タヌキ侍は、おにぎりや団子のことを考えている"""
         H, foods = C.THOUGHT, self.stage.thought
-        white, edge = (244, 244, 252), (16, 10, 24)
-        for k, (cx, cy, r) in enumerate(((x + 6, y - 2, 1), (x + 9, y - 9, 2))):
-            if shown > k * 2:
-                pygame.draw.circle(screen, edge, (cx, cy), r + 2)
-                pygame.draw.circle(screen, white, (cx, cy), r)
         g = min(1.0, max(0.0, (shown - 4) / max(1, H["grow"] - 4)))
+        bx, by = self._cloud(screen, x, y - 6, (22 + 22 * len(foods)) * g, 30 * g, dots=min(2, (shown + 1) // 2))
         if g <= 0:
             return
-        w, h = round((22 + 22 * len(foods)) * g), round(30 * g)
-        bx, by = max(w // 2 + 6, min(x + 14, C.BASE_W - w // 2 - 6)), y - 28
-        for color, pad in ((edge, 2), (white, 0)):
-            pygame.draw.ellipse(screen, color, (bx - w // 2 - pad, by - h // 2 - pad, w + pad * 2, h + pad * 2))
         for i, kind in enumerate(foods):
             if shown >= H["grow"] + i * H["per"] + 1:
                 img = self.a.item[kind]
                 fx = bx + round((i - (len(foods) - 1) / 2) * 22)
                 screen.blit(img, (fx - img.get_width() // 2, by - img.get_height() // 2 + round(math.sin((self.ending + i * 20) / 14) * 1.5)))
+
+    def _cloud(self, screen, x, top, w, h, dots=2):
+        """雲形の吹き出し（考えごと）。(x, top) は、頭のてっぺん。そこから上へ、小さな丸が2つ、その先に、もこもこした雲（幅 w・高さ h）。
+        雲は、頭に重ならない高さに置く。雲の中心 (bx, by) を返す（中に、物を描くため）"""
+        white, edge = (244, 244, 252), (16, 10, 24)
+        w, h = round(w), round(h)
+        bx = max(w // 2 + 8, min(x + 12, C.BASE_W - w // 2 - 8))
+        by = top - C.THOUGHT["lift"] - h // 2
+        circles = [(x + 5, top - 2, 1), (x + 8, top - 7, 2)][:dots]
+        if w >= 8 and h >= 8:
+            r = h * 0.34                                # こぶの半径
+            n = max(2, round((w - 2 * r) / (r * 1.5)) + 1)
+            for k in range(n):                          # 上と下に、こぶを並べる（上と下で、半分ずらす）
+                u = k / (n - 1)
+                circles.append((bx - w / 2 + r + (w - 2 * r) * u, by - h * 0.18, r))
+                if k < n - 1:
+                    circles.append((bx - w / 2 + r + (w - 2 * r) * (u + 0.5 / (n - 1)), by + h * 0.2, r * 0.92))
+            circles += [(bx - w / 2 + r * 0.8, by + h * 0.04, r * 0.9), (bx + w / 2 - r * 0.8, by + h * 0.04, r * 0.9)]
+        for color, pad in ((edge, 2), (white, 0)):
+            for cx, cy, r in circles:
+                pygame.draw.circle(screen, color, (round(cx), round(cy)), max(1, round(r)) + pad)
+            if pad == 0 and w >= 8 and h >= 8:           # こぶの間の、すき間を埋める
+                pygame.draw.ellipse(screen, white, (bx - w // 2 + 3, by - h // 3, w - 6, h * 2 // 3))
+        return bx, by
 
     def _draw_boss_fade(self, screen, cam, t):
         """倒れたボスが、光になって消える: 白く光ってから、薄くなりながら昇る。光の粒が、上へ昇っていく"""
@@ -1532,6 +1784,8 @@ def keys_to_input(keys):
         held.add("right")
     if keys[pygame.K_DOWN]:
         held.add("down")
+    if keys[pygame.K_UP]:
+        held.add("up")      # メニューの項目選びに使う（遊んでいる間は、ジャンプ）
     return held
 
 
@@ -1553,6 +1807,9 @@ async def main():
         if a in C.LEVELS:
             C.LEVEL = a
     game = Game(title=not (start or {"boss", "cp"} & set(sys.argv[1:])))
+    if "roll" in sys.argv[1:]:   # 確認用: python main.py roll で、エンドロールから始める
+        game.title = False
+        game._start_roll()
     if start:     # 確認用: python main.py s2（s3・s4）で、その面から始める（スタート画面は出さない）
         game.reset(start[0] - 1)
     if "cp" in sys.argv[1:]:     # 確認用: python main.py cp で、中間地点の手前から始める（スタート画面は出さない）
@@ -1578,6 +1835,7 @@ async def main():
                 pressed.add("pause_on")
             pressed |= pad.handle(event)
         game.step(keys_to_input(pygame.key.get_pressed()) | pad.held(), pressed)
+        audio.set_gain(game.vol_bgm / C.MENU["steps"], game.vol_sfx / C.MENU["steps"])    # 音を鳴らす前に（変えた音量で、鳴るように）
         for name in dict.fromkeys(game.sfx + sprites.SOUNDS):     # 同じ音は、1フレームに1回だけ
             audio.play_sfx(name)
         game.sfx.clear()

@@ -1,0 +1,90 @@
+"""エンドロールの文字を、縦に長い1枚の絵にする（ゲームにフォントを入れずに、日本語を出すため）。
+
+使い方: python tools/make_credits.py [フォント.ttf] [出力.png]
+  既定のフォントは assets/concept/fonts/PixelMplus12-Bold.ttf（M+ FONT LICENSE）、出力は assets/images/credits.png。
+  ドットのフォントを、もとの大きさ（12ドット）で、アンチエイリアスなしで書く。どの行も、中央ぞろえ。黒い縁取りを付ける（明るい空の上でも読めるように）。
+  中身を変えるときは、下の LINES を直して、作り直す。("見出し", 文) は金色の小見出し、("題", 文) は2倍の大きさ、("", 文) はふつうの行、None は、すき間
+"""
+import os
+import sys
+
+from PIL import Image, ImageDraw, ImageFont
+
+ROOT = os.path.join(os.path.dirname(__file__), "..")
+W = 232      # 画面の右半分（幅 240）に収める
+GOLD, WHITE, EDGE = (255, 226, 120, 255), (250, 250, 250, 255), (16, 10, 24, 255)
+LINES = (
+    ("題", "平泉タヌキ侍"),
+    None, None,
+    ("見出し", "ぶたい"),
+    ("", "岩手県 平泉"),
+    ("", "毛越寺・高館・月見坂・金色堂"),
+    None,
+    ("見出し", "え"),
+    ("", "Gemini"),
+    ("", "ChatGPT"),
+    None,
+    ("見出し", "おんがく"),
+    ("", "Gemini"),
+    ("", "Evening at the Border Post"),
+    ("", "Clash of the Iron Fan"),
+    ("", "Crimson Temple Breach"),
+    ("", "Seven Blades High"),
+    ("", "Steps Into the Morning Sun"),
+    None,
+    ("見出し", "プログラム"),
+    ("", "Claude"),
+    ("", "Python・pygame"),
+    None,
+    ("見出し", "もじ"),
+    ("", "PixelMplus"),
+    ("", "DotGothic16"),
+    None, None,
+    ("見出し", "こうつうあんぜん"),
+    ("", "道をわたるときは"),
+    ("", "止まって、右を見て、左を見て"),
+    ("", "もういちど、右を見る"),
+    None, None, None,
+    ("題", "おしまい"),
+    None,
+    ("", "あそんでくれて、ありがとう"),
+)
+ROW, GAP = 17, 12
+
+
+def line_image(font, s, color, scale):
+    mask = Image.new("L", (int(font.getlength(s)) + 2, 15), 0)
+    d = ImageDraw.Draw(mask)
+    d.fontmode = "1"
+    d.text((0, 0), s, font=font, fill=255)
+    mask = mask.point(lambda v: 255 if v >= 128 else 0)
+    if scale > 1:
+        mask = mask.resize((mask.width * scale, mask.height * scale), Image.NEAREST)
+    out = Image.new("RGBA", (mask.width + 2, mask.height + 2), (0, 0, 0, 0))
+    for dx, dy in ((0, 1), (2, 1), (1, 0), (1, 2), (0, 0), (2, 2), (0, 2), (2, 0)):     # 黒い縁取り
+        out.paste(EDGE, (dx, dy), mask)
+    out.paste(color, (1, 1), mask)
+    return out
+
+
+def main(font_path, out):
+    font = ImageFont.truetype(font_path, 12)
+    rows, y = [], 0
+    for item in LINES:
+        if item is None:
+            y += GAP
+            continue
+        kind, s = item
+        img = line_image(font, s, GOLD if kind else WHITE, 2 if kind == "題" else 1)
+        rows.append((img, y))
+        y += img.height + (ROW - 14)
+    sheet = Image.new("RGBA", (W, y), (0, 0, 0, 0))
+    for img, yy in rows:
+        sheet.alpha_composite(img, ((W - img.width) // 2, yy))
+    sheet.save(out)
+    print("書き出し:", out, sheet.size)
+
+
+if __name__ == "__main__":
+    main(sys.argv[1] if len(sys.argv) > 1 else os.path.join(ROOT, "assets", "concept", "fonts", "PixelMplus12-Bold.ttf"),
+         sys.argv[2] if len(sys.argv) > 2 else os.path.join(ROOT, "assets", "images", "credits.png"))

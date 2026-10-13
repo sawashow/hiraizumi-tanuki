@@ -213,13 +213,16 @@ class StageDef:
     def __init__(self, name, width, ground, platforms, items, checkpoint, spawns, bgm, bgm_boss,
                  sky="bg_sky.png", mid="bg_mid.png", tiles="", boss_x=None,
                  boss_title=C.BOSS_TITLE, boss_name=C.BOSS_NAME, boss_pattern=C.BOSS_PATTERN,
-                 talk_boss=C.TALK_BOSS, talk_tanuki=C.TALK_TANUKI, number=1, stele_x=150, boss_kind="boss", pit=(8, 6, 18), gates=(), lanterns=(), zones=(), gilt=False, haze=None, winds=(), traps=(), thought=(), pit_deep=None, climb=None, blinks=(), mid_follow=None):
+                 talk_boss=C.TALK_BOSS, talk_tanuki=C.TALK_TANUKI, number=1, stele_x=150, boss_kind="boss", pit=(8, 6, 18), gates=(), lanterns=(), zones=(), gilt=False, haze=None, winds=(), traps=(), thought=(), pit_deep=None, climb=None, blinks=(), mid_follow=None, fill_rows=()):
         self.name, self.width = name, width
         self.blinks = tuple(blinks)     # 消える光の足場: (x0, x1, 高さ, ずれ)。Terrain の blinks を見よ
         self.climb = climb      # 崖登り: (左端, 右端, 高さ)。Terrain の climb を見よ
         # 崖登りで、中景が、画面の動きに、どれだけついてくるか（None なら config.CLIMB_BG の mid。0 なら、画面に貼り付いたまま）。
         # 堂の中の柱は、上から下まで通っているので、沈めると、柱の上の端が、切り口になって見える。0 にする
         self.mid_follow = mid_follow
+        # 地面の中身のタイルを、段ごとに決める（上の段から。最後の番号を、下までくり返す）。空なら、位置から、ばらばらに混ぜる（石畳・土に合う）。
+        # 堂の中の床は、黒と朱の板を混ぜると、市松のように、がちゃがちゃして見える。上の1段だけ朱の飾り、その下は黒漆、と帯にする
+        self.fill_rows = tuple(fill_rows)
         self.ground, self.platforms, self.items = ground, platforms, items
         self.checkpoint, self.spawns = checkpoint, spawns
         self.bgm, self.bgm_boss = bgm, bgm_boss
@@ -720,7 +723,7 @@ STAGE4 = StageDef("金色堂", W4, GROUND4, PLATFORMS4, thin_dango(ITEMS4, PLATF
                   sky="stage4/bg_sky.png", mid="stage4/bg_mid.png", tiles="stage4/",
                   boss_title="enemies/boss4_title.png", boss_name="enemies/boss4_name.png",
                   talk_boss="talk_boss4.png", talk_tanuki="talk_tanuki4.png", number=4, stele_x=130,
-                  boss_kind="boss4", pit=(30, 20, 8), gates=GATES4, zones=ZONES4, gilt=True, climb=CLIMB4, mid_follow=0,
+                  boss_kind="boss4", pit=(30, 20, 8), haze=20, gates=GATES4, zones=ZONES4, gilt=True, climb=CLIMB4, mid_follow=0, fill_rows=(3, 0),
                   # 光の橋: 幅400の切れ目を、消える光の足場3つと、真ん中の消えない足場1つで渡る。
                   # 光は、左から右へ、60 フレームずつ遅れて点く（波のように進む）。となりどうしが、70 フレーム、一緒に点いている
                   blinks=((6540, 6590, _B4 - 30, 0), (6740, 6790, _B4 - 36, 140), (6830, 6880, _B4 - 28, 80)),
