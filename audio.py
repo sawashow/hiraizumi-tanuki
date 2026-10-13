@@ -1,5 +1,6 @@
 """音（BGM）。音が出せない環境（音声デバイスなし・画面なしのテスト）でも、ゲームは止めない"""
 import os
+import sys
 
 import pygame
 
@@ -69,5 +70,8 @@ class Audio:
 
     def fade_out(self, ms):
         if self.ok and self.playing:
-            pygame.mixer.music.fadeout(ms)
+            if sys.platform == "emscripten":    # ブラウザ版: フェード中に次の曲を読むと固まるので、すぐ止める
+                pygame.mixer.music.stop()
+            else:
+                pygame.mixer.music.fadeout(ms)
             self.playing = None
