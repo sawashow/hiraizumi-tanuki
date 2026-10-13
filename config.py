@@ -346,6 +346,7 @@ ENDING_SCREEN = dict(fade=90, wait=240)
 # 姫を助ける場面（最後の面の結果のあと、エンディングの絵の前）。昔のゲームの「THANK YOU ○○!」の画面。
 # 暗い堂の中。タヌキ侍が左から歩いてきて、奥で待っていた姫の前で止まる。姫が跳ねて喜び、礼の文が、1文字ずつ出る。
 #   walk: 歩く速さ / stop_x・hime_x: 二人が立つ場所 / hop: 姫が跳ねるフレーム数（2回） / type: 1文字が出る間隔 / gap: 行と行の間 / wait: 文が出きってから、キーを受け付けるまで
+STORY_BG = "story_bg.png"       # 始まりの語りの背景（夜の平泉。tools/make_story_bg.py）。無ければ、真っ暗
 THANKS_BG = "thanks_bg.png"     # 姫を助ける場面の背景（夜明けの参道。地面ごと描いた1枚絵。tools/make_thanks_bg.py）。無ければ、真っ暗な背景に、タイルの床
 THANKS = dict(walk=1.3, stop_x=178, hime_x=298, floor=238, hop=44, type=4, gap=26, wait=70,
               lines=("THANK YOU TANUKI!", "YOUR QUEST IS OVER."), text_y=(24, 52), sub_y=82,

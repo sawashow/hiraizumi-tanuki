@@ -81,6 +81,7 @@ class Game:
         self._roll_fade = None   # エンドロールの、左の枠の右の端を暗くぼかす帯
         self.story = False       # いま、始まりの語りを流している
         self.story_t = 0
+        self.story_fade = None      # 文章の上下の透け具合（初めて描くときに作る）
         self.story_run = 0       # 決定してからのフレーム数（タヌキ侍が気づいて、駆け抜けている）
         self.story_wake = 0      # 決定してから、走り出すまでのフレーム数
         self.story_woke = False  # 決定したとき、眠っていた
@@ -1204,22 +1205,27 @@ class Game:
         """始まりの語り: 暗い画面の上を、文章が下から上へ流れ（1回だけ）、下にタヌキ侍がいる"""
         T = C.STORY_TANUKI
         screen.fill(C.BLACK)
+        if self.a.story_bg:
+            screen.blit(self.a.story_bg, (0, 0))
         # 文章: 決まった範囲の中だけを流す。上下の端では、暗がりに消える
         img = self.a.story
         y = C.STORY_WINDOW - self.story_t * C.STORY_SPEED
         if y > -img.get_height():
-            screen.set_clip((0, 0, C.BASE_W, C.STORY_WINDOW))
+            if self.story_fade is None:     # 文字だけを、上下の端で透けさせる（背景は、そのまま見える）
+                m = pygame.Surface((C.BASE_W, C.STORY_WINDOW), pygame.SRCALPHA)
+                for i in range(C.STORY_WINDOW):
+                    a = 255 * min(1.0, i / C.STORY_FADE, (C.STORY_WINDOW - 1 - i) / C.STORY_FADE)
+                    pygame.draw.line(m, (255, 255, 255, int(a)), (0, i), (C.BASE_W, i))
+                self.story_fade = m
+            win = pygame.Surface((C.BASE_W, C.STORY_WINDOW), pygame.SRCALPHA)
             img.set_alpha(max(0, 255 - self.story_run * 16))    # 決定したら、文章は、すっと消える
-            screen.blit(img, (C.BASE_W // 2 - img.get_width() // 2, round(y)))
-            line = pygame.Surface((C.BASE_W, 2))
-            for i in range(0, C.STORY_FADE, 2):
-                line.set_alpha(255 * (C.STORY_FADE - i) // C.STORY_FADE)
-                screen.blit(line, (0, i))
-                screen.blit(line, (0, C.STORY_WINDOW - 2 - i))
-            screen.set_clip(None)
+            win.blit(img, (C.BASE_W // 2 - img.get_width() // 2, round(y)))
+            win.blit(self.story_fade, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
+            screen.blit(win, (0, 0))
         # 地面の線
-        pygame.draw.rect(screen, (40, 32, 56), (0, T["ground"], C.BASE_W, 2))
-        pygame.draw.rect(screen, (24, 20, 36), (0, T["ground"] + 2, C.BASE_W, 2))
+        if not self.a.story_bg:
+            pygame.draw.rect(screen, (40, 32, 56), (0, T["ground"], C.BASE_W, 2))
+            pygame.draw.rect(screen, (24, 20, 36), (0, T["ground"] + 2, C.BASE_W, 2))
         # タヌキ侍: 立っている → あくび → うとうと → 座って眠る → 夢を見る。決定すると、気づいて（飛び起きて）、右へ駆け抜ける
         x, t = round(self.story_x), self.story_t
         frame, dy = 0, 0
