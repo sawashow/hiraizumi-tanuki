@@ -561,22 +561,15 @@ class Game:
                 if e.active and e.last_swing != p.swing_id and sword.colliderect(e.rect):
                     e.last_swing = p.swing_id
                     e.hit(C.SWORD_DAMAGE)
-        # 手裏剣 → 敵
-        for s in self.shurikens:
+        # 手裏剣・強化中の光波 → 敵（当たると、消える）
+        for s in self.shurikens + self.slashes:
             for e in foes:
                 if s.alive and e.active and s.rect.colliderect(e.rect):
                     s.alive = False
-                    tid = s.throw_id
-                    if tid is None or e.last_throw != tid:   # 1投げにつき、同じ敵に当たるのは1つだけ（残りは、消えるだけ）
-                        e.last_throw = tid
-                        e.hit(C.SHURIKEN_DAMAGE)
-                    self.effects.append(HitEffect(*s.rect.center, self.a))
-        # 強化中の光波 → 敵
-        for s in self.slashes:
-            for e in foes:
-                if s.alive and e.active and s.rect.colliderect(e.rect):
-                    s.alive = False
-                    e.hit(C.SLASH["damage"])
+                    if s.throw_id is None or e.last_throw != s.throw_id:   # 手裏剣は、1投げにつき、同じ敵に当たるのは1つだけ（残りは、消えるだけ）
+                        e.hit(s.damage)
+                    if s.throw_id is not None:
+                        e.last_throw = s.throw_id
                     self.effects.append(HitEffect(*s.rect.center, self.a))
 
     def _hit_lanterns(self, sword):
