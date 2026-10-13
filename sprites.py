@@ -1400,9 +1400,9 @@ class Boss(Enemy):
             t = (self.st * 2 + i * 9) % 27
             for sgn in (-1, 1):
                 pygame.draw.circle(surface, (214, 196, 160), (r.centerx + sgn * (self.w // 3 + t // 2), r.bottom - 2 - t // 3), max(1, 3 - t // 10))
-        if self.thrust:
+        if getattr(self, "thrust", False):
             ly = r.bottom + C.WAVE["dy"]
-        elif self.high:
+        elif getattr(self, "high", False) and "high_bottom" in P:
             ly = r.bottom - P["high_bottom"] - P["high_h"] // 2
         else:
             ly = r.bottom + C.WAVE["dy"]
