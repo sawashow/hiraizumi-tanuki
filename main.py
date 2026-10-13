@@ -1358,6 +1358,31 @@ class Game:
             carry = d - seg
         return out
 
+    def _map_dot_kinds(self):
+        """地図の道の、点線の点（位置, 種類）。種類は gold（通った道）・white（これからの道）・dim（まだ無い面への道）。
+        分かれ道と高館の間は、行きと帰りで、同じ道を通る。通った道の上には、これからの道の点を、打たない（金の上に、白が重ならないように）"""
+        playable = {st.number for st in STAGES}
+        arrived = self._map_pos()[2]
+        base = self.map_from or self.map_to
+        walk_d = max(0.0, (self.map_t - C.MAP_WAIT) * C.MAP_WALK_SPEED)   # 駒が歩いた距離
+        chain = self._map_chain()
+        dots = []
+        for na, nb in zip(chain, chain[1:]):
+            for pos, dist in self._map_dots(self._map_route(na, nb)):
+                if nb <= base or (arrived and nb <= self.map_to):
+                    kind = "gold"
+                elif na == base and nb == self.map_to and dist <= walk_d:
+                    kind = "gold"        # 駒が通った所から、金に変わる
+                elif nb in playable:
+                    kind = "white"
+                else:
+                    kind = "dim"
+                dots.append((pos, kind))
+        walked = [pos for pos, kind in dots if kind == "gold"]
+        near = C.MAP_DOT_GAP * 0.6      # 同じ道の上なら、いちばん近い金の点は、間隔の半分より近い
+        rest = [(pos, kind) for pos, kind in dots if kind != "gold" and not any(math.dist(pos, w) < near for w in walked)]
+        return rest + [(pos, "gold") for pos in walked]
+
     def _thanks_at(self, what):
         """姫を助ける場面の、区切りのフレーム: arrive（着く）・hop（姫が跳ねる）・type（文が出始める）・done（文が出きる）"""
         K = C.THANKS
@@ -1623,22 +1648,11 @@ class Game:
         screen.blit(a.map_vignette, (0, 0))      # 周りを暗くして、道と場所を浮かび上がらせる
         playable = {st.number for st in STAGES}
         (x, y), right, arrived = self._map_pos()
-        base = self.map_from or self.map_to
-        walk_d = max(0.0, (self.map_t - C.MAP_WAIT) * C.MAP_WALK_SPEED)   # 駒が歩いた距離
-        chain = self._map_chain()
         gold, white, dim, dark = (252, 208, 40), (240, 240, 250), (84, 88, 120), (10, 8, 16)
-        for na, nb in zip(chain, chain[1:]):
-            for (dx, dy), dist in self._map_dots(self._map_route(na, nb)):
-                if nb <= base or (arrived and nb <= self.map_to):
-                    color = gold
-                elif na == base and nb == self.map_to and dist <= walk_d:
-                    color = gold         # 駒が通った所から、金に変わる
-                elif nb in playable:
-                    color = white
-                else:
-                    color = dim
-                pygame.draw.rect(screen, dark, (round(dx) - 1, round(dy) - 1, 4, 4))
-                pygame.draw.rect(screen, color, (round(dx), round(dy), 2, 2))
+        colors = dict(gold=gold, white=white, dim=dim)
+        for (dx, dy), kind in self._map_dot_kinds():
+            pygame.draw.rect(screen, dark, (round(dx) - 1, round(dy) - 1, 4, 4))
+            pygame.draw.rect(screen, colors[kind], (round(dx), round(dy), 2, 2))
         for n, (px, py) in C.MAP_PADS.items():
             if n == self.map_to:
                 continue
