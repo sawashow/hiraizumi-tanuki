@@ -2036,7 +2036,7 @@ run(g, 20, {"right"} | pad.held())
 check("コントローラの入力を、ゲームに渡す形（キーボードと同じ文字列）で受け取れる", g.player.px > x0)
 
 # ---------------------------------------------------------------- 20. 2面のボス（基衡）
-from sprites import Boss2, Fan, Gust, Petal  # noqa: E402
+from sprites import Boss2, Fan, Gale, Gust, Petal  # noqa: E402
 
 
 def boss2_game():
@@ -2086,6 +2086,55 @@ run(gg, 12)
 check("風に当たると、押し戻される（ダメージなし）", gg.player.px < x0 - 4 and gg.player.hp == hp0, "x %.1f→%.1f hp %d" % (x0, gg.player.px, gg.player.hp))
 gg.waves = []
 check("風は、刀で消せない", getattr(Gust, "cuttable", True) is False)
+
+# 大風（月見坂の基衡だけ）: 予告の間は、押さない。吹くと、床にいる主人公を、押し続ける（ダメージなし）。足場の上には、届かない
+def hold_boss(game, n):      # ボスを、歩かせたままにして（攻撃させずに）、進める
+    for _ in range(n):
+        game.boss.state, game.boss.st = "walk", 0
+        run(game, 1)
+
+
+gg = boss2_game()
+gg.boss.cx = gg.player.px + 220
+ar = gg._arena()
+gale = Gale(ar["x0"], ar["x1"], gg.player.py, -1, gg.a)
+gg.waves = [gale]
+hp0, x0 = gg.player.hp, gg.player.px
+hold_boss(gg, C.GALE["warn"] - 2)
+check("大風は、予告の間は、押さない（ダメージもない）", not gale.blowing and abs(gg.player.px - x0) < 1 and gg.player.hp == hp0,
+      "x %.1f→%.1f hp %d" % (x0, gg.player.px, gg.player.hp))
+hold_boss(gg, 30)
+x1 = gg.player.px
+check("大風が吹くと、床にいる主人公は、押され続ける（ダメージなし）", gale.blowing and x1 < x0 - 40 and gg.player.hp == hp0,
+      "x %.1f→%.1f hp %d" % (x0, x1, gg.player.hp))
+gg.player.px, gg.player.py = x0, gg.player.py - C.GALE["h"] - 12      # 風より高い所（足場の高さ）
+check("大風は、足場の高さには、届かない", not gg.player.rect.colliderect(gale.rect))
+gg.player.py += C.GALE["h"] + 12
+hold_boss(gg, C.GALE["blow"])
+x2 = gg.player.px
+hold_boss(gg, 10)
+check("大風は、時間がたつと、やむ（やんだら、押されない）", not gale.alive and gale not in gg.waves and abs(gg.player.px - x2) < 1)
+check("大風は、刀で消せない", Gale.cuttable is False)
+# 基衡が、大風を呼ぶ: 扇を上げる（予告） → 振り下ろす → 風が吹いている間に、扇を投げる
+gg = boss2_game()
+b = gg.boss
+b.pattern, b.count = C.BOSS2_GALE_PATTERN, C.BOSS2_GALE_PATTERN.index("G")
+b.cx = gg.player.px + 200
+b.state, b.st = "walk", C.BOSS2["walk_frames"] - 1
+run(gg, 3)
+check("基衡は、扇を高く上げて、大風を呼ぶ（床に、予告の風が流れ始める）",
+      b.state == "gale_ready" and any(isinstance(w, Gale) and not w.blowing for w in gg.waves), b.state)
+run(gg, C.GALE["warn"] + C.BOSS2["gale_frames"] + 4)
+check("大風が吹いている間に、続けて、扇を投げる", b.state in ("throw_ready", "throw") and any(isinstance(w, Gale) and w.blowing for w in gg.waves), b.state)
+st3 = [st for st in PROD_STAGES if st.name == "月見坂"][0]
+ar3 = st3.arenas[-1]
+pl3 = [pl for pl in st3.platforms if pl[1] > ar3["x0"] and pl[0] < ar3["x1"]]
+floor3 = st3.terrain().height_at(ar3["boss_x"])
+check("月見坂のボスの間に、大風をやり過ごせる足場が、左右にある（風の高さより、上）",
+      len(pl3) >= 2 and all(pl[2] <= floor3 - C.GALE["h"] - 8 for pl in pl3), str(pl3))
+check("大風を使うのは、月見坂の基衡だけ（足場の無い間で戦う、影の基衡は、使わない）",
+      "G" in st3.boss_pattern and "G" not in C.BOSS2_PATTERN and "G" not in C.BOSS2_RAGE_PATTERN
+      and [st.name for st in PROD_STAGES if "G" in str(st.boss_pattern)] == ["月見坂"])
 
 # 扇: 飛んで、戻ってくる。当たるとダメージ。刀で消せる
 gg = boss2_game()
