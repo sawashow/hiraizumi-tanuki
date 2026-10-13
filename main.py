@@ -571,7 +571,7 @@ class Game:
         # 刀 → 光波（刀で斬ると消せる。手裏剣は通り抜ける）
         if sword:
             for w in self.waves:
-                if w.alive and getattr(w, "cuttable", True) and sword.colliderect(w.rect):
+                if w.alive and getattr(w, "cuttable", True) and sword.colliderect(w.rect.inflate(C.BEAD["cut_pad"], 6) if hasattr(w, "ring") else w.rect):
                     w.alive = False
                     self.sfx.append(C.SFX["cut"])
                     self.effects.append(HitEffect(*w.rect.center, self.a))
