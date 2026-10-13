@@ -279,6 +279,33 @@ class Game:
         return not (self.title or self.story or self.map_on or self.thanks or self.roll or self.ending_screen or self.cleared
                     or self.ending or self.player.hp <= 0)
 
+    def _pick_items(self, p):
+        """アイテムを拾う（step から呼ぶ）。"""
+        for it in self.items:
+            if it.alive and p.rect.colliderect(it.rect):
+                it.alive = False
+                self.taken.add(it.idx)
+                if it.kind == "dango":
+                    self.score += C.SCORE_DANGO      # 団子: 手裏剣を投げられる数が増える（持てる数まで）
+                    self.dango += 1
+                    self.last_food = it.food
+                    p.ammo = min(C.AMMO["max"], p.ammo + C.AMMO["dango"])
+                    self.sfx.append(C.SFX["dango"])
+                elif it.kind == "onigiri":
+                    self.sfx.append(C.SFX["heal"])
+                    if p.hp < C.PLAYER_HP:
+                        p.hp = min(C.PLAYER_HP, p.hp + C.HEAL_ONIGIRI)
+                    else:
+                        self.score += C.SCORE_FULL_HP
+                elif it.kind == "leaf":
+                    p.power = True
+                    self.sfx.append(C.SFX["power"])
+                elif it.kind == "triple":
+                    p.triple = True
+                    self.sfx.append(C.SFX["power"])
+                else:
+                    p.super_t = C.SUPER_FRAMES
+
     def step(self, held, pressed=()):
         # ポーズ: P キー・コントローラの START で、止める・再開する。窓が後ろに回ったとき（pause_on）も、止める
         if self.paused and not self.can_pause:
@@ -521,31 +548,7 @@ class Game:
                 kind = getattr(e, "sure_drop", None) or drop_kind(self.rng.random() / self.L["drops"])    # 必ず落とす敵（立ち往生）もいる
                 if kind:
                     self.items.append(Item(kind, e.rect.centerx, e.rect.centery, self.a, drop=True))
-        # アイテムを拾う
-        for it in self.items:
-            if it.alive and p.rect.colliderect(it.rect):
-                it.alive = False
-                self.taken.add(it.idx)
-                if it.kind == "dango":
-                    self.score += C.SCORE_DANGO      # 団子: 手裏剣を投げられる数が増える（持てる数まで）
-                    self.dango += 1
-                    self.last_food = it.food
-                    p.ammo = min(C.AMMO["max"], p.ammo + C.AMMO["dango"])
-                    self.sfx.append(C.SFX["dango"])
-                elif it.kind == "onigiri":
-                    self.sfx.append(C.SFX["heal"])
-                    if p.hp < C.PLAYER_HP:
-                        p.hp = min(C.PLAYER_HP, p.hp + C.HEAL_ONIGIRI)
-                    else:
-                        self.score += C.SCORE_FULL_HP
-                elif it.kind == "leaf":
-                    p.power = True
-                    self.sfx.append(C.SFX["power"])
-                elif it.kind == "triple":
-                    p.triple = True
-                    self.sfx.append(C.SFX["power"])
-                else:
-                    p.super_t = C.SUPER_FRAMES
+        self._pick_items(p)
         # 中間地点（鳥居）を通る
         if not self.checkpoint.active and p.rect.colliderect(self.checkpoint.rect):
             self.checkpoint.activate()
