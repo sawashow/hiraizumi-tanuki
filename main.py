@@ -1797,7 +1797,9 @@ KEYDOWN_MAP = {
 
 async def main():
     pygame.init()
-    window = pygame.display.set_mode((C.BASE_W * C.SCALE, C.BASE_H * C.SCALE))
+    # パソコン版は、窓の端をつかんで大きさを変えられる（ブラウザ版は、ページの側で広げる）
+    flags = 0 if sys.platform == "emscripten" else pygame.RESIZABLE
+    window = pygame.display.set_mode((C.BASE_W * C.SCALE, C.BASE_H * C.SCALE), flags)
     pygame.display.set_caption(C.TITLE)
     screen = pygame.Surface((C.BASE_W, C.BASE_H))
     clock = pygame.time.Clock()
@@ -1846,7 +1848,12 @@ async def main():
         else:
             audio.fade_out(C.BGM_FADE_MS)   # やられたら（クリアしたら）、曲を消していく。再開すると、また始まる
         game.draw(screen, font)
-        pygame.transform.scale(screen, window.get_size(), window)
+        window = pygame.display.get_surface()
+        ww, wh = window.get_size()
+        k = min(ww / C.BASE_W, wh / C.BASE_H)   # 16:9 を保って、余白は黒
+        w, h = round(C.BASE_W * k), round(C.BASE_H * k)
+        window.fill((0, 0, 0))
+        window.blit(pygame.transform.scale(screen, (w, h)), ((ww - w) // 2, (wh - h) // 2))
         pygame.display.flip()
         clock.tick(C.FPS)
         await asyncio.sleep(0)   # ブラウザ版では、毎フレームここで制御をブラウザに返す
