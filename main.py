@@ -503,51 +503,10 @@ class Game:
             if not -C.SHURIKEN_W <= s.px - self.cam_x <= C.BASE_W + C.SHURIKEN_W:     # 画面の端まで飛ぶ。画面の外の敵には、当たらない
                 s.alive = False
 
-        # 刀 → 敵（1振りにつき、同じ敵に1回だけ）
         sword = p.sword_rect()
-        if sword:
-            for e in foes:
-                if e.active and e.last_swing != p.swing_id and sword.colliderect(e.rect):
-                    e.last_swing = p.swing_id
-                    e.hit(C.SWORD_DAMAGE)
-        # 手裏剣 → 敵
-        for s in self.shurikens:
-            for e in foes:
-                if s.alive and e.active and s.rect.colliderect(e.rect):
-                    s.alive = False
-                    tid = getattr(s, "throw_id", None)
-                    if tid is None or getattr(e, "last_throw", None) != tid:   # 1投げにつき、同じ敵に当たるのは1つだけ（残りは、消えるだけ）
-                        e.last_throw = tid
-                        e.hit(C.SHURIKEN_DAMAGE)
-                    self.effects.append(HitEffect(*s.rect.center, self.a))
-        # 強化中の光波 → 敵
-        for s in self.slashes:
-            for e in foes:
-                if s.alive and e.active and s.rect.colliderect(e.rect):
-                    s.alive = False
-                    e.hit(C.SLASH["damage"])
-                    self.effects.append(HitEffect(*s.rect.center, self.a))
-        # 刀・手裏剣・光波 → 石灯籠（壊すと、中の物が出る）
-        for lt in self.lanterns:
-            lt.update()
-            if not lt.active:
-                continue
-            broke = bool(sword and sword.colliderect(lt.rect))
-            for s in self.shurikens + self.slashes:
-                if not broke and s.alive and s.rect.colliderect(lt.rect):
-                    s.alive = False
-                    broke = True
-            if broke and lt.hit():
-                self.toro_broken.add(lt.idx)
-                self.effects.append(HitEffect(*lt.rect.center, self.a))
-                self.items.append(Item(lt.kind, lt.rect.centerx, lt.rect.centery, self.a, drop=True))
-        # 倒した敵が、物を落とす（ボスは落とさない）
-        for e in self.enemies:
-            if e.dying and not getattr(e, "dropped", False):
-                e.dropped = True
-                kind = getattr(e, "sure_drop", None) or drop_kind(self.rng.random() / self.L["drops"])    # 必ず落とす敵（立ち往生）もいる
-                if kind:
-                    self.items.append(Item(kind, e.rect.centerx, e.rect.centery, self.a, drop=True))
+        self._hit_foes(p, foes, sword)
+        self._hit_lanterns(sword)
+        self._drop_items()
         self._pick_items(p)
         # 中間地点（鳥居）を通る
         if not self.checkpoint.active and p.rect.colliderect(self.checkpoint.rect):
@@ -573,6 +532,59 @@ class Game:
 
         self._follow_cam(p)
         self._move_cam_y()
+
+    def _hit_foes(self, p, foes, sword):
+        """主人公の攻撃（刀・手裏剣・光波）が、敵に当たる（step から呼ぶ）。"""
+        # 刀 → 敵（1振りにつき、同じ敵に1回だけ）
+        if sword:
+            for e in foes:
+                if e.active and e.last_swing != p.swing_id and sword.colliderect(e.rect):
+                    e.last_swing = p.swing_id
+                    e.hit(C.SWORD_DAMAGE)
+        # 手裏剣 → 敵
+        for s in self.shurikens:
+            for e in foes:
+                if s.alive and e.active and s.rect.colliderect(e.rect):
+                    s.alive = False
+                    tid = getattr(s, "throw_id", None)
+                    if tid is None or getattr(e, "last_throw", None) != tid:   # 1投げにつき、同じ敵に当たるのは1つだけ（残りは、消えるだけ）
+                        e.last_throw = tid
+                        e.hit(C.SHURIKEN_DAMAGE)
+                    self.effects.append(HitEffect(*s.rect.center, self.a))
+        # 強化中の光波 → 敵
+        for s in self.slashes:
+            for e in foes:
+                if s.alive and e.active and s.rect.colliderect(e.rect):
+                    s.alive = False
+                    e.hit(C.SLASH["damage"])
+                    self.effects.append(HitEffect(*s.rect.center, self.a))
+
+    def _hit_lanterns(self, sword):
+        """主人公の攻撃が、石灯籠に当たる（step から呼ぶ）。"""
+        # 刀・手裏剣・光波 → 石灯籠（壊すと、中の物が出る）
+        for lt in self.lanterns:
+            lt.update()
+            if not lt.active:
+                continue
+            broke = bool(sword and sword.colliderect(lt.rect))
+            for s in self.shurikens + self.slashes:
+                if not broke and s.alive and s.rect.colliderect(lt.rect):
+                    s.alive = False
+                    broke = True
+            if broke and lt.hit():
+                self.toro_broken.add(lt.idx)
+                self.effects.append(HitEffect(*lt.rect.center, self.a))
+                self.items.append(Item(lt.kind, lt.rect.centerx, lt.rect.centery, self.a, drop=True))
+
+    def _drop_items(self):
+        """倒した敵が、物を落とす（step から呼ぶ）。"""
+        # 倒した敵が、物を落とす（ボスは落とさない）
+        for e in self.enemies:
+            if e.dying and not getattr(e, "dropped", False):
+                e.dropped = True
+                kind = getattr(e, "sure_drop", None) or drop_kind(self.rng.random() / self.L["drops"])    # 必ず落とす敵（立ち往生）もいる
+                if kind:
+                    self.items.append(Item(kind, e.rect.centerx, e.rect.centery, self.a, drop=True))
 
     def _hit_by_waves(self, p, sword):
         """敵の弾（光波・矢・風）の当たり判定: 押し戻す・弾かれる・刀で斬る・主人公に当たる（step から呼ぶ）。"""
