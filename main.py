@@ -556,6 +556,26 @@ class Game:
             self.cp_state = (self.score, self.dango, frozenset(self.taken))
         if self.msg_t:
             self.msg_t -= 1
+        self._hit_by_waves(p, sword)
+        self._touch_foes(p, foes)
+
+        self._boss_shake(p)
+        self.bar_t = max(0, min(C.BOSS_INTRO["bar_frames"], self.bar_t + (1 if self.boss_intro else -1)))
+        self.enemies = [e for e in self.enemies if e.alive]
+        self._boss_defeated()
+        self.shurikens = [s for s in self.shurikens if s.alive]
+        self.waves = [w for w in self.waves if w.alive]
+        self.slashes = [s for s in self.slashes if s.alive]
+        self.items = [it for it in self.items if it.alive]
+        for fx in self.effects:
+            fx.update()
+        self.effects = [fx for fx in self.effects if fx.alive]
+
+        self._follow_cam(p)
+        self._move_cam_y()
+
+    def _hit_by_waves(self, p, sword):
+        """敵の弾（光波・矢・風）の当たり判定: 押し戻す・弾かれる・刀で斬る・主人公に当たる（step から呼ぶ）。"""
         # 扇の風: ダメージはなく、押し戻す（壁や、画面の端より先へは、押されない）
         for w in self.waves:
             push = getattr(w, "push", 0)
@@ -585,6 +605,9 @@ class Game:
             if w.alive and not getattr(w, "push", 0) and not p.untouchable and p.rect.colliderect(w.rect):
                 w.alive = False
                 p.take_damage(w.px, getattr(w, "damage", C.WAVE["damage"]))
+
+    def _touch_foes(self, p, foes):
+        """敵に触れたときの当たり判定（step から呼ぶ）。"""
         # 敵 → 主人公（踏んでも倒せない。触れるとダメージ）
         for e in foes:
             if getattr(e, "clang", False):      # 立ち往生が、攻撃を弾いた
@@ -603,21 +626,6 @@ class Game:
                     self.effects.append(HitEffect(*e.rect.center, self.a))
                 else:
                     p.take_damage(e.rect.centerx, e.P["touch"])
-
-        self._boss_shake(p)
-        self.bar_t = max(0, min(C.BOSS_INTRO["bar_frames"], self.bar_t + (1 if self.boss_intro else -1)))
-        self.enemies = [e for e in self.enemies if e.alive]
-        self._boss_defeated()
-        self.shurikens = [s for s in self.shurikens if s.alive]
-        self.waves = [w for w in self.waves if w.alive]
-        self.slashes = [s for s in self.slashes if s.alive]
-        self.items = [it for it in self.items if it.alive]
-        for fx in self.effects:
-            fx.update()
-        self.effects = [fx for fx in self.effects if fx.alive]
-
-        self._follow_cam(p)
-        self._move_cam_y()
 
     def _boss_shake(self, p):
         """ボスの構え・着地で、画面を揺らす（step から呼ぶ）。"""
