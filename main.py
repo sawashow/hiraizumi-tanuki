@@ -661,7 +661,7 @@ class Game:
 
     def _boss_shake(self, p):
         """ボスの構え・着地で、画面を揺らす（step から呼ぶ）。"""
-        if self.boss and getattr(self.boss, "alert", False):     # ボスが構えに入った: 小さく揺らす
+        if self.boss and self.boss.alert:     # ボスが構えに入った: 小さく揺らす
             self.boss.alert = False
             self.shake_t = max(self.shake_t, 3)
         if self.boss and self.boss.landed:   # ボスが着地した: 画面を揺らす（降ってきたときは、大きく）
@@ -677,8 +677,8 @@ class Game:
 
     def _boss_defeated(self):
         """ボス（面の途中の影も）を倒したあとの処理（step から呼ぶ）。"""
-        if self.boss and self.boss.dying and getattr(self.boss, "midway", False):    # 影を倒した: 倒れて消えたら、先へ進める
-            if not getattr(self.boss, "shadow_done", False):
+        if self.boss and self.boss.dying and self.boss.midway:    # 影を倒した: 倒れて消えたら、先へ進める
+            if not self.boss.shadow_done:
                 self.boss.shadow_done = True
                 self.waves, self.shurikens, self.slashes = [], [], []
                 self.score += C.SCORE_SHADOW
@@ -909,7 +909,7 @@ class Game:
             return None
         n = self.stage.number
         if self.boss_on:
-            mid = getattr(self.boss, "midway", False)
+            mid = self.boss.midway
             return self._song(C.BGM_MIDBOSS if mid else C.BGM_BOSS_N % n) or self.stage.bgm_boss
         if self.player.super_t and self.super_bgm:
             return C.BGM_SUPER
@@ -1246,7 +1246,7 @@ class Game:
         screen.blit(font.render("LIFE x%d" % max(self.lives, 0), False, C.TEXT), (C.BASE_W - 64, 24))
         if self.boss and self.boss.active and self.boss.intro_done:
             self._draw_boss_hp(screen, font)
-        if self.boss and self.boss.state == "pose" and not getattr(self.boss, "midway", False):   # ボスの二つ名と名前（ゆっくり出て、ゆっくり消える）
+        if self.boss and self.boss.state == "pose" and not self.boss.midway:   # ボスの二つ名と名前（ゆっくり出て、ゆっくり消える）
             t, total, fade = self.boss.st, self.boss.intro["pose"], C.BOSS_INTRO["name_fade"]
             delay = C.BOSS_NAME_DELAY if total > C.BOSS_NAME_DELAY * 3 else 0   # 短いときは、一度に出す
             for img, y, start in ((self.a.boss_title, C.BOSS_TITLE_Y, 0), (self.a.boss_name, C.BOSS_NAME_Y, delay)):

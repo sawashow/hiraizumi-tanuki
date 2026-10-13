@@ -710,6 +710,8 @@ class Enemy:
     clang = False       # このフレームに、攻撃を弾いた（立ち往生。Game が、音を鳴らす）
     dropped = False     # 倒されて、物を落とした（1回だけ）
     last_throw = None   # 最後に当たった手裏剣の、投げの番号（1投げにつき、当たるのは1つだけ）
+    shadow = False      # 影のボス（暗く、青みがかった色で描く）
+    chain = False       # いまの構えは、続けて撃つ2発目以降（構えが短くなる）
 
     def __init__(self, x, y=None, assets=None):
         P = self.P
@@ -778,7 +780,7 @@ class Enemy:
             pygame.draw.rect(surface, C.BLACK, r.inflate(2, 2))
             pygame.draw.rect(surface, (168, 0, 32), r)
             return
-        if getattr(self, "shadow", False):   # 影のボス: 暗く、青みがかった色にする
+        if self.shadow:   # 影のボス: 暗く、青みがかった色にする
             img = self._shadow_image(img)
         if self.flash:   # 攻撃を受けた直後は、白いシルエットにする
             img = pygame.mask.from_surface(img).to_surface(setcolor=C.WHITE, unsetcolor=(0, 0, 0, 0))
@@ -791,7 +793,7 @@ class Enemy:
 
     def _ready_len(self):
         """構えの長さ（続けて撃つときの2発目からは、短い）"""
-        return self.P.get("combo_ready", self.P["ready_frames"]) if getattr(self, "chain", False) else self.P["ready_frames"]
+        return self.P.get("combo_ready", self.P["ready_frames"]) if self.chain else self.P["ready_frames"]
 
     def _opt(self, anim):
         """あれば使う動きの絵（無ければ None）"""
@@ -1195,6 +1197,12 @@ class Boss(Enemy):
 
     INTRO = ("wait", "drop", "land", "pose")   # 出てくる場面の動き（この間は、攻撃を受けない）
 
+    # ボスによって違う性質の、既定値（持つボスだけが、変える）
+    alert = False         # このフレームに、構えに入った（Game が見て、画面を小さく揺らす）
+    midway = False        # 面の途中の相手（影のボス・中ボス）。倒すと、先へ進める
+    shadow_done = False   # 影を倒したあとの後始末を、済ませた
+    thrust = False        # いまの構えは、突き（突きを持つボスだけが、変える）
+
     def __init__(self, x, assets=None, floor=None, x_min=0.0, x_max=None, quick=False, end_x=None, pattern=None):
         self.floor = float(floor if floor is not None else C.FLOOR_Y)
         super().__init__(x, y=self.floor - C.FLOOR_Y - C.BOSS["h"], assets=assets)   # 画面の上から降ってくる（床が低い所では、そのぶん低い所から）
@@ -1409,15 +1417,15 @@ class Boss(Enemy):
             t = (self.st * 2 + i * 9) % 27
             for sgn in (-1, 1):
                 pygame.draw.circle(surface, (214, 196, 160), (r.centerx + sgn * (self.w // 3 + t // 2), r.bottom - 2 - t // 3), max(1, 3 - t // 10))
-        if getattr(self, "thrust", False):
+        if self.thrust:
             ly = r.bottom + C.WAVE["dy"]
-        elif getattr(self, "high", False) and "high_bottom" in P:
+        elif self.high and "high_bottom" in P:
             ly = r.bottom - P["high_bottom"] - P["high_h"] // 2
         else:
             ly = r.bottom + C.WAVE["dy"]
         x0 = r.centerx + d * (self.w // 2 + 4)
         L = int(70 * k)
-        col = (255, 120, 90) if getattr(self, "thrust", False) else (255, 236, 120)
+        col = (255, 120, 90) if self.thrust else (255, 236, 120)
         pygame.draw.line(surface, col, (x0, ly), (x0 + d * L, ly), 1)
         pygame.draw.line(surface, col, (x0, ly - 1), (x0 + d * L // 2, ly - 1), 1)
 
