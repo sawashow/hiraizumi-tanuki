@@ -78,6 +78,7 @@ class Game:
         self.menu_page = "main"  # メニューの画面（main = STORY・OPTION・HOW TO PLAY / option = 難しさ・音量）
         self.howto = False       # 操作説明を出している
         self._fade_cache = {}    # 崖の縁の、中景の入れ替えに使う、濃さの帯（幅ごとに作る）
+        self._roll_fade = None   # エンドロールの、左の枠の右の端を暗くぼかす帯
         self.story = False       # いま、始まりの語りを流している
         self.story_t = 0
         self.story_run = 0       # 決定してからのフレーム数（タヌキ侍が気づいて、駆け抜けている）
@@ -168,6 +169,7 @@ class Game:
 
     def _begin_stage(self):
         self.dango = 0
+        self.last_food = "dango"      # 最後に拾った食べ物（左上のゲージの絵）
         self.intro_t = 0        # 面の名前を出してからのフレーム数（遊び始めてから数える）
         self.taken = set()          # 取ったアイテム（配置表の番号）
         self.toro_broken = set()    # 壊した石灯籠（配置表の番号）。やられて再開しても、壊れたまま
@@ -526,6 +528,7 @@ class Game:
                 if it.kind == "dango":
                     self.score += C.SCORE_DANGO      # 団子: 手裏剣を投げられる数が増える（持てる数まで）
                     self.dango += 1
+                    self.last_food = it.food
                     p.ammo = min(C.AMMO["max"], p.ammo + C.AMMO["dango"])
                     self.sfx.append(C.SFX["dango"])
                 elif it.kind == "onigiri":
@@ -597,6 +600,9 @@ class Game:
                 else:
                     p.take_damage(e.rect.centerx, e.P["touch"])
 
+        if self.boss and getattr(self.boss, "alert", False):     # ボスが構えに入った: 小さく揺らす
+            self.boss.alert = False
+            self.shake_t = max(self.shake_t, 3)
         if self.boss and self.boss.landed:   # ボスが着地した: 画面を揺らす（降ってきたときは、大きく）
             self.boss.landed = False
             self.shake_t = C.BOSS_INTRO["shake"] if self.boss_intro else C.LEAP_SHAKE
@@ -894,11 +900,11 @@ class Game:
         if climb:   # 中景は、画面より遅く動く。崖の下の中景は、登ると下へ沈み、崖の上の中景は、崖より右にだけ、上から降りてくる
             f = C.CLIMB_BG["mid"] if self.stage.mid_follow is None else self.stage.mid_follow
             wall = max(0, min(C.BASE_W, self._wall_x - cam))
-            band = min(C.CLIMB_BG["overhang"], wall)       # 縁のまわりで、2つの中景を、だんだん入れ替える幅（切れ目が、すっぱり出ないように）
+            band = C.CLIMB_BG["overhang"]       # 縁のまわりで、2つの中景を、だんだん入れ替える幅（切れ目が、すっぱり出ないように）
             off_down, off_up = round((climb[2] - cy) * f), -round(cy * f)
             if wall < C.BASE_W:
-                self._blit_mid(world, 0, wall, mid_x, off_down, cy, "out", band)         # 崖の下: 縁へ向かって、薄くなる
-                self._blit_mid(world, wall - band, C.BASE_W, mid_x, off_up, cy, "in", band)    # 崖の上: 縁から、濃くなる
+                self._blit_mid(world, 0, wall, mid_x, off_down, cy, "out", min(band, wall))         # 崖の下: 縁へ向かって、薄くなる
+                self._blit_mid(world, wall, C.BASE_W, mid_x, off_up, cy, "in", min(band, C.BASE_W - wall))    # 崖の上: 縁（より右）から、濃くなる。崖の外には、出さない
             else:
                 self._blit_mid(world, 0, C.BASE_W, mid_x, off_down, cy, None, 0)
         else:
@@ -947,7 +953,7 @@ class Game:
             self._draw_dim(screen)
         if end[0] == "boss" and self.boss:
             r = self.boss.rect
-            self._draw_bubble(screen, self.a.talk_boss, r.centerx - cam, r.bottom - cy - C.TALK_BOSS_Y, self._talk_shown(*end))
+            self._draw_bubble(screen, self.a.talk_boss, r.centerx - cam, self._boss_tail_y(r) - cy, self._talk_shown(*end))
         elif end[0] == "reply":
             r = self.player.rect
             if self.stage.thought:
@@ -1165,9 +1171,12 @@ class Game:
             pygame.draw.rect(screen, (252, 208, 40), (x + 1, 11, 40 * p.super_t // C.SUPER_FRAMES, 4))
         text = font.render("%06d" % self.score, False, C.TEXT)
         screen.blit(text, (C.BASE_W - text.get_width() - 8, 8))
-        # 団子のゲージ（手裏剣を投げられる数）。体力の赤い四角とは、形と色を変える（串に刺さった、丸い団子）
-        dango = pygame.transform.scale(self.a.dango_straight, (4, 12))
-        screen.blit(dango, (8, 23))
+        # 腹ペコゲージ（手裏剣を投げられる数）。左端は、最後に拾った食べ物。体力の赤い四角とは、形と色を変える（串に刺さった、丸い団子）
+        icon = self.a.item.get(self.last_food, self.a.item["dango"])
+        w, h = icon.get_size()
+        k = min(14 / w, 14 / h)
+        icon = pygame.transform.scale(icon, (max(1, round(w * k)), max(1, round(h * k))))
+        screen.blit(icon, (9 - icon.get_width() // 2 + 2, 29 - icon.get_height() // 2))
         p = self.player
         warn = p.empty_t and (p.empty_t // 4) % 2      # 無いのに投げようとした: 赤く点滅
         pygame.draw.rect(screen, C.BLACK, (17, 28, C.AMMO["max"] * 7 + 3, 3))             # 串
@@ -1271,7 +1280,7 @@ class Game:
             for ox, oy, r in cloud:
                 pygame.draw.circle(screen, color, (bx + round(ox * bw), by + round(oy * bh)), round(r * bh) + (1 if pad else 0))
         if grow >= 1.0:
-            o = self.a.item["onigiri"]
+            o = self.a.item[self.a.foods[((t - T["dream_at"]) // C.FOOD_SWAP) % len(self.a.foods)]]       # 食べ物が、次々に浮かぶ（いつも腹ペコ）
             screen.blit(o, (bx - o.get_width() // 2, by - o.get_height() // 2 + round(math.sin(t / 22) * 1.5)))
             if (t // 24) % 3 == 0:      # きらり
                 sx, sy = bx + 10, by - 8
@@ -1351,7 +1360,7 @@ class Game:
         if t >= done + K["dream"]:      # 礼を言われている間も、タヌキ侍は、食べ物のことを考えている（おにぎりと団子が、かわるがわる浮かぶ）
             # 頭のてっぺんの高さから、上へ置く（前は、ここで、礼の文の絵の高さを使っていて、雲が、頭に重なっていた）
             bx, by = self._cloud(screen, round(x), K["floor"] - C.THOUGHT["head"], 36, 26)
-            food = self.a.item[("onigiri", "dango")[((t - done - K["dream"]) // K["dream_swap"]) % 2]]
+            food = self.a.item[self.a.foods[((t - done - K["dream"]) // K["dream_swap"]) % len(self.a.foods)]]
             screen.blit(food, (bx - food.get_width() // 2, by - food.get_height() // 2))
         if t >= done + 10 and self.a.thanks_sub:
             sub = self.a.thanks_sub
@@ -1457,8 +1466,9 @@ class Game:
             screen.fill((196, 196, 188), (0, bottom, VW, C.BASE_H - bottom))
             screen.fill((228, 228, 220), (0, bottom, VW, 3))
         mid = (top + bottom) // 2
-        for x in range(-(scroll % 48), VW if not road else 0, 48):       # 車道の真ん中の線（絵が無いときだけ）
-            screen.fill((226, 226, 200), (x, mid - 1, 24, 2))
+        if not road:        # 車道の真ん中の線（絵が無いときだけ。絵の帯には、線が入っている）
+            for x in range(-(scroll % 48), VW, 48):
+                screen.fill((226, 226, 200), (x, mid - 1, 24, 2))
         for n in range(self.roll_n - 1, self.roll_n + 3):   # 横断歩道（白い帯を、車道の幅いっぱいに並べる）
             zx = (n + 1) * R["every"] - scroll - R["zebra"] // 2 + (R["hime_dx"] // 2)
             if -R["zebra"] < zx < VW:
@@ -1509,6 +1519,12 @@ class Game:
             things.append((cy, img, round(car[0]) - img.get_width() // 2, 0))
         for fy, img, x, up in sorted(things, key=lambda th: th[0]):     # 奥の物から描く
             screen.blit(img, (x, round(fy) - img.get_height() - up))
+        fade = self._roll_fade                      # 右の端（文字の暗い地との境）を、暗くぼかす（横断歩道・車が、端からいきなり出てこないように）
+        if fade is None:
+            fade = self._roll_fade = pygame.Surface((R["edge"], C.BASE_H), pygame.SRCALPHA)
+            for x in range(R["edge"]):
+                fade.fill((10, 8, 22, round(255 * (x / (R["edge"] - 1)) ** 1.6)), (x, 0, 1, C.BASE_H))
+        screen.blit(fade, (VW - R["edge"], 0))
         # 右半分: 暗い地に、エンドロールの文字（下から上へ）
         full.fill((10, 8, 22), (VW, 0, C.BASE_W - VW, C.BASE_H))
         full.fill((214, 168, 72), (VW, 0, 1, C.BASE_H))
@@ -1710,6 +1726,17 @@ class Game:
         pygame.draw.rect(screen, C.HEART, (x, y, w * max(self.boss.hp, 0) // self.boss.max_hp, 6))
         screen.blit(font.render("BOSS", False, C.TEXT), (x - 40, y - 4))
 
+    def _boss_tail_y(self, r):
+        """ボスの吹き出しの、しっぽの先の高さ（世界の座標）。倒れたボスの絵の、いちばん上より、少し上にする（絵が背の高いボスや、台座に座るボスに、かぶらないように）。
+        どのボスも、足元から TALK_BOSS_Y より低くはしない"""
+        tip = r.bottom - C.TALK_BOSS_Y
+        img = self.boss.image() if self.a else None
+        if img is not None:
+            art = C.ENEMY_ART[self.boss.KIND]
+            top = r.bottom - art["h"] if art["mode"] == "bottom" else r.centery - art["ay"]
+            tip = min(tip, top + img.get_bounding_rect().top - 6)
+        return tip
+
     def _draw_bubble(self, screen, img, x, y, shown):
         """吹き出し。x, y は、しっぽの先（話している者の上）。shown は、出ている字の数（左から1文字ずつ出す）"""
         w, h = img.get_width() + 24, img.get_height() + 16
@@ -1872,6 +1899,7 @@ async def main():
         game.player.px = float(game.stage.arena_x0 + 100)
         game.enemies = []
     audio = Audio()
+    audio.preload(sorted(f for f in os.listdir(AUDIO_DIR) if f.startswith("sfx_")))    # 効果音は先に読んでおく
     pad = Pad()   # コントローラ（挿すと、すぐ使える）
 
     while True:

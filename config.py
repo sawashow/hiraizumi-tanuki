@@ -230,6 +230,9 @@ TALK_CELL = 24                  # せりふの絵の、1文字のますの幅（
 #   grow: 丸が出て、雲がふくらみきるまで / per: 食べ物が1つ浮かぶごとの間
 #   lift: 頭のてっぺんから、雲の下端までのすき間（雲が、頭や兜に重ならないように）/ head: 姫を助ける場面での、足元から頭のてっぺんまでの高さ
 THOUGHT = dict(grow=10, per=8, lift=12, head=44)
+# タヌキ侍の、頭の中の食べ物（いつも腹ペコ）。夢の吹き出し（語りの眠り・姫を助けたあと）では、これを順に浮かべる。assets/images/items/food_*.png（tools/make_foods.py）。絵が無い物は、飛ばす
+FOODS = ("onigiri", "dango", "wanko", "reimen", "jajamen", "mochi", "senbei", "kushi", "hittsumi", "anko")
+FOOD_SWAP = 40      # 夢の吹き出しで、食べ物が替わるフレーム数
 TALK_PAUSE = {"reply": (3, 90)}   # せりふの途中の間: (何文字目のあとで, 何フレーム止まるか)。「・・・」のあと、間をおいて「姫？」
 TALK_BOSS_Y = 40                # ボスの吹き出しの、しっぽの先（足元からの高さ）
 
@@ -346,7 +349,7 @@ ENDING_SCREEN = dict(fade=90, wait=240)
 THANKS_BG = "thanks_bg.png"     # 姫を助ける場面の背景（夜明けの参道。地面ごと描いた1枚絵。tools/make_thanks_bg.py）。無ければ、真っ暗な背景に、タイルの床
 THANKS = dict(walk=1.3, stop_x=178, hime_x=298, floor=238, hop=44, type=4, gap=26, wait=70,
               lines=("THANK YOU TANUKI!", "YOUR QUEST IS OVER."), text_y=(24, 52), sub_y=82,
-              dream=40, dream_swap=70)     # dream: 文が出きってから、タヌキ侍の頭の上に、食べ物の吹き出しが出るまで / dream_swap: おにぎりと団子が入れ替わる間隔
+              dream=40, dream_swap=45)     # dream: 文が出きってから、タヌキ侍の頭の上に、食べ物の吹き出しが出るまで / dream_swap: 食べ物（FOODS）が入れ替わる間隔
 # エンドロール（姫を助ける場面のあと、エンディングの絵の前）。平和になった、いまの平泉の道を、タヌキ侍と姫が、右へ歩いていく。
 # 道は、手前と奥に歩道があって、間を車道が横に通っている。横断歩道に来ると、二人は止まる。車が通りすぎるのを待って、
 # 右・左を見てから、向こうの歩道へ渡る。これを、くり返す。その間、画面の右半分を、エンドロールの文字が、下から上へ流れる。
@@ -355,9 +358,9 @@ THANKS = dict(walk=1.3, stop_x=178, hime_x=298, floor=238, hop=44, type=4, gap=2
 #   car_wait: 止まってから、車が来るまで / car_speed: 車の速さ / look: 右・左を見る1回の長さ（3回見る）/ cross: 渡りきるまでのフレーム数
 #   scroll: 文字が流れる速さ / window: 文字が見える範囲（上端, 下端）/ skip: 決定のキーで飛ばせるようになるまで / tail: 文字が流れきってから、絵に替わるまで
 #   view_w: 左の、動きを見せる枠の幅。画面の左半分で、二人が歩き、右半分（暗い地）を、文字が流れる
-ROLL = dict(view_w=240, x=140, hime_dx=-46, far=166, near=252, road=(176, 240), speed=0.9, every=330, zebra=39,
+ROLL = dict(view_w=240, x=140, hime_dx=-46, far=166, near=252, road=(176, 240), speed=0.9, every=330, zebra=38,
             car_wait=24, car_speed=3.4, look=26, cross=76, scroll=0.35, window=(0, 270), skip=90, tail=120,
-            slot_h=118, boss_tick=14)      # slot_h: 文字の絵（credits.png）の、ボスの絵の空き場所の高さ（tools/make_credits.py の SLOT_H と同じ）/ boss_tick: ボスの絵が、次のコマに替わるフレーム数
+            slot_h=118, boss_tick=14, edge=24)      # slot_h: 文字の絵（credits.png）の、ボスの絵の空き場所の高さ（tools/make_credits.py の SLOT_H と同じ）/ boss_tick: ボスの絵が、次のコマに替わるフレーム数 / edge: 左の枠の、右の端を暗くぼかす幅（ドット）
 # 「しゅつえん」に出る、ボスの待機の絵（コマの順。1コマだけのときは、ゆっくり、1ドットずつ上下する）。文字の絵の空き場所（上から順）に、この順で重ねて描く。右半分の中央に、足元をそろえて置く
 ROLL_BOSSES = (tuple("enemies/boss_stance_%d.png" % i for i in range(3)),                       # 四代 泰衡
                tuple("enemies/boss3_stance_%d.png" % i for i in range(3)),                      # 三代 秀衡
@@ -438,7 +441,7 @@ CLIMB_CAM = dict(feet=190, speed=4, top=70, bottom=230)
 # 崖登りの背景: 中景（松・柵など）は、画面の動きの mid 倍だけ、ついてくる（登ると、下へ沈む）。崖の上の中景は、崖より右にだけ出す。
 # 空は、縦に長い絵（bg_sky_tall.png）があれば、登るにつれて、絵の下から上へ、見える所が移る。
 # 崖の壁は、岩肌のタイル（cliff_*.png）があれば、地面の上端から cliff_rows 段より下を、それで埋める
-# overhang: 崖の縁のまわりで、崖の下の中景と、崖の上の中景を、だんだん入れ替える幅（ドット）。すっぱり切ると、縁にかかった松や島が、四角く切れて見える
+# overhang: 崖の縁のまわりで、崖の下の中景と、崖の上の中景を、だんだん入れ替える幅（ドット）。崖の下は、縁へ向かって薄くなり、崖の上は、縁より右で、縁から濃くなる（崖の外に、崖の上の中景を出さない。すっぱり切ると、縁にかかった松や島が、四角く切れて見える）
 CLIMB_BG = dict(mid=0.6, cliff_rows=2, overhang=56)
 CLIFF_PATTERN = (1, 2, 4, 1, 0, 2, 4, 1, 3, 2, 1, 4, 5, 2, 4, 1)     # 岩肌のタイルの並べ方（ほとんどは、無地の岩。ときどき、割れ目・根・苔）
 FALL_DAMAGE = 2
@@ -454,10 +457,11 @@ GAMEOVER_WAIT = 145    # このフレームまでは、Enter を押しても再�
 # 2面のボス（二代・基衡「怨庭公家」）: 歩いて、「扇の風」「扇を投げる」を交互に出す。体力が半分になると、「花びらの雨」が入る。
 # 順番の文字: W=扇の風 / T=扇を投げる / P=花びらの雨。風は、ダメージなしで、主人公を押し戻す（池や穴が近いと危ない）。
 # 扇は、ゆっくり飛んで、戻ってくる（刀で消せる）。花びらは、落ちる場所に、先に目印が出る
-BOSS2 = dict(w=36, h=76, hp=28, touch=1, speed=0.6, near=80, gravity=0.3,
-             walk_frames=90, rage_walk_frames=60, recover_frames=75, rage_recover_frames=50,
+BOSS2 = dict(w=36, h=76, hp=36, touch=1, speed=0.75, near=80, gravity=0.3,
+             walk_frames=70, rage_walk_frames=42, recover_frames=56, rage_recover_frames=34,      # 2026-10-13 に、弱すぎたので、テコ入れ（体力 28→36、歩き 90→70、隙 75→56 など）
              wind_ready=34, wind_at=12, wind_frames=34,
-             throw_ready=38, throw_at=8, throw_frames=26,
+             throw_ready=38, throw_ready_chain=20, throw_at=8, throw_frames=26,       # throw_ready_chain: 風のすぐあとの、扇の構え（風で押し戻して、すぐ投げる）
+             fan2_delay=14, fan2_y=14,                                                  # 体力が半分以下: 2枚目の扇（足元の高さ）を、14 フレームあとに投げる。しゃがむか、跳ぶか、選ばせる
              petal_ready=50, petal_frames=30)
 BOSS2_PATTERN = "WTWT"
 BOSS2_RAGE_PATTERN = "TPWP"

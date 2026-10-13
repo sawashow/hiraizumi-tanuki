@@ -364,7 +364,7 @@ STAGE1 = StageDef("月見坂", W1, GROUND1, PLATFORMS1, thin_dango(ITEMS1, PLATF
                   number=3, stele_x=140,
                   boss_title="enemies/boss2_title.png", boss_name="enemies/boss2_name.png",
                   talk_boss="talk_boss2.png", talk_tanuki="talk_tanuki2.png",
-                  boss_kind="boss2", boss_pattern=C.BOSS2_PATTERN, zones=ZONES1, thought=("onigiri", "dango"),
+                  boss_kind="boss2", boss_pattern=C.BOSS2_PATTERN, zones=ZONES1, thought=("onigiri", "jajamen", "senbei", "anko", "dango"),
                   winds=((3450, 3970, 170),),    # 長い登り: 坂の上から、山おろし
                   pit=(26, 18, 44), haze=32)     # 夕焼けの空に、黒いもやは浮く。穴の底を、夕闇の紫にして、もやを低くする
 
@@ -464,7 +464,7 @@ ZONES2 = (
 STAGE2 = StageDef("毛越寺", 5000, GROUND2, PLATFORMS2, thin_dango(ITEMS2, PLATFORMS2), (2170, T - 32), SPAWNS2, C.BGM_STAGE1, C.BGM_BOSS,
                   lanterns=(("triple", 300), ("onigiri", 2310), ("onigiri", 4370)),   # 石灯籠: 入口（強化）・中間地点の先（回復）・ボスの前（回復）
                   sky="stage2/bg_sky.png", mid="stage2/bg_mid.png", tiles="stage2/",
-                  number=1, stele_x=130, zones=ZONES2, thought=("onigiri",))   # ボスは、1面の泰衡（遊ぶ順で決まる）。絵が無いあいだは、1面の絵で代わりにする
+                  number=1, stele_x=130, zones=ZONES2, thought=("onigiri", "wanko", "mochi"))   # ボスは、1面の泰衡（遊ぶ順で決まる）。絵が無いあいだは、1面の絵で代わりにする
 # ---------------------------------------------------------------- 2面（高館）
 # 義経堂のある高台。北上川と衣川を見下ろす崖の道。夏の昼。高低差が大きく、遠くから撃たれる面（敵の絵・弓兵は、まだ無いので、いまは既存の敵）
 W3 = 6000
@@ -601,7 +601,7 @@ STAGE3 = StageDef("高館", W3, GROUND3, PLATFORMS3, thin_dango(ITEMS3, PLATFORM
                   boss_title="enemies/boss3_title.png", boss_name="enemies/boss3_name.png",
                   talk_boss="talk_boss3.png", talk_tanuki="talk_tanuki3.png", number=2, stele_x=130,
                   boss_kind="boss3", boss_pattern=C.BOSS3_PATTERN,   # ボスは遊ぶ順で決まる（代をさかのぼる: 1面:四代・泰衡 2面:三代・秀衡 3面:二代・基衡 4面:初代・清衡）
-                  zones=ZONES3, thought=("dango",), climb=CLIMB3,
+                  zones=ZONES3, thought=("dango", "kushi", "reimen", "hittsumi"), climb=CLIMB3,
                   pit=(150, 186, 208), pit_deep=(84, 130, 170), haze=36)
 # 崖の切れ目の下は、青く霞んだ谷。昼の景色に、暗い穴は合わない。高い崖の上にいる感じを出す。
 # 前は、白（226, 240, 246）で、もやの高さ 100。穴のふちが、いちばん明るくなって、下から光が出ているように見えた。
