@@ -703,6 +703,14 @@ class Enemy:
     KIND = ""    # 絵の種類名
     DEATH_TICKS = 8   # やられの1コマの長さ
 
+    # 種類によって違う性質の、既定値（持つ種類だけが、上書きする）。Game は、どの敵にも、これをそのまま読む
+    spawned = None      # 出した弾（光波・矢）。出す種類は、__init__ で、リストにする（Game が受け取って動かす）
+    sure_drop = None    # 倒すと、必ず落とす物（立ち往生）
+    solid = False       # 通り抜けられず、敵の弾も弾く（立ち往生）
+    clang = False       # このフレームに、攻撃を弾いた（立ち往生。Game が、音を鳴らす）
+    dropped = False     # 倒されて、物を落とした（1回だけ）
+    last_throw = None   # 最後に当たった手裏剣の、投げの番号（1投げにつき、当たるのは1つだけ）
+
     def __init__(self, x, y=None, assets=None):
         P = self.P
         self.a = assets

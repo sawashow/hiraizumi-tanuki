@@ -378,7 +378,7 @@ class Game:
             if self.boss_on and e is not self.boss and not e.dying:    # ボスと戦っている間、ザコ敵は、動かない（間の外から、狐火や矢が入ってこないように）
                 continue
             e.update(p.rect, self.stage.width, self.terrain)
-            spawned = getattr(e, "spawned", None)
+            spawned = e.spawned
             if spawned:
                 self.waves.extend(spawned)
                 spawned.clear()
@@ -567,7 +567,7 @@ class Game:
                 if s.alive and e.active and s.rect.colliderect(e.rect):
                     s.alive = False
                     tid = getattr(s, "throw_id", None)
-                    if tid is None or getattr(e, "last_throw", None) != tid:   # 1投げにつき、同じ敵に当たるのは1つだけ（残りは、消えるだけ）
+                    if tid is None or e.last_throw != tid:   # 1投げにつき、同じ敵に当たるのは1つだけ（残りは、消えるだけ）
                         e.last_throw = tid
                         e.hit(C.SHURIKEN_DAMAGE)
                     self.effects.append(HitEffect(*s.rect.center, self.a))
@@ -600,9 +600,9 @@ class Game:
         """倒した敵が、物を落とす（step から呼ぶ）。"""
         # 倒した敵が、物を落とす（ボスは落とさない）
         for e in self.enemies:
-            if e.dying and not getattr(e, "dropped", False):
+            if e.dying and not e.dropped:
                 e.dropped = True
-                kind = getattr(e, "sure_drop", None) or drop_kind(self.rng.random() / self.L["drops"])    # 必ず落とす敵（立ち往生）もいる
+                kind = e.sure_drop or drop_kind(self.rng.random() / self.L["drops"])    # 必ず落とす敵（立ち往生）もいる
                 if kind:
                     self.items.append(Item(kind, e.rect.centerx, e.rect.centery, self.a, drop=True))
 
@@ -616,7 +616,7 @@ class Game:
                 p.px = max(C.PLAYER_W / 2, min(nx, self.stage.width - C.PLAYER_W / 2))
         # 立ち往生は、敵の矢や光波も、弾いて消す
         for e in self.enemies:
-            if getattr(e, "solid", False):
+            if e.solid:
                 for w in self.waves:
                     if w.alive and not getattr(w, "push", 0) and w.rect.colliderect(e.rect):
                         w.alive = False
@@ -642,10 +642,10 @@ class Game:
         """敵に触れたときの当たり判定（step から呼ぶ）。"""
         # 敵 → 主人公（踏んでも倒せない。触れるとダメージ）
         for e in foes:
-            if getattr(e, "clang", False):      # 立ち往生が、攻撃を弾いた
+            if e.clang:      # 立ち往生が、攻撃を弾いた
                 e.clang = False
                 self.sfx.append(C.SFX_CLANG)
-            if getattr(e, "solid", False):      # 立ち往生: ダメージは無い。来たほうへ、押し戻す（上に乗っても、横へ落とす）
+            if e.solid:      # 立ち往生: ダメージは無い。来たほうへ、押し戻す（上に乗っても、横へ落とす）
                 if p.rect.colliderect(e.rect):
                     half = (e.w + C.PLAYER_W) / 2
                     side = -1 if p.px < e.cx else 1
