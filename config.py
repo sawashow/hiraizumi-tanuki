@@ -463,9 +463,19 @@ BOSS2 = dict(w=36, h=76, hp=36, touch=1, speed=0.75, near=80, gravity=0.3,
              wind_ready=34, wind_at=12, wind_frames=34,
              throw_ready=38, throw_ready_chain=20, throw_at=8, throw_frames=26,       # throw_ready_chain: 風のすぐあとの、扇の構え（風で押し戻して、すぐ投げる）
              fan2_delay=14, fan2_y=14,                                                  # 体力が半分以下: 2枚目の扇（足元の高さ）を、14 フレームあとに投げる。しゃがむか、跳ぶか、選ばせる
-             petal_ready=50, petal_frames=30)
+             petal_ready=50, petal_frames=30,
+             gale_frames=30)     # 大風: 扇を振り下ろしてから、次の動き（扇を投げる）に移るまで。予告の長さは GALE の warn
 BOSS2_PATTERN = "WTWT"
 BOSS2_RAGE_PATTERN = "TPWP"
+# 月見坂の基衡（本家）だけが使う順番。G=大風。金色堂の影の基衡は、足場の無い間で戦うので、上の順番（大風なし）のまま
+BOSS2_GALE_PATTERN = "WTGT"
+BOSS2_GALE_RAGE_PATTERN = "TPGTP"
+# 大風: ボスの間の、端から端まで、床ぞいに吹く。ダメージは無いが、床にいると、吹いている間、押され続ける（h=風の高さ。足場は、これより高い）。
+# warn=予告の長さ（扇を高く上げて、床に、弱い風の筋と木の葉が流れ始める） / blow=吹いている長さ / push=押す速さ（最高速より小さい。跳べば、進める）
+# 見た目: 風の帯を、うすい白で塗る（alpha=濃さ 0〜255。うしろが見える濃さ）。上の縁に、波打つ線（風の高さが、ひと目で分かる）。
+# 筋の数・長さ・速さ: 予告は、少なく・短く・ゆっくり（warn_〜）。帯は、だんだん濃くなる。吹いている間は、多く・長く・速く
+GALE = dict(h=40, push=2.4, warn=70, blow=150, alpha=84, streaks=14, long=34, speed=6.0, leaves=8,
+            warn_alpha=50, warn_streaks=6, warn_long=14, warn_speed=1.6, warn_leaves=4)
 # 3面のボス（三代・秀衡「鬼角薙将」）。縦に高く、角のある兜に、大鎧、長い薙刀。動きは、1面の泰衡と同じ形
 # （歩く → 構える → 薙刀を振って光波、3回に1回、跳びかかり）だが、間合いが長く、光波が速くて遠くまで届く。
 # 光波の高さの順は、「低・高」を、交互に薙ぎ分ける

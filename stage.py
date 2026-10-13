@@ -364,7 +364,7 @@ STAGE1 = StageDef("月見坂", W1, GROUND1, PLATFORMS1, thin_dango(ITEMS1, PLATF
                   number=3, stele_x=140,
                   boss_title="enemies/boss2_title.png", boss_name="enemies/boss2_name.png",
                   talk_boss="talk_boss2.png", talk_tanuki="talk_tanuki2.png",
-                  boss_kind="boss2", boss_pattern=C.BOSS2_PATTERN, zones=ZONES1, thought=("jajamen", "senbei", "anko"),
+                  boss_kind="boss2", boss_pattern=C.BOSS2_GALE_PATTERN, zones=ZONES1, thought=("jajamen", "senbei", "anko"),
                   winds=((3450, 3970, 170),),    # 長い登り: 坂の上から、山おろし
                   pit=(26, 18, 44), haze=32)     # 夕焼けの空に、黒いもやは浮く。穴の底を、夕闇の紫にして、もやを低くする
 
