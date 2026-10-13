@@ -604,6 +604,23 @@ class Game:
                 else:
                     p.take_damage(e.rect.centerx, e.P["touch"])
 
+        self._boss_shake(p)
+        self.bar_t = max(0, min(C.BOSS_INTRO["bar_frames"], self.bar_t + (1 if self.boss_intro else -1)))
+        self.enemies = [e for e in self.enemies if e.alive]
+        self._boss_defeated()
+        self.shurikens = [s for s in self.shurikens if s.alive]
+        self.waves = [w for w in self.waves if w.alive]
+        self.slashes = [s for s in self.slashes if s.alive]
+        self.items = [it for it in self.items if it.alive]
+        for fx in self.effects:
+            fx.update()
+        self.effects = [fx for fx in self.effects if fx.alive]
+
+        self._follow_cam(p)
+        self._move_cam_y()
+
+    def _boss_shake(self, p):
+        """ボスの構え・着地で、画面を揺らす（step から呼ぶ）。"""
         if self.boss and getattr(self.boss, "alert", False):     # ボスが構えに入った: 小さく揺らす
             self.boss.alert = False
             self.shake_t = max(self.shake_t, 3)
@@ -617,8 +634,9 @@ class Game:
                 p.facing = 1 if self.boss.cx > p.px else -1
         elif self.shake_t:
             self.shake_t -= 1
-        self.bar_t = max(0, min(C.BOSS_INTRO["bar_frames"], self.bar_t + (1 if self.boss_intro else -1)))
-        self.enemies = [e for e in self.enemies if e.alive]
+
+    def _boss_defeated(self):
+        """ボス（面の途中の影も）を倒したあとの処理（step から呼ぶ）。"""
         if self.boss and self.boss.dying and getattr(self.boss, "midway", False):    # 影を倒した: 倒れて消えたら、先へ進める
             if not getattr(self.boss, "shadow_done", False):
                 self.boss.shadow_done = True
@@ -630,14 +648,9 @@ class Game:
             self.waves, self.shurikens, self.slashes = [], [], []
             self.score += C.SCORE_BOSS
             self.ending = 1
-        self.shurikens = [s for s in self.shurikens if s.alive]
-        self.waves = [w for w in self.waves if w.alive]
-        self.slashes = [s for s in self.slashes if s.alive]
-        self.items = [it for it in self.items if it.alive]
-        for fx in self.effects:
-            fx.update()
-        self.effects = [fx for fx in self.effects if fx.alive]
 
+    def _follow_cam(self, p):
+        """画面を、主人公に合わせて、横に動かす（step から呼ぶ）。"""
         if not self.boss_on:   # ボスと戦っている間は、画面を動かさない（入ったときだけ、右端まで流す）
             target = max(0, min(p.rect.centerx - C.BASE_W // 2, self.stage.width - C.BASE_W))
             if self.cam_ease and abs(target - self.cam_x) > C.BOSS_CAM_SPEED:     # 影を倒したあとは、ゆっくり戻す
@@ -646,7 +659,6 @@ class Game:
                 self.cam_x, self.cam_ease = target, False
         elif self.cam_x < self._arena()["x0"]:
             self.cam_x = min(self._arena()["x0"], self.cam_x + C.BOSS_CAM_SPEED)
-        self._move_cam_y()
 
     def _end_phase(self):
         """寸劇の、いまの場面と、その場面に入ってからのフレーム数。
