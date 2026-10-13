@@ -290,7 +290,7 @@ STAGE1_LEGACY = StageDef("月見坂", C.STAGE_W, GROUND, PLATFORMS, ITEMS, CHECK
                          talk_boss="talk_boss3.png", talk_tanuki="talk_tanuki3.png",
                          boss_kind="boss3", boss_pattern=C.BOSS3_PATTERN)
 
-# 月見坂は、金色堂の手前の坂なので、遊ぶ順は3番目（地図の上で、金色堂の1つ前）。ボスは、遊ぶ順で決まる（1面:泰衡 2面:基衡 3面:秀衡 4面:清衡）。
+# 月見坂は、金色堂の手前の坂なので、遊ぶ順は3番目（地図の上で、金色堂の1つ前）。ボスは、遊ぶ順で決まる（代をさかのぼる。1面:四代・泰衡 2面:三代・秀衡 3面:二代・基衡 4面:初代・清衡）。
 # 長さ 7500。前半（〜3330）は、古い版の、石段・谷・塔・穴5つ。後半に、もう一つの長い登り（石段の連続・頂上・下り）を足した
 W1 = 7500
 _E = [(120, 16), (120, 32), (120, 48), (120, 64), (160, 80), ("穴", 100),                     # 3330〜4070: 長い登りの始まり
@@ -311,6 +311,8 @@ PLATFORMS1 = tuple(pl for pl in PLATFORMS if pl[0] < 3330) + (
     (5900, 5950, T - 130),
     (6630, 6680, T - 30),                                        # 穴（6610〜6700）の真ん中
     (6200, 6250, T - 90), (6780, 6830, T - 70),
+    # ボスの間（7020〜）の足場: 基衡は、跳びかからず、背も高い（地面からは、跳び越えられない）。追い詰められたら、足場から跳び越える
+    (7120, 7180, T - 52), (7330, 7390, T - 52),
 )
 ITEMS1 = tuple(it for it in ITEMS if it[1] < 3330) + (
     ("dango", 3420, T - 114), ("dango", 3580, T - 130),
@@ -360,9 +362,9 @@ ZONES1 = (
 STAGE1 = StageDef("月見坂", W1, GROUND1, PLATFORMS1, thin_dango(ITEMS1, PLATFORMS1), (4650, T), SPAWNS1B, C.BGM_STAGE1, C.BGM_BOSS,
                   lanterns=(("triple", 300), ("onigiri", 4750), ("onigiri", 6880)),   # 石灯籠: 入口（強化）・中間地点の先（回復）・ボスの前（回復）
                   number=3, stele_x=140,
-                  boss_title="enemies/boss3_title.png", boss_name="enemies/boss3_name.png",
-                  talk_boss="talk_boss3.png", talk_tanuki="talk_tanuki3.png",
-                  boss_kind="boss3", boss_pattern=C.BOSS3_PATTERN, zones=ZONES1, thought=("onigiri", "dango"),
+                  boss_title="enemies/boss2_title.png", boss_name="enemies/boss2_name.png",
+                  talk_boss="talk_boss2.png", talk_tanuki="talk_tanuki2.png",
+                  boss_kind="boss2", boss_pattern=C.BOSS2_PATTERN, zones=ZONES1, thought=("onigiri", "dango"),
                   winds=((3450, 3970, 170),),    # 長い登り: 坂の上から、山おろし
                   pit=(26, 18, 44), haze=32)     # 夕焼けの空に、黒いもやは浮く。穴の底を、夕闇の紫にして、もやを低くする
 
@@ -530,8 +532,6 @@ PLATFORMS3 = (
     (4600, 4650, T - 96),
     (5165, 5215, T - 40),                                     # 切れ目（5140〜5240）の真ん中
     (5300, 5350, T - 60),
-    # ボスの間の足場: 基衡は、跳びかからず、背も高い（地面からは、跳び越えられない）。追い詰められたら、足場から跳び越える
-    (5620, 5680, T - 52), (5830, 5890, T - 52),
 )
 PLATFORMS3 = _lowered(PLATFORMS3, 0) + (
     # 崖登り。段の崖: 段の手前の足場を踏んで、段の上へ（上りは 52 → 44）
@@ -598,9 +598,9 @@ ZONES3 = (
 STAGE3 = StageDef("高館", W3, GROUND3, PLATFORMS3, thin_dango(ITEMS3, PLATFORMS3), (3340, _B3 - 16), SPAWNS3, C.BGM_STAGE1, C.BGM_BOSS,
                   lanterns=(("triple", 300), ("onigiri", 3392), ("onigiri", 5400)),   # 石灯籠: 入口（強化）・中間地点の先（回復）・ボスの前（回復）
                   sky="stage3/bg_sky.png", mid="stage3/bg_mid.png", tiles="stage3/",
-                  boss_title="enemies/boss2_title.png", boss_name="enemies/boss2_name.png",
-                  talk_boss="talk_boss2.png", talk_tanuki="talk_tanuki2.png", number=2, stele_x=130,
-                  boss_kind="boss2", boss_pattern=C.BOSS2_PATTERN,   # ボスは遊ぶ順で決まる（2面: 基衡）
+                  boss_title="enemies/boss3_title.png", boss_name="enemies/boss3_name.png",
+                  talk_boss="talk_boss3.png", talk_tanuki="talk_tanuki3.png", number=2, stele_x=130,
+                  boss_kind="boss3", boss_pattern=C.BOSS3_PATTERN,   # ボスは遊ぶ順で決まる（代をさかのぼる: 1面:四代・泰衡 2面:三代・秀衡 3面:二代・基衡 4面:初代・清衡）
                   zones=ZONES3, thought=("dango",), climb=CLIMB3,
                   pit=(150, 186, 208), pit_deep=(84, 130, 170), haze=36)
 # 崖の切れ目の下は、青く霞んだ谷。昼の景色に、暗い穴は合わない。高い崖の上にいる感じを出す。
@@ -608,7 +608,7 @@ STAGE3 = StageDef("高館", W3, GROUND3, PLATFORMS3, thin_dango(ITEMS3, PLATFORM
 # 空より暗い青にして、もやを低くした（明るい色を、高く立ち上げない）
 # ---------------------------------------------------------------- 4面（金色堂）
 # 堂の中。暗い所から、金色の光へ。いちばん長い面（総まとめ）。走る区間と、ボスの間を、交互に並べる:
-# 入口の間 → 影・泰衡 → 回廊 → 影・基衡 → 柱の間 → 影・秀衡 → 奥の廊下（いちばん長い）→ 清衡。
+# 入口の間 → 影・泰衡 → 回廊 → 影・秀衡 → 柱の間 → 影・基衡 → 奥の廊下（いちばん長い）→ 清衡（代をさかのぼる）。
 # 影のボスは、本家の半分の体力。倒すと、おにぎりが出て、やられたらそこから再開する
 _A = [(300, 0), (120, 16), (120, 32), (120, 16), (120, 0), ("穴", 90), (130, 16), (120, 32), (120, 48), (100, 32), (160, 0)]      # 0〜1500
 _B = [(140, 16), (120, 32), (120, 48), (120, 32), (100, 16), ("穴", 100), (120, 0), (120, 16), (120, 32), (120, 16), (140, 0)]     # 1980〜3300
@@ -622,7 +622,7 @@ RISE4 = 384
 CLIMB4 = (7230, 7860, RISE4)
 _D_END = 7230
 _B4 = T + RISE4
-GATES4 = ((1500, "boss"), (3300, "boss2"), (5100, "boss3"))      # 影のボスの間（左端の x, 本家のボス）
+GATES4 = ((1500, "boss"), (3300, "boss3"), (5100, "boss2"))      # 影のボスの間（左端の x, 本家のボス）
 GROUND4 = []
 _x = 0
 for _parts, _end in ((_A, 1500), (_B, 3300), (_C, 5100)):
@@ -652,8 +652,8 @@ PLATFORMS4 = (
     (5650, 5710, T - 60), (5950, 6010, T - 76),                # 奥の廊下
     (6640, 6690, T - 44),                                      # 光の橋の真ん中の、消えない足場（ひと息つく所）
     (8200, 8260, T - 70),
-    # 影の基衡の間（3300〜3780）の足場: 基衡は、地面からは跳び越えられない。追い詰められたら、足場から跳び越える
-    (3390, 3450, T - 52), (3620, 3680, T - 52),
+    # 影の基衡の間（5100〜5580）の足場: 基衡は、地面からは跳び越えられない。追い詰められたら、足場から跳び越える
+    (5190, 5250, T - 52), (5420, 5480, T - 52),
 )
 PLATFORMS4 = _lowered(PLATFORMS4, 0, RISE4, CLIMB4[0]) + (
     (7325, 7375, _B4 - 50), (7485, 7535, _B4 - 146),           # 最後の登り。段の壁に付けた足場（上りは 50 → 46）
@@ -689,10 +689,10 @@ SPAWNS4 = (   # 堂の中は、敵が少なめ（主役は、ボス）。区画�
     # 影・泰衡（1500〜1980）
     ("kitsunebi_low", 2120), ("kitsunebi_high", 2180), ("ochimusha", 2300), ("karasu", 2420),   # 回廊
     ("kitsunebi_high", 2750), ("karasu", 2900), ("kitsunebi_low", 2950),                        # 回廊の奥
-    # 影・基衡（3300〜3780）
+    # 影・秀衡（3300〜3780）
     ("kitsunebi_high", 3900), ("ochimusha", 3990), ("kitsunebi_low", 4100), ("ochimusha", 4230), ("karasu", 4350),   # 金の登り
     ("kitsunebi_low", 4600), ("kitsunebi_high", 4640), ("miira", 4680), ("miira", 4730), ("ochimusha", 4830),      # 下り: ミイラの列
-    # 影・秀衡（5100〜5580）
+    # 影・基衡（5100〜5580）
     ("kitsunebi_low", 5820), ("kitsunebi_high", 5900), ("ochimusha", 6200),                     # 奥の廊下
     # 光の橋（6360〜6900）には、敵を置かない（消える足場で、間合いを計って渡るのが主役）
     # 鳥居（6950）のまわりには、置かない
@@ -708,10 +708,10 @@ ZONES4 = (
     (1340, 1980, "影・泰衡", "見せ場", 5),
     (1980, 2680, "回廊", "組み合わせ", 3),
     (2680, 3160, "回廊の奥", "試す", 3),
-    (3160, 3780, "影・基衡", "見せ場", 5),
+    (3160, 3780, "影・秀衡", "見せ場", 5),
     (3780, 4500, "金の登り", "組み合わせ", 4),
     (4500, 5000, "下り", "試す", 3),
-    (5000, 5580, "影・秀衡", "見せ場", 5),
+    (5000, 5580, "影・基衡", "見せ場", 5),
     (5580, 6360, "奥の廊下", "試す", 3),
     (6360, 6900, "光の橋", "渡る", 3),
     (6900, 7230, "鳥居", "休む", 2),

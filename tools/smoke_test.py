@@ -2162,10 +2162,10 @@ gp.intro_t = 999
 gp.player.px = gp.stage.arena_x0 + C.BOSS_TRIGGER + 10
 gp.player.py = gp.terrain.height_at(gp.player.px)
 run(gp, 2)
-check("3面（月見坂）のボスは、秀衡", gp.boss is not None and type(gp.boss).__name__ == "Boss3" and gp.stage.name == "月見坂" and gp.boss.max_hp == C.BOSS3["hp"])
+check("3面（月見坂）のボスは、基衡", gp.boss is not None and type(gp.boss).__name__ == "Boss2" and gp.stage.name == "月見坂" and gp.boss.max_hp == C.BOSS2["hp"])
 gp = Game()
 gp.reset(1)
-check("2面（高館）のボスは、基衡", gp.stage.name == "高館" and gp.stage.boss_kind == "boss2")
+check("2面（高館）のボスは、秀衡", gp.stage.name == "高館" and gp.stage.boss_kind == "boss3")
 
 # 地図: 面をクリアすると、前の場所から次の場所へ、道を歩く。高館が無い間は、寄らずに、分かれ道を通って月見坂へ
 gm = Game(title=True)
@@ -2272,9 +2272,9 @@ gg3.boss.hit(gg3.boss.hp)
 run(gg3, 200)
 check("清衡を倒すと、倒れた絵になる", gg3.boss.dying and gg3.boss.image() is gg3.a.enemy["boss4"]["death"][gg3.boss.facing > 0][1])
 
-# ---------------------------------------------------------------- 23. 3面のボス（秀衡）
+# ---------------------------------------------------------------- 23. 2面のボス（三代・秀衡。代をさかのぼる順で、2面）
 gb = Game()
-gb.reset(2)
+gb.reset(1)
 gb.title = False
 gb.intro_t = 999
 gb.player.hp = 6
@@ -2282,8 +2282,9 @@ gb.player.px = gb.stage.arena_x0 + C.BOSS_TRIGGER + 10
 gb.player.py = gb.terrain.height_at(gb.player.px)
 gb.enemies = []
 run(gb, 2)
-check("3面は、秀衡が出てくる（体が大きく、体力が多い）", type(gb.boss).__name__ == "Boss3" and gb.boss.h == C.BOSS3["h"] and gb.boss.max_hp > C.BOSS["hp"])
+check("2面（高館）は、秀衡が出てくる（体が大きく、体力が多い）", type(gb.boss).__name__ == "Boss3" and gb.boss.h == C.BOSS3["h"] and gb.boss.max_hp > C.BOSS["hp"])
 heights = ""
+gb.boss.P = dict(C.BOSS3, thrust_near=0)      # 光波の順番だけを見る（踏み込み突きは、下の検査で見る）
 for _ in range(2400):
     gb.step(set(), set())
     gb.player.hp, gb.player.invincible = 6, 0
@@ -2296,12 +2297,51 @@ for _ in range(2400):
 check("秀衡は、光波を、低・高と薙ぎ分ける（順番どおり）", heights == C.BOSS3_PATTERN[:len(heights)] and len(heights) >= 6, heights)
 gb.boss.hit(gb.boss.hp)
 run(gb, 200)
+# 踏み込み突き: 近いと、光波の代わりに、速くて短い低い光波で突く（泰衡と、違う型にするため）
+gt = Game()
+gt.reset(1)
+gt.title = False
+gt.intro_t = 999
+gt.player.hp = 6
+gt.player.px = gt.stage.arena_x0 + C.BOSS_TRIGGER + 10
+gt.player.py = gt.terrain.height_at(gt.player.px)
+gt.enemies = []
+run(gt, 2)
+thrusts, normal, dashed, marker = [], [], False, False
+for _ in range(3000):
+    gt.step(set(), set())
+    gt.player.hp, gt.player.invincible = 6, 0
+    gt.player.px = float(gt.boss.cx - 110)       # 近くに立ち続ける（距離 150 より内側）
+    gt.player.px = max(gt.player.px, float(gt.stage.arena_x0 + 40))
+    marker = marker or (gt.boss.state == "ready" and gt.boss.thrust)
+    for w in gt.waves:
+        if isinstance(w, Wave) and w.t == 1:
+            (thrusts if w.speed == C.BOSS3["thrust_speed"] else normal).append(w)
+    if len(thrusts) >= 2:
+        break
+check("秀衡は、近いと、踏み込み突き（速くて短い、低い光波）を出す", len(thrusts) >= 2 and all(not w.tall and w.reach == C.BOSS3["thrust_range"] for w in thrusts), "%d" % len(thrusts))
+check("突きの構えの間は、赤い矢印の予告が出る（thrust が立つ）", marker)
+gf = Game()
+gf.reset(1)
+gf.title = False
+gf.intro_t = 999
+gf.player.hp = 6
+gf.player.px = gf.stage.arena_x0 + C.BOSS_TRIGGER + 10
+gf.player.py = gf.terrain.height_at(gf.player.px)
+gf.enemies = []
+run(gf, 2)
+gf.boss.cx = gf.stage.arena_x0 + 420.0
+x0 = gf.boss.cx
+gf.boss.thrust, gf.boss.facing = True, -1
+gf.boss._set("swing")
+run(gf, 12)
+check("突きのとき、前へ踏み込む（thrust_dash ドットほど）", abs((x0 - gf.boss.cx) - C.BOSS3["thrust_dash"]) <= 2, "%.1f" % (x0 - gf.boss.cx))
 check("秀衡を倒すと、倒れた絵になる", gb.boss.dying and gb.boss.image() is gb.a.enemy["boss3"]["death"][gb.boss.facing > 0][1])
 
 # ---------------------------------------------------------------- 24. 面の途中のボスの間（影のボス）
 st4 = STAGES[3]
 arenas = st4.arenas
-check("4面には、ボスの間が4つ（影3つ＋清衡）", [a["kind"] for a in arenas] == ["boss", "boss2", "boss3", "boss4"] and [a["shadow"] for a in arenas] == [True, True, True, False])
+check("4面には、ボスの間が4つ（影3つ＋清衡）", [a["kind"] for a in arenas] == ["boss", "boss3", "boss2", "boss4"] and [a["shadow"] for a in arenas] == [True, True, True, False])
 check("ボスの間の地面は、平ら（幅480）", all(any(a0 <= a["x0"] and a["x1"] <= b0 and len({t for x0, x1, t in st4.ground if x0 < a["x1"] and a["x0"] < x1}) == 1 for a0, b0, _ in st4.ground) for a in arenas[:3]))
 
 
@@ -2354,12 +2394,12 @@ gg.player.hp, gg.lives = 0, 3
 run(gg, C.RESPAWN_AT + 5)
 check("影を倒したあとにやられると、その所から再開する", gg.player.px == ar["x1"] + 60 and gg.player.hp > 0 and gg.boss is None)
 gg2, ar2 = gate_game(1)
-check("2つ目の間で、影の基衡が出る", type(gg2.boss).__name__ == "Boss2" and gg2.boss.shadow and gg2.arena_i == 1)
+check("2つ目の間で、影の秀衡が出る", type(gg2.boss).__name__ == "Boss3" and gg2.boss.shadow and gg2.arena_i == 1)
 gg2.player.hp, gg2.lives = 0, 3
 run(gg2, C.RESPAWN_AT + 5)
 check("影の間でやられると、その間の入口から再開する", abs(gg2.player.px - (ar2["x0"] + 100)) < 1 and gg2.boss is None and not gg2.boss_on)
 gg3, ar3 = gate_game(2)
-check("3つ目の間で、影の秀衡が出る", type(gg3.boss).__name__ == "Boss3" and gg3.boss.shadow)
+check("3つ目の間で、影の基衡が出る", type(gg3.boss).__name__ == "Boss2" and gg3.boss.shadow)
 gg4 = Game()
 gg4.reset(3)
 gg4.title = False
