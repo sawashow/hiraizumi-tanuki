@@ -502,12 +502,14 @@ BENKEI_PATTERN = "LHLLH"
 BOSS4 = dict(w=44, h=72, hp=36, bob=2, touch=1, speed=0.7, near=110, gravity=0.3, hover=12,
              walk_frames=80, rage_walk_frames=52, recover_frames=60, rage_recover_frames=40,
              ready=36, fire_at=8, cast_frames=44, gap=36, rage_gap=30,
-             ring_ready=44, pillar_frames=78, warp_out=22, warp_in=26, warp_dist=150, warp_min=90, roar=56)
+             ring_ready=44, pillar_frames=102, warp_out=22, warp_in=26, warp_dist=150, warp_min=90, roar=56)
 # 攻撃の順（くり返す）。beads=数珠の玉 / pillar=光の柱 / ring=数珠の輪 / warp=転移（すぐ次の攻撃に移る）
 BOSS4_CYCLE = ("beads", "pillar", "warp", "beads", "ring", "pillar", "warp", "ring")
 BOSS4_RAGE_CYCLE = ("beads", "pillar", "ring", "warp", "pillar", "beads", "warp", "ring")   # 怒ったあと（最初に、転移が入る）
 # 光の柱: warn=予告の長さ / beam=柱が出ている長さ / spread=柱の間隔（主人公の足元を中心に並ぶ。間に立てる幅） / stagger=外側の柱が遅れるフレーム数
-PILLAR = dict(w=20, warn=54, rage_warn=42, beam=16, damage=1, count=3, rage_count=5, spread=64, stagger=8)
+# flash=落ちる直前に、予告が速く点滅するフレーム数。予告は、柱と同じ太さの、うすい光で見せる（どこまで動けば安全かが、先に分かる）。
+# 2026-10-13: 発生が早すぎて、よけづらかったので、予告を長くした（warn 54→78、rage_warn 42→60）。清衡の pillar_frames も、合わせて 78→102
+PILLAR = dict(w=20, warn=78, rage_warn=60, flash=14, beam=16, damage=1, count=3, rage_count=5, spread=64, stagger=8)
 # 数珠の輪: 清衡のまわり radius の所に count 個の玉が出て、八方へ飛ぶ。横へ飛ぶ玉は、しゃがめば当たらない高さ
 RING = dict(count=8, radius=40, speed=1.9, rage_speed=2.3, range=200)
 # 後光: 半径 r（怒ると rage_r）、光の筋 rays 本（長い・短いを交互）、spin=回る速さ、dy=体の中心から上へずらす量
