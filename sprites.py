@@ -1027,7 +1027,20 @@ class Tachiojo(Enemy):
         surface.blit(img, (r.centerx - art["ax"], r.bottom - art["h"] - self.dead_t // 3))
 
 
-class Arrow:
+class Shot:
+    """敵の弾（光波・矢・数珠の玉・光の柱・風・扇・花びら）の、共通の性質。動きと絵は、種類ごとに作る。
+    Game は、どの弾にも、これをそのまま読む（違う種類だけが、上書きする）"""
+    push = 0                      # 当たると、押し戻す強さ（0 なら、押さない。押す弾は、ダメージを与えない）
+    cuttable = True               # 刀で斬って、消せる
+    damage = C.WAVE["damage"]     # 当たったときのダメージ
+    cut_pad = (0, 0)              # 刀で斬る判定を、広げる幅（横・縦）
+
+    def cut_effect(self):
+        """斬られた・弾かれたときに、あとに残す物（無ければ None。矢は、折れて落ちる）"""
+        return None
+
+
+class Arrow(Shot):
     """弓兵の矢。撃った瞬間に主人公がいた所へ向けて、まっすぐ飛ぶ（角度には限りがある）。刀で斬ると、折れて消える"""
     cuttable = True
     _turned = {}    # 向きごとに回した絵（使い回す）
@@ -1900,9 +1913,10 @@ class Boss2(Boss):
         return f[name][d]
 
 
-class Bead:
+class Bead(Shot):
     """数珠の玉: 決まった高さを、まっすぐ飛ぶ。刀で消せる。当たるとダメージ"""
     damage = C.BEAD["damage"]
+    cut_pad = (C.BEAD["cut_pad"], 6)    # 小さいので、斬る判定を、少し広げる
 
     def __init__(self, x, y, direction, assets, speed=None, vy=0.0, floor=None, reach=None, ring=False):
         self.a = assets
@@ -1950,7 +1964,7 @@ class Bead:
         pygame.draw.circle(surface, (255, 250, 214), (x - 2, y - 2), 2)
 
 
-class Pillar:
+class Pillar(Shot):
     """光の柱（清衡）: 床に、光る印と、細い光の筋が出る（予告）。そのあと、上から、太い光の柱が落ちる。刀では消せない。印の間に立てば、当たらない"""
     cuttable = False
     damage = C.PILLAR["damage"]
@@ -2005,7 +2019,7 @@ class Pillar:
         pygame.draw.ellipse(surface, (255, 252, 226), (x - w, floor - 6, w * 2, 10))
 
 
-class Gust:
+class Gust(Shot):
     """扇の風: 地面ぞいに、ゆっくり進む。ダメージはないが、当たると押し戻される。刀では消せない（ジャンプで越える）"""
     push = C.GUST["push"]
     cuttable = False
@@ -2098,7 +2112,7 @@ class HillGust(Gust):
             self.py = h - C.GUST["h"] / 2
 
 
-class Fan:
+class Fan(Shot):
     """投げた扇: ボスの向きに飛んで、距離まで行くと、その場で止まって白く光り（戻る予告）、ボスのところへ戻る。
     刀で消せる。当たるとダメージ"""
     cuttable = True
@@ -2155,7 +2169,7 @@ class Fan:
             pygame.draw.polygon(surface, (255, 236, 120), ((tip, y), (tip - d * 4, y - 4), (tip - d * 4, y + 4)))
 
 
-class Petal:
+class Petal(Shot):
     """花びら: 落ちる場所に、先に目印（地面の楕円と、落ちてくる筋道の点線）が出る。そのあと、上から落ちてくる。刀で消せる。当たるとダメージ"""
     cuttable = True
     damage = C.PETAL["damage"]
@@ -2261,7 +2275,7 @@ class Shuriken:
         surface.blit(img, (round(self.px) - img.get_width() // 2 - cam_x, round(self.py) - img.get_height() // 2))
 
 
-class Wave:
+class Wave(Shot):
     """落ち武者の光波。まっすぐ飛んで、一定の距離で消える"""
 
     def __init__(self, x, y, direction, assets, speed=None, reach=None, tall=False):
