@@ -60,8 +60,9 @@ def zebra(src):
         for i, c in enumerate(row):
             if c[0] > 225 and c[1] > 220 and c[2] < 225 and c[0] - c[2] > 15:
                 out.putpixel((i, j), mean + (255,))
-    box = out.getbbox()
-    return out.crop((box[0], 0, box[2], H)), mean
+    counts = [sum(1 for j in range(H) if out.getpixel((i, j))[3]) for i in range(cols)]
+    keep = [i for i, n in enumerate(counts) if n >= 0.7 * max(counts)]      # 白線の両端の、かすれて欠けた列は、切る（端から入るとき、点線に見えないように）
+    return out.crop((keep[0], 0, keep[-1] + 1, H)), mean
 
 
 def main(road_src, zebra_src, out):

@@ -7,6 +7,7 @@ import pygame
 import config as C
 
 DIR = os.path.join(os.path.dirname(__file__), "assets", "audio")
+pygame.mixer.pre_init(44100, -16, 2, 2048)    # 出力の溜め（バッファ）を大きく: ブラウザ版で、音がぶつぶつ切れるのを減らす（pygame.init より前に効かせる）
 
 
 class Audio:
@@ -18,6 +19,7 @@ class Audio:
         try:
             if not pygame.mixer.get_init():
                 pygame.mixer.init()
+            pygame.mixer.set_num_channels(24)    # 同時に鳴らせる数（足りないと、音が途中で切られる）
             self.ok = True
         except pygame.error:
             pass   # 音なしで続ける
@@ -43,14 +45,22 @@ class Audio:
         except pygame.error:
             pass
 
+    def preload(self, names):
+        """効果音を先に読み込む（初めて鳴らす瞬間の読み込みで、フレームが止まって音が途切れるのを防ぐ）"""
+        for n in names:
+            self._sound(n)
+
+    def _sound(self, name):
+        if name not in self.sounds:
+            self.sounds[name] = pygame.mixer.Sound(os.path.join(DIR, name))
+            self.sounds[name].set_volume(C.SFX_VOLUME.get(name, 0.3) * self.gain[1])
+        return self.sounds[name]
+
     def play_sfx(self, name):
         if not self.ok:
             return
         try:
-            if name not in self.sounds:
-                self.sounds[name] = pygame.mixer.Sound(os.path.join(DIR, name))
-                self.sounds[name].set_volume(C.SFX_VOLUME.get(name, 0.3) * self.gain[1])
-            self.sounds[name].play()
+            self._sound(name).play()
         except (pygame.error, FileNotFoundError):
             pass   # 効果音が鳴らせなくても、続ける
 

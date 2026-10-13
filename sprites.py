@@ -147,6 +147,11 @@ class Assets:
         slash = [_load(f"slash_{i}.png") for i in range(C.SLASH_FRAMES)]
         self.slash = {True: slash, False: [pygame.transform.flip(f, True, False) for f in slash]}
         self.item = {k: _load(f"items/{k}.png") for k in ("dango", "onigiri", "leaf")}
+        for k in C.FOODS[2:]:       # 頭の中の食べ物（あれば）
+            if os.path.exists(os.path.join(IMG, "items", f"food_{k}.png")):
+                self.item[k] = _load(f"items/food_{k}.png")
+        self.foods = [k for k in C.FOODS if k in self.item]      # 夢の吹き出しに、順に浮かべる食べ物
+        self.snacks = [k for k in self.foods if k != "onigiri"]      # 拾うと、手裏剣が増える食べ物（おにぎりは、回復なので入れない）
         self.dango_straight = self.item["dango"]      # 団子のゲージ（左上）は、縦の絵のまま
         if os.path.exists(os.path.join(IMG, "items", "dango_tilt.png")):       # 拾える団子・吹き出しの団子は、斜めの絵（tools/make_dango_tilt.py）
             self.item["dango"] = _load("items/dango_tilt.png")
@@ -1259,6 +1264,9 @@ class Boss(Enemy):
     def _set(self, state):
         self.state = state
         self.st = 0
+        if state == "ready" and self.KIND != "boss4":     # 構えに入る: 低い音と、小さな揺れで知らせる
+            snd("charge")
+            self.alert = True
 
     @property
     def high(self):
@@ -1379,6 +1387,40 @@ class Boss(Enemy):
         f = self._frames("walk")
         return f[(self.t // 12) % len(f)]
 
+    def _telegraph(self, surface, r, img, x, y):
+        """構えの間の予告（矢印は使わない）: 体が白く脈打ち、足元に土ぼこりが立ち、攻撃が来る高さに細い光の筋が伸びる"""
+        if self.state != "ready" or self.dying:
+            return
+        P, d = self.P, self.facing
+        k = min(self.st, 30) / 30
+        white = pygame.mask.from_surface(img).to_surface(setcolor=C.WHITE, unsetcolor=(0, 0, 0, 0))
+        white.set_alpha(int(40 + 90 * abs(math.sin(self.st / 4))) * (1 if k else 0))
+        surface.blit(white, (x, y))
+        for i in range(3):      # 土ぼこり（足元から、左右へ散って昇る）
+            t = (self.st * 2 + i * 9) % 27
+            for sgn in (-1, 1):
+                pygame.draw.circle(surface, (214, 196, 160), (r.centerx + sgn * (self.w // 3 + t // 2), r.bottom - 2 - t // 3), max(1, 3 - t // 10))
+        if self.thrust:
+            ly = r.bottom + C.WAVE["dy"]
+        elif self.high:
+            ly = r.bottom - P["high_bottom"] - P["high_h"] // 2
+        else:
+            ly = r.bottom + C.WAVE["dy"]
+        x0 = r.centerx + d * (self.w // 2 + 4)
+        L = int(70 * k)
+        col = (255, 120, 90) if getattr(self, "thrust", False) else (255, 236, 120)
+        pygame.draw.line(surface, col, (x0, ly), (x0 + d * L, ly), 1)
+        pygame.draw.line(surface, col, (x0, ly - 1), (x0 + d * L // 2, ly - 1), 1)
+
+    def draw(self, surface, cam_x):
+        super().draw(surface, cam_x)
+        if self.state == "ready" and not self.dying and self.a and self.KIND not in ("boss4", "tachiojo"):
+            img = self.image()
+            if img is not None:
+                r = self.rect.move(-cam_x, 0)
+                art = C.ENEMY_ART[self.KIND]
+                self._telegraph(surface, r, img, r.centerx - (art["ax"] if self.facing < 0 else art["w"] - art["ax"]), r.bottom - art["h"])
+
 
 class Boss3(Boss):
     """2面のボス（三代・秀衡）。体が大きく、体力が多く、薙刀の光波が速くて遠くまで届く。
@@ -1417,18 +1459,6 @@ class Boss3(Boss):
         P = self.P
         if self.state == "swing" and self.thrust and self.st <= P["thrust_dash_frames"]:       # 突きと一緒に、踏み込む
             self.cx = max(self.x_min, min(self.cx + self.facing * P["thrust_dash"] / P["thrust_dash_frames"], self.x_max))
-
-    def draw(self, surface, cam_x):
-        super().draw(surface, cam_x)
-        if self.state == "ready" and self.thrust and not self.dying and self.st // 4 % 2 == 0:     # 突きの予告: 足元に、赤い矢印（点滅）
-            r = self.rect.move(-cam_x, 0)
-            d = self.facing
-            x, y = r.centerx + d * (self.w // 2 + 6), r.bottom + C.WAVE["dy"]
-            for i in range(3):
-                tip = x + d * (10 + i * 9)
-                pts = [(tip, y), (tip - d * 7, y - 6), (tip - d * 7, y + 6)]
-                pygame.draw.polygon(surface, (255, 96, 64), pts)
-                pygame.draw.polygon(surface, C.BLACK, pts, 1)
 
 
 class Benkei(Boss):
@@ -1498,24 +1528,8 @@ class Benkei(Boss):
         f = self._frames("stand")
         return f[(self.t // self.P["breath"]) % len(f)]
 
-    def _mark(self, surface, r):
-        """構えの間、攻撃が来る高さに、点滅する矢印を出す（構えの絵が、まだ無いので、これが予告）。
-        低い光波 = 足元・黄 / 高い光波 = 頭の高さ・黄 / 突き = 足元・赤（太く、短い）"""
-        if self.state != "ready" or self.st // 4 % 2:
-            return
-        P, d = self.P, self.facing
-        x = r.centerx + d * (self.w // 2 + 6)
-        if self.thrust:
-            y, n, color = r.bottom + C.WAVE["dy"], 3, (255, 96, 64)
-        elif self.high:
-            y, n, color = r.bottom - P["high_bottom"] - P["high_h"] // 2, 2, (255, 232, 96)
-        else:
-            y, n, color = r.bottom + C.WAVE["dy"], 2, (255, 232, 96)
-        for i in range(n):
-            tip = x + d * (10 + i * 9)
-            pts = [(tip, y), (tip - d * 7, y - 6), (tip - d * 7, y + 6)]
-            pygame.draw.polygon(surface, color, pts)
-            pygame.draw.polygon(surface, C.BLACK, pts, 1)
+    def _mark(self, surface, r, img, x, y):
+        self._telegraph(surface, r, img, x, y)
 
     def draw(self, surface, cam_x):
         r = self.rect.move(-cam_x, 0)
@@ -1534,7 +1548,7 @@ class Benkei(Boss):
         if self.flash:
             img = pygame.mask.from_surface(img).to_surface(setcolor=C.WHITE, unsetcolor=(0, 0, 0, 0))
         surface.blit(img, (x, y))
-        self._mark(surface, r)
+        self._mark(surface, r, img, x, y)
 
 
 class Boss4(Boss):
@@ -1800,16 +1814,27 @@ class Boss2(Boss):
                 self.spawned.append(Gust(self.cx + self.facing * (self.w / 2 + 12), self.floor - C.GUST["h"] / 2,
                                          self.facing, self.a))
             if self.st >= P["wind_frames"]:
-                self._set("recover")
+                if self.move == "T":        # 風で押し戻して、すぐ、扇を投げる（連携）
+                    self.facing = 1 if pr.centerx > self.cx else -1
+                    self.chain = True
+                    self.count += 1
+                    self._set("throw_ready")
+                else:
+                    self._set("recover")
         elif s == "throw_ready":
-            if self.st >= P["throw_ready"]:
+            if self.st >= (P["throw_ready_chain"] if self.chain else P["throw_ready"]):
                 self._set("throw")
         elif s == "throw":
             if self.st == P["throw_at"]:
                 snd("fan")
                 self.spawned.append(Fan(self.cx + self.facing * (self.w / 2 + 6), self.floor - C.FAN["y"],
                                         self.facing, self.a, self))
-            if self.st >= P["throw_frames"]:
+            if self.rage and self.st == P["throw_at"] + P["fan2_delay"]:      # 体力が半分以下: 2枚目（足元）
+                snd("fan")
+                self.spawned.append(Fan(self.cx + self.facing * (self.w / 2 + 6), self.floor - P["fan2_y"],
+                                        self.facing, self.a, self))
+            if self.st >= P["throw_frames"] + (P["fan2_delay"] if self.rage else 0):
+                self.chain = False
                 self._set("recover")
         elif s == "petal_ready":
             if self.st >= P["petal_ready"]:
@@ -2282,6 +2307,9 @@ class Item:
         self.cx, self.cy = float(x), float(y)
         self.t = 0
         self.alive = True
+        snacks = getattr(assets, "snacks", None) if assets else None
+        # 手裏剣の元（dango）は、いろんな食べ物の絵で出る。置き場所で、食べ物が決まる（やり直しても、同じ）
+        self.food = snacks[(idx if idx >= 0 else int(x) // 7) % len(snacks)] if kind == "dango" and snacks else kind
 
     @property
     def rect(self):
@@ -2316,8 +2344,8 @@ class Item:
         x = round(self.cx) - cam_x
         y = round(self.cy + (math.sin(self.t / 18) * 2 if self.resting else 0))
         imgs = getattr(self.a, "item", None) if self.a else None
-        if imgs and self.kind in imgs:
-            img = imgs[self.kind]
+        if imgs and self.food in imgs:
+            img = imgs[self.food]
             surface.blit(img, (x - img.get_width() // 2, y - img.get_height() // 2))
             return
         if self.kind == "dango":
