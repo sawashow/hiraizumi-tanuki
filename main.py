@@ -606,37 +606,40 @@ class Game:
                 if kind:
                     self.items.append(Item(kind, e.rect.centerx, e.rect.centery, self.a, drop=True))
 
+    def _cut_effect(self, w):
+        """斬られた・弾かれた弾が、あとに残す物を出す（矢は、折れて落ちる）。"""
+        fx = w.cut_effect()
+        if fx is not None:
+            self.effects.append(fx)
+
     def _hit_by_waves(self, p, sword):
         """敵の弾（光波・矢・風）の当たり判定: 押し戻す・弾かれる・刀で斬る・主人公に当たる（step から呼ぶ）。"""
         # 扇の風: ダメージはなく、押し戻す（壁や、画面の端より先へは、押されない）
         for w in self.waves:
-            push = getattr(w, "push", 0)
-            if push and w.alive and p.rect.colliderect(w.rect):
-                nx = self.terrain.push_x(p.px, p.px + w.dir * push, p.py, C.PLAYER_W / 2)
+            if w.push and w.alive and p.rect.colliderect(w.rect):
+                nx = self.terrain.push_x(p.px, p.px + w.dir * w.push, p.py, C.PLAYER_W / 2)
                 p.px = max(C.PLAYER_W / 2, min(nx, self.stage.width - C.PLAYER_W / 2))
         # 立ち往生は、敵の矢や光波も、弾いて消す
         for e in self.enemies:
             if e.solid:
                 for w in self.waves:
-                    if w.alive and not getattr(w, "push", 0) and w.rect.colliderect(e.rect):
+                    if w.alive and not w.push and w.rect.colliderect(e.rect):
                         w.alive = False
                         e.hit(0)
-                        if hasattr(w, "cut_effect"):
-                            self.effects.append(w.cut_effect())
+                        self._cut_effect(w)
         # 刀 → 光波（刀で斬ると消せる。手裏剣は通り抜ける）
         if sword:
             for w in self.waves:
-                if w.alive and getattr(w, "cuttable", True) and sword.colliderect(w.rect.inflate(C.BEAD["cut_pad"], 6) if hasattr(w, "ring") else w.rect):
+                if w.alive and w.cuttable and sword.colliderect(w.rect.inflate(*w.cut_pad)):
                     w.alive = False
                     self.sfx.append(C.SFX["cut"])
                     self.effects.append(HitEffect(*w.rect.center, self.a))
-                    if hasattr(w, "cut_effect"):    # 矢は、折れて落ちる
-                        self.effects.append(w.cut_effect())
+                    self._cut_effect(w)
         # 光波 → 主人公（無敵のあいだは、すり抜ける）
         for w in self.waves:
-            if w.alive and not getattr(w, "push", 0) and not p.untouchable and p.rect.colliderect(w.rect):
+            if w.alive and not w.push and not p.untouchable and p.rect.colliderect(w.rect):
                 w.alive = False
-                p.take_damage(w.px, getattr(w, "damage", C.WAVE["damage"]))
+                p.take_damage(w.px, w.damage)
 
     def _touch_foes(self, p, foes):
         """敵に触れたときの当たり判定（step から呼ぶ）。"""
