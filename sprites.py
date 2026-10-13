@@ -141,6 +141,9 @@ class Assets:
         self.wave = {True: wave, False: [pygame.transform.flip(f, True, False) for f in wave]}   # True=右向き
         gust = [_load(f"gust_{i}.png") for i in range(4)] if os.path.exists(os.path.join(IMG, "gust_0.png")) else []
         self.gust = {True: gust, False: [pygame.transform.flip(f, True, False) for f in gust]}   # 風（基衡の扇・山おろし）。絵が無ければ、線で描く
+        for frames in self.gust.values():
+            for f in frames:
+                f.set_alpha(C.GUST["alpha"])    # 薄くして、風のうしろの敵や地形が見えるように
         slash = [_load(f"slash_{i}.png") for i in range(C.SLASH_FRAMES)]
         self.slash = {True: slash, False: [pygame.transform.flip(f, True, False) for f in slash]}
         self.item = {k: _load(f"items/{k}.png") for k in ("dango", "onigiri", "leaf")}
