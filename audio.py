@@ -33,6 +33,16 @@ class Audio:
         except (pygame.error, FileNotFoundError):
             self.ok = False
 
+    def keep_playing(self):
+        """曲が終わっていたら、もう一度かける（ブラウザ版で、くり返し再生が効かず、長いボス戦の途中で、曲が止まるため）"""
+        if not self.ok or not self.playing or getattr(self, "paused", False):
+            return
+        try:
+            if not pygame.mixer.music.get_busy():
+                pygame.mixer.music.play(-1)
+        except pygame.error:
+            pass
+
     def play_sfx(self, name):
         if not self.ok:
             return

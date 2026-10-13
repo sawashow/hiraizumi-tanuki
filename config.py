@@ -343,7 +343,8 @@ ENDING_SCREEN = dict(fade=90, wait=240)
 # 姫を助ける場面（最後の面の結果のあと、エンディングの絵の前）。昔のゲームの「THANK YOU ○○!」の画面。
 # 暗い堂の中。タヌキ侍が左から歩いてきて、奥で待っていた姫の前で止まる。姫が跳ねて喜び、礼の文が、1文字ずつ出る。
 #   walk: 歩く速さ / stop_x・hime_x: 二人が立つ場所 / hop: 姫が跳ねるフレーム数（2回） / type: 1文字が出る間隔 / gap: 行と行の間 / wait: 文が出きってから、キーを受け付けるまで
-THANKS = dict(walk=1.3, stop_x=178, hime_x=298, floor=198, hop=44, type=4, gap=26, wait=70,
+THANKS_BG = "thanks_bg.png"     # 姫を助ける場面の背景（夜明けの参道。地面ごと描いた1枚絵。tools/make_thanks_bg.py）。無ければ、真っ暗な背景に、タイルの床
+THANKS = dict(walk=1.3, stop_x=178, hime_x=298, floor=238, hop=44, type=4, gap=26, wait=70,
               lines=("THANK YOU TANUKI!", "YOUR QUEST IS OVER."), text_y=(24, 52), sub_y=82,
               dream=40, dream_swap=70)     # dream: 文が出きってから、タヌキ侍の頭の上に、食べ物の吹き出しが出るまで / dream_swap: おにぎりと団子が入れ替わる間隔
 # エンドロール（姫を助ける場面のあと、エンディングの絵の前）。平和になった、いまの平泉の道を、タヌキ侍と姫が、右へ歩いていく。
@@ -354,10 +355,19 @@ THANKS = dict(walk=1.3, stop_x=178, hime_x=298, floor=198, hop=44, type=4, gap=2
 #   car_wait: 止まってから、車が来るまで / car_speed: 車の速さ / look: 右・左を見る1回の長さ（3回見る）/ cross: 渡りきるまでのフレーム数
 #   scroll: 文字が流れる速さ / window: 文字が見える範囲（上端, 下端）/ skip: 決定のキーで飛ばせるようになるまで / tail: 文字が流れきってから、絵に替わるまで
 #   view_w: 左の、動きを見せる枠の幅。画面の左半分で、二人が歩き、右半分（暗い地）を、文字が流れる
-ROLL = dict(view_w=240, x=140, hime_dx=-46, far=166, near=252, road=(176, 240), speed=0.9, every=330, zebra=46,
-            car_wait=24, car_speed=3.4, look=26, cross=76, scroll=0.35, window=(0, 270), skip=90, tail=120)
-ROLL_IMAGES = dict(bg="ending_bg.png", cars=("ending_car_0.png", "ending_car_1.png"), credits="credits.png",
-                   hime_walk=("hime_walk_0.png", "hime_walk_1.png", "hime_walk_2.png", "hime_walk_3.png"))   # 無い絵は、図形や、いまの絵で代わりにする
+ROLL = dict(view_w=240, x=140, hime_dx=-46, far=166, near=252, road=(176, 240), speed=0.9, every=330, zebra=39,
+            car_wait=24, car_speed=3.4, look=26, cross=76, scroll=0.35, window=(0, 270), skip=90, tail=120,
+            slot_h=118, boss_tick=14)      # slot_h: 文字の絵（credits.png）の、ボスの絵の空き場所の高さ（tools/make_credits.py の SLOT_H と同じ）/ boss_tick: ボスの絵が、次のコマに替わるフレーム数
+# 「しゅつえん」に出る、ボスの待機の絵（コマの順。1コマだけのときは、ゆっくり、1ドットずつ上下する）。文字の絵の空き場所（上から順）に、この順で重ねて描く。右半分の中央に、足元をそろえて置く
+ROLL_BOSSES = (tuple("enemies/boss_stance_%d.png" % i for i in range(3)),                       # 四代 泰衡
+               tuple("enemies/boss3_stance_%d.png" % i for i in range(3)),                      # 三代 秀衡
+               tuple("enemies/boss2_idle_%d.png" % i for i in range(3)),                        # 二代 基衡
+               ("enemies/boss4_pray_0.png",))      # 初代 清衡（座った像なので、1コマだけ。ゆっくり浮き沈みする。コマを替えると、うるさい）
+ROLL_IMAGES = dict(bg="ending_bg.png", cars=("ending_car_0.png", "ending_car_1.png", "ending_car_2.png"), credits="credits.png",
+                   hime_walk=tuple("hime_walk_%d.png" % i for i in range(6)),
+                   road="roll_road.png", zebra="roll_zebra.png",     # 道（歩道・縁石・車道）の帯と、横断歩道（tools/make_roll_road_ai.py）。無ければ、四角の塗りで描く
+                   tanuki_raise=tuple("roll_tanuki_raise_%d.png" % i for i in range(6)),    # 道を渡る間の、手を挙げて歩く絵（tools/make_roll_raise.py）。右向き
+                   hime_raise=tuple("roll_hime_raise_%d.png" % i for i in range(6)))        # 姫。左向き。   # 無い絵は、図形や、いまの絵で代わりにする
 HIME_IMAGES = ("hime_0.png", "hime_1.png")      # 姫の絵（立つ・跳ねる）。無ければ、タヌキ侍の絵を、桃色にして代わりにする
 THANKS_SUB = "thanks_sub.png"                   # 英語の文の下に出す、日本語の一行（tools/make_text_image.py）   # 明るくなるまでのフレーム数 / Enter を受け付けるまで
 
@@ -428,7 +438,8 @@ CLIMB_CAM = dict(feet=190, speed=4, top=70, bottom=230)
 # 崖登りの背景: 中景（松・柵など）は、画面の動きの mid 倍だけ、ついてくる（登ると、下へ沈む）。崖の上の中景は、崖より右にだけ出す。
 # 空は、縦に長い絵（bg_sky_tall.png）があれば、登るにつれて、絵の下から上へ、見える所が移る。
 # 崖の壁は、岩肌のタイル（cliff_*.png）があれば、地面の上端から cliff_rows 段より下を、それで埋める
-CLIMB_BG = dict(mid=0.6, cliff_rows=2)
+# overhang: 崖の縁のまわりで、崖の下の中景と、崖の上の中景を、だんだん入れ替える幅（ドット）。すっぱり切ると、縁にかかった松や島が、四角く切れて見える
+CLIMB_BG = dict(mid=0.6, cliff_rows=2, overhang=56)
 CLIFF_PATTERN = (1, 2, 4, 1, 0, 2, 4, 1, 3, 2, 1, 4, 5, 2, 4, 1)     # 岩肌のタイルの並べ方（ほとんどは、無地の岩。ときどき、割れ目・根・苔）
 FALL_DAMAGE = 2
 
@@ -455,7 +466,9 @@ BOSS2_RAGE_PATTERN = "TPWP"
 # 光波の高さの順は、「低・高」を、交互に薙ぎ分ける
 BOSS3 = dict(BOSS, w=34, h=88, hp=30, speed=0.55, near=90, wave_speed=2.3, wave_range=520, high_bottom=34,
              rage_walk_frames=46, rage_recover_frames=40,
-             combo=2, rage_combo=3, combo_ready=26)   # 光波を、続けて撃つ（ふだん2発、体力が半分で3発）。2発目からは、構えが短い
+             combo=2, rage_combo=3, combo_ready=26,   # 光波を、続けて撃つ（ふだん2発、体力が半分で3発）。2発目からは、構えが短い
+             thrust_near=150, thrust_ready=34, thrust_speed=4.4, thrust_range=130,   # 踏み込み突き: 主人公が、この距離より近いと、光波の代わりに突く。構え 34 フレーム（足元に赤い矢印）
+             thrust_dash=44, thrust_dash_frames=10)      # 突くとき、前へ 44 ドット踏み込む（10 フレームで）。光波は、速くて短い低い光波（跳ぶか、下がればよけられる）
 BOSS3_PATTERN = "LHLLHH"
 # 高館の中ボス（弁慶の亡霊「立ち往生」）。道の真ん中に立って、動かない。どこから斬っても、効く（特別な決まりは無い）。
 #   離れていると: 薙刀を薙いで、光波を飛ばす（低い = 跳ぶ / 高い = しゃがむ）

@@ -4,6 +4,8 @@
   既定のフォントは assets/concept/fonts/PixelMplus12-Bold.ttf（M+ FONT LICENSE）、出力は assets/images/credits.png。
   ドットのフォントを、もとの大きさ（12ドット）で、アンチエイリアスなしで書く。どの行も、中央ぞろえ。黒い縁取りを付ける（明るい空の上でも読めるように）。
   中身を変えるときは、下の LINES を直して、作り直す。("見出し", 文) は金色の小見出し、("題", 文) は2倍の大きさ、("", 文) はふつうの行、None は、すき間
+  ("絵", "") は、ボスの絵（動く）を、ゲームが重ねて描くための、空き場所（高さ SLOT_H。config.py の ROLL の slot_h と同じにする）。
+  空き場所の上端の、左端の画素に、目印（色 255,0,255・不透明度 3。見えない）を打つ。ゲームは、これを探して、絵を重ねる（出てくる順が、config.py の ROLL_BOSSES の順）
 """
 import os
 import sys
@@ -19,6 +21,32 @@ LINES = (
     ("見出し", "ぶたい"),
     ("", "岩手県 平泉"),
     ("", "毛越寺・高館・月見坂・金色堂"),
+    None,
+    ("見出し", "しゅつえん"),
+    None,
+    ("絵", ""),
+    ("見出し", "四代  藤原泰衡"),
+    ("", "1155 - 1189"),
+    ("", "頼朝に攻められ、"),
+    ("", "家臣に裏切られて滅んだ"),
+    None,
+    ("絵", ""),
+    ("見出し", "三代  藤原秀衡"),
+    ("", "1122 - 1187"),
+    ("", "奥州の最盛期を築き、"),
+    ("", "義経をかくまった"),
+    None,
+    ("絵", ""),
+    ("見出し", "二代  藤原基衡"),
+    ("", "生年不明 - 1157"),
+    ("", "毛越寺を造り、"),
+    ("", "浄土の庭を残した"),
+    None,
+    ("絵", ""),
+    ("見出し", "初代  藤原清衡"),
+    ("", "1056 - 1128"),
+    ("", "戦のない世を願い、"),
+    ("", "中尊寺と金色堂を建てた"),
     None,
     ("見出し", "え"),
     ("", "Gemini"),
@@ -50,6 +78,8 @@ LINES = (
     ("", "あそんでくれて、ありがとう"),
 )
 ROW, GAP = 17, 12
+SLOT_H = 118        # ボスの絵の空き場所の高さ（いちばん高い絵 115 + 余白）
+MARK = (255, 0, 255, 3)
 
 
 def line_image(font, s, color, scale):
@@ -69,18 +99,24 @@ def line_image(font, s, color, scale):
 
 def main(font_path, out):
     font = ImageFont.truetype(font_path, 12)
-    rows, y = [], 0
+    rows, y, slots = [], 0, []
     for item in LINES:
         if item is None:
             y += GAP
             continue
         kind, s = item
+        if kind == "絵":
+            slots.append(y)
+            y += SLOT_H + 4
+            continue
         img = line_image(font, s, GOLD if kind else WHITE, 2 if kind == "題" else 1)
         rows.append((img, y))
         y += img.height + (ROW - 14)
     sheet = Image.new("RGBA", (W, y), (0, 0, 0, 0))
     for img, yy in rows:
         sheet.alpha_composite(img, ((W - img.width) // 2, yy))
+    for sy in slots:
+        sheet.putpixel((0, sy), MARK)       # 空き場所の目印（ゲームが探す）
     sheet.save(out)
     print("書き出し:", out, sheet.size)
 

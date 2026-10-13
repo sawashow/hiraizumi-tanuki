@@ -77,6 +77,7 @@ class Game:
         self.menu_i = 0          # 選んでいる項目
         self.menu_page = "main"  # メニューの画面（main = STORY・OPTION・HOW TO PLAY / option = 難しさ・音量）
         self.howto = False       # 操作説明を出している
+        self._fade_cache = {}    # 崖の縁の、中景の入れ替えに使う、濃さの帯（幅ごとに作る）
         self.story = False       # いま、始まりの語りを流している
         self.story_t = 0
         self.story_run = 0       # 決定してからのフレーム数（タヌキ侍が気づいて、駆け抜けている）
@@ -893,12 +894,13 @@ class Game:
         if climb:   # 中景は、画面より遅く動く。崖の下の中景は、登ると下へ沈み、崖の上の中景は、崖より右にだけ、上から降りてくる
             f = C.CLIMB_BG["mid"] if self.stage.mid_follow is None else self.stage.mid_follow
             wall = max(0, min(C.BASE_W, self._wall_x - cam))
-            view = world.get_clip()
-            for x0, x1, off in ((0, wall, round((climb[2] - cy) * f)), (wall, C.BASE_W, -round(cy * f))):
-                if x1 > x0 and abs(off) < C.BASE_H:
-                    world.set_clip(pygame.Rect(x0, cy, x1 - x0, C.BASE_H))
-                    world.blit(self.a.mid, (-mid_x, cy + off))
-            world.set_clip(view)
+            band = min(C.CLIMB_BG["overhang"], wall)       # 縁のまわりで、2つの中景を、だんだん入れ替える幅（切れ目が、すっぱり出ないように）
+            off_down, off_up = round((climb[2] - cy) * f), -round(cy * f)
+            if wall < C.BASE_W:
+                self._blit_mid(world, 0, wall, mid_x, off_down, cy, "out", band)         # 崖の下: 縁へ向かって、薄くなる
+                self._blit_mid(world, wall - band, C.BASE_W, mid_x, off_up, cy, "in", band)    # 崖の上: 縁から、濃くなる
+            else:
+                self._blit_mid(world, 0, C.BASE_W, mid_x, off_down, cy, None, 0)
         else:
             world.blit(self.a.mid, (-mid_x, cy))
         self._draw_ground(world, cam)
@@ -1087,6 +1089,28 @@ class Game:
         img.set_alpha(alpha)
         screen.blit(img, (C.BASE_W // 2 - img.get_width() // 2, C.BASE_H // 2 - img.get_height() // 2 - 8))
 
+    def _blit_mid(self, world, x0, x1, mid_x, off, cy, ramp, band):
+        """中景を、x0〜x1 の範囲だけ描く（崖登りの面: 崖の下と上で、動きが違う中景を、縁で入れ替える）。
+        ramp が "out" なら、右の端の band ドットが、だんだん薄くなる。"in" なら、左の端の band ドットが、だんだん濃くなる"""
+        w = x1 - x0
+        if w <= 0 or abs(off) >= C.BASE_H:
+            return
+        part = pygame.Surface((w, C.BASE_H), pygame.SRCALPHA)
+        part.blit(self.a.mid, (-mid_x - x0, off))
+        if ramp and band > 0:
+            key = (w, ramp, band)
+            grad = self._fade_cache.get(key)
+            if grad is None:
+                line = pygame.Surface((w, 1), pygame.SRCALPHA)
+                for x in range(w):
+                    t = 1.0 if ramp == "out" and x < w - band or ramp == "in" and x >= band else (
+                        (w - 1 - x) / band if ramp == "out" else x / band) if band else 1.0
+                    line.set_at((x, 0), (255, 255, 255, round(255 * max(0.0, min(1.0, t)))))
+                grad = pygame.transform.scale(line, (w, C.BASE_H))
+                self._fade_cache[key] = grad
+            part.blit(grad, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
+        world.blit(part, (x0, cy))
+
     def _draw_pit_haze(self, screen, cam):
         """穴の上に、底の色の「もや」を、下ほど濃く重ねる。奥の絵（松・灯籠・柵）の足元を沈めて、そこに地面があるように見せない。
         2ドットごとの段にして、ドット絵の粗さに合わせる"""
@@ -1142,7 +1166,7 @@ class Game:
         text = font.render("%06d" % self.score, False, C.TEXT)
         screen.blit(text, (C.BASE_W - text.get_width() - 8, 8))
         # 団子のゲージ（手裏剣を投げられる数）。体力の赤い四角とは、形と色を変える（串に刺さった、丸い団子）
-        dango = pygame.transform.scale(self.a.item["dango"], (4, 12))
+        dango = pygame.transform.scale(self.a.dango_straight, (4, 12))
         screen.blit(dango, (8, 23))
         p = self.player
         warn = p.empty_t and (p.empty_t // 4) % 2      # 無いのに投げようとした: 赤く点滅
@@ -1297,8 +1321,10 @@ class Game:
         """姫を助ける場面。暗い堂の中に、金の床。左から、タヌキ侍が歩いてくる。右に、姫。礼の文が、上に出る"""
         K, t = C.THANKS, self.thanks_t
         screen.fill((6, 4, 10))
+        if self.a.thanks_bg:        # 夜明けの参道（真っ黒だと、怖いので）。地面ごと描いた絵なので、床のタイルは敷かない
+            screen.blit(self.a.thanks_bg, (0, 0))
         tile = self.a.tiles[1]
-        for x in range(0, C.BASE_W, tile.get_width()):
+        for x in range(0, C.BASE_W if not self.a.thanks_bg else 0, tile.get_width()):
             screen.blit(tile, (x, K["floor"]))
         # タヌキ侍: 歩いてきて、止まる
         x = min(K["stop_x"], -24 + t * K["walk"])
@@ -1418,17 +1444,27 @@ class Game:
                 pygame.draw.rect(screen, (150, 120, 60), (hx, top - 62, 70, 40))
                 pygame.draw.polygon(screen, (110, 84, 40), [(hx - 12, top - 62), (hx + 35, top - 86), (hx + 82, top - 62)])
         # 奥の歩道・車道・手前の歩道
-        screen.fill((196, 196, 188), (0, top - 22, VW, 22))
-        screen.fill((150, 150, 144), (0, top - 3, VW, 3))
-        screen.fill((74, 76, 86), (0, top, VW, bottom - top))
-        screen.fill((196, 196, 188), (0, bottom, VW, C.BASE_H - bottom))
-        screen.fill((228, 228, 220), (0, bottom, VW, 3))
+        road = self.a.roll_road
+        if road:        # 絵（歩道・縁石・車道・中央線）を、横にくり返して流す
+            x = -(scroll % road.get_width())
+            while x < VW:
+                screen.blit(road, (x, top - 22))
+                x += road.get_width()
+        else:
+            screen.fill((196, 196, 188), (0, top - 22, VW, 22))
+            screen.fill((150, 150, 144), (0, top - 3, VW, 3))
+            screen.fill((74, 76, 86), (0, top, VW, bottom - top))
+            screen.fill((196, 196, 188), (0, bottom, VW, C.BASE_H - bottom))
+            screen.fill((228, 228, 220), (0, bottom, VW, 3))
         mid = (top + bottom) // 2
-        for x in range(-(scroll % 48), VW, 48):       # 車道の真ん中の線
+        for x in range(-(scroll % 48), VW if not road else 0, 48):       # 車道の真ん中の線（絵が無いときだけ）
             screen.fill((226, 226, 200), (x, mid - 1, 24, 2))
         for n in range(self.roll_n - 1, self.roll_n + 3):   # 横断歩道（白い帯を、車道の幅いっぱいに並べる）
             zx = (n + 1) * R["every"] - scroll - R["zebra"] // 2 + (R["hime_dx"] // 2)
             if -R["zebra"] < zx < VW:
+                if self.a.roll_zebra:
+                    screen.blit(self.a.roll_zebra, (zx, top - 22))      # 帯と同じ高さの絵（白線だけ）
+                    continue
                 screen.fill((74, 76, 86), (zx, mid - 2, R["zebra"], 4))
                 for y in range(top + 3, bottom - 4, 9):
                     screen.fill((238, 238, 232), (zx, y, R["zebra"], 5))
@@ -1442,10 +1478,15 @@ class Game:
             right = (k // R["look"]) % 2 == 0
         frame = C.WALK[(t // C.WALK_TICKS) % len(C.WALK)] if walking else C.IDLE[0]
         tanuki = self.a.player[right][frame]
-        if self.a.hime_walk:        # 歩く絵。立っている間は、両足をそろえたコマ（大きさが、歩く絵と同じ）
-            hime = self.a.hime_walk[(t // 9) % len(self.a.hime_walk) if walking else 1]
+        if self.a.hime_walk and walking:        # 歩く絵（タヌキ侍と、同じ速さ）。立っている間は、立ち絵
+            hime = self.a.hime_walk[(t // C.WALK_TICKS) % len(self.a.hime_walk)]
         else:
             hime = self.a.hime[0]
+        if st == "cross":       # 道を渡る間は、手を挙げて歩く（車に、渡ることを知らせる）
+            if self.a.tanuki_raise:
+                tanuki = self.a.tanuki_raise[(t // C.WALK_TICKS) % len(self.a.tanuki_raise)]
+            if self.a.hime_raise:
+                hime = self.a.hime_raise[(t // (C.WALK_TICKS * 6 // len(self.a.hime_raise))) % len(self.a.hime_raise)]    # コマ数が違っても、一巡りの長さは、タヌキ侍と同じ
         hime = pygame.transform.flip(hime, True, False) if right else hime       # 姫の絵は、左向き
         bob = 1 if walking and not self.a.hime_walk and (t // 8) % 2 else 0     # 歩く絵が無い間は、小さく上下させる
         things = [(feet, tanuki, R["x"] - tanuki.get_width() // 2, 0), (feet, hime, R["x"] + R["hime_dx"] - hime.get_width() // 2, bob)]
@@ -1475,7 +1516,14 @@ class Game:
         if self.a.credits:
             w0, w1 = R["window"]
             full.set_clip(pygame.Rect(VW + 2, w0, C.BASE_W - VW - 2, w1 - w0))
-            full.blit(self.a.credits, (VW + (C.BASE_W - VW - self.a.credits.get_width()) // 2 + 1, w1 - round(t * R["scroll"])))
+            cx, cy = VW + (C.BASE_W - VW - self.a.credits.get_width()) // 2 + 1, w1 - round(t * R["scroll"])
+            full.blit(self.a.credits, (cx, cy))
+            if self.a.roll_bosses:      # 「しゅつえん」: ボスの絵（待機の動き）を、空き場所に重ねる（足元をそろえ、中央に）
+                for sy, frames in zip(self.a.credits_slots, self.a.roll_bosses):
+                    if cy + sy < w1 and cy + sy + R["slot_h"] > w0:
+                        img = frames[(t // R["boss_tick"]) % len(frames)]
+                        bob = round(math.sin(t / 22)) if len(frames) == 1 else 0       # 1コマだけの像は、ゆっくり浮き沈みする
+                        full.blit(img, (cx + (self.a.credits.get_width() - img.get_width()) // 2, cy + sy + R["slot_h"] - 3 - img.get_height() + bob))
             full.set_clip(None)
         if t < 40:      # 暗い所から、明るくなる
             fade = pygame.Surface((C.BASE_W, C.BASE_H))
@@ -1812,6 +1860,9 @@ async def main():
     if "roll" in sys.argv[1:]:   # 確認用: python main.py roll で、エンドロールから始める
         game.title = False
         game._start_roll()
+    if "thanks" in sys.argv[1:]:  # 確認用: python main.py thanks で、姫を助ける場面から始める
+        game.title = False
+        game.thanks, game.thanks_t, game._thanks_typed = True, 0, 0
     if start:     # 確認用: python main.py s2（s3・s4）で、その面から始める（スタート画面は出さない）
         game.reset(start[0] - 1)
     if "cp" in sys.argv[1:]:     # 確認用: python main.py cp で、中間地点の手前から始める（スタート画面は出さない）
@@ -1845,6 +1896,7 @@ async def main():
         audio.set_paused(game.paused)
         if game.bgm:
             audio.play_bgm(game.bgm)        # ボスの場所に入ると、曲が変わる
+            audio.keep_playing()            # 曲が終わっていたら、かけ直す（ブラウザ版）
         else:
             audio.fade_out(C.BGM_FADE_MS)   # やられたら（クリアしたら）、曲を消していく。再開すると、また始まる
         game.draw(screen, font)

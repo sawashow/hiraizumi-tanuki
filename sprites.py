@@ -147,6 +147,9 @@ class Assets:
         slash = [_load(f"slash_{i}.png") for i in range(C.SLASH_FRAMES)]
         self.slash = {True: slash, False: [pygame.transform.flip(f, True, False) for f in slash]}
         self.item = {k: _load(f"items/{k}.png") for k in ("dango", "onigiri", "leaf")}
+        self.dango_straight = self.item["dango"]      # 団子のゲージ（左上）は、縦の絵のまま
+        if os.path.exists(os.path.join(IMG, "items", "dango_tilt.png")):       # 拾える団子・吹き出しの団子は、斜めの絵（tools/make_dango_tilt.py）
+            self.item["dango"] = _load("items/dango_tilt.png")
         # 三方手裏剣・スーパータヌキの絵（仮）: 手裏剣の絵を縮めたものと、図形で描いた星。絵ができたら、差し替える
         self.item["triple"] = _triple_icon(self.shuriken[0])
         self.item["super"] = _star_icon()
@@ -195,7 +198,16 @@ class Assets:
         R = C.ROLL_IMAGES
         self.roll_bg, self.credits = opt(R["bg"]), opt(R["credits"])
         self.roll_cars = [c for c in (opt(n) for n in R["cars"]) if c]
+        self.roll_road, self.roll_zebra = opt(R["road"]), opt(R["zebra"])
+        self.thanks_bg = opt(C.THANKS_BG)
+        self.roll_bosses = [[opt(n) for n in names] for names in C.ROLL_BOSSES]       # 「しゅつえん」のボス（動く）。1つでも絵が無ければ、出さない
+        if not all(all(f) for f in self.roll_bosses):
+            self.roll_bosses = []
+        # 文字の絵の、ボスの空き場所（左端の画素に打った、見えない目印。tools/make_credits.py）
+        self.credits_slots = [y for y in range(self.credits.get_height()) if tuple(self.credits.get_at((0, y))) == (255, 0, 255, 3)] if self.credits else []
         self.hime_walk = [opt(n) for n in R["hime_walk"]] if all(opt(n) for n in R["hime_walk"]) else []
+        self.tanuki_raise = [opt(n) for n in R["tanuki_raise"]] if all(opt(n) for n in R["tanuki_raise"]) else []    # 道を渡る間の、手を挙げて歩く絵
+        self.hime_raise = [opt(n) for n in R["hime_raise"]] if all(opt(n) for n in R["hime_raise"]) else []
         if all(os.path.exists(os.path.join(IMG, n)) for n in C.HIME_IMAGES):
             self.hime = [_load(n) for n in C.HIME_IMAGES]
         else:       # 姫の絵が、まだ無い: タヌキ侍（左向き）を、桃色に染めて、代わりにする
@@ -1260,6 +1272,14 @@ class Boss(Enemy):
         self.spawned.append(Wave(self.cx + direction * (self.w / 2 + 8), y, direction, self.a,
                                  P["wave_speed"], P["wave_range"], tall))
 
+    def _choose(self, dx):
+        """歩き終わって、次の攻撃が決まったあとの手入れ（ボスごとに、変える所）。dx は、主人公までの横の距離"""
+
+    def _fire(self):
+        """振って、光波を出す（ボスごとに、変える所）"""
+        self._wave(self.facing, self.high)
+        self.shots += 1
+
     def think(self, pr, stage_w, terrain=None):
         P = self.P
         self.st += 1
@@ -1301,13 +1321,13 @@ class Boss(Enemy):
                 self._set("crouch" if self.count % 3 == 0 or cornered else "ready")
                 self.combo_left = P.get("rage_combo" if self.rage else "combo", 1) - 1   # このあと、続けて撃つ数
                 self.chain = False
+                self._choose(dx)
         elif s == "ready":         # 構える（光波の予告）。続けて撃つときの2発目からは、短い
             if self.st >= self._ready_len():
                 self._set("swing")
         elif s == "swing":
             if self.st == P["wave_at"]:
-                self._wave(self.facing, self.high)
-                self.shots += 1
+                self._fire()
             if self.st >= P["swing_frames"]:
                 if self.combo_left > 0:     # 続けて、もう一度構える（高い・低いは、そのつど変わる）
                     self.combo_left -= 1
@@ -1361,9 +1381,54 @@ class Boss(Enemy):
 
 
 class Boss3(Boss):
-    """3面のボス（三代・秀衡）。動きは、泰衡（Boss）と同じ。体が大きく、体力が多く、薙刀の光波が速くて遠くまで届く"""
+    """2面のボス（三代・秀衡）。体が大きく、体力が多く、薙刀の光波が速くて遠くまで届く。
+    泰衡（Boss）と同じ型（歩く → 光波 / 跳びかかり）に、固有の攻撃「踏み込み突き」を足した（1面と2面が、似たボスにならないように）:
+    主人公が近い（thrust_near より内側）と、光波ではなく、腰を落として構え（足元に赤い矢印の予告）→ 踏み込んで、速くて短い光波で突く。
+    跳ぶか、下がれば、よけられる。突いたあとは隙になる"""
     P = C.BOSS3
     KIND = "boss3"
+
+    def __init__(self, *args, **kw):
+        super().__init__(*args, **kw)
+        self.thrust = False     # いまの構えは、突き
+
+    @property
+    def high(self):
+        return not self.thrust and super().high      # 突きの構えは、低い構え（腰を落として、得物を後ろへ引く）
+
+    def _ready_len(self):
+        return self.P["thrust_ready"] if self.thrust else super()._ready_len()
+
+    def _choose(self, dx):
+        self.thrust = self.state == "ready" and abs(dx) < self.P["thrust_near"]
+        if self.thrust:
+            self.combo_left = 0     # 突きは、1回だけ
+
+    def _fire(self):
+        if not self.thrust:
+            return super()._fire()
+        P = self.P
+        snd("thrust")
+        self.spawned.append(Wave(self.cx + self.facing * (self.w / 2 + 8), self.floor + C.WAVE["dy"], self.facing,
+                                 self.a, P["thrust_speed"], P["thrust_range"], False))
+
+    def think(self, pr, stage_w, terrain=None):
+        super().think(pr, stage_w, terrain)
+        P = self.P
+        if self.state == "swing" and self.thrust and self.st <= P["thrust_dash_frames"]:       # 突きと一緒に、踏み込む
+            self.cx = max(self.x_min, min(self.cx + self.facing * P["thrust_dash"] / P["thrust_dash_frames"], self.x_max))
+
+    def draw(self, surface, cam_x):
+        super().draw(surface, cam_x)
+        if self.state == "ready" and self.thrust and not self.dying and self.st // 4 % 2 == 0:     # 突きの予告: 足元に、赤い矢印（点滅）
+            r = self.rect.move(-cam_x, 0)
+            d = self.facing
+            x, y = r.centerx + d * (self.w // 2 + 6), r.bottom + C.WAVE["dy"]
+            for i in range(3):
+                tip = x + d * (10 + i * 9)
+                pts = [(tip, y), (tip - d * 7, y - 6), (tip - d * 7, y + 6)]
+                pygame.draw.polygon(surface, (255, 96, 64), pts)
+                pygame.draw.polygon(surface, C.BLACK, pts, 1)
 
 
 class Benkei(Boss):

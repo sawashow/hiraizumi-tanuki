@@ -58,12 +58,13 @@ def stage_title(font_path, num, name, sub, path):
     imgs = [outlined(c) for c, _ in cols]
     gap = 14
     W = sum(i.width for i in imgs) + gap * 2
-    H = max(i.height for i in imgs)
+    tops = (36, 0, 10)      # 上端は、地名にそろえる（副題は少し下げる）
+    H = max(i.height + t for i, t in zip(imgs, tops))     # 下げた分も入れる（副題が長い面で、下が切れないように）
     out = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     x = 0
     # 右から左へ読むので、左に副題、中央に地名、右に「第N面」。上端は、地名にそろえる（副題は少し下げる）
     for k, img in enumerate(imgs):
-        top = {0: 36, 1: 0, 2: 10}[k]
+        top = tops[k]
         out.alpha_composite(img, (x, top))
         x += img.width + gap
     out.save(path)
