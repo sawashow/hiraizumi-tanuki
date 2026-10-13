@@ -1809,9 +1809,11 @@ class Boss4(Boss):
 class Boss2(Boss):
     """2面のボス（二代・基衡）。上から降りてきて、「歩く → 構える → 扇の風 / 扇を投げる / 花びらの雨 → 隙」を繰り返す。
     攻撃を受けても、ひるまない。体力が半分になると、歩く時間と隙が短くなり、花びらの雨が入る。
-    月見坂の本家だけ、大風（Gale）も使う: 床は風、足場の上は静か。風が吹いている間に、扇を投げてくる"""
+    月見坂の本家だけ、大風（Gale）も使う。低い大風は、床が風で、足場の上は静か。高い大風は、足場の高さが風で、床は静か。
+    風の帯が出る場所を見て、上と下を行き来する。風が吹いている間に、扇を投げてくる"""
     P = C.BOSS2
     KIND = "boss2"
+    gale_high = False       # いま呼んでいる大風は、高い大風
 
     def __init__(self, *args, **kw):
         super().__init__(*args, **kw)
@@ -1819,8 +1821,8 @@ class Boss2(Boss):
 
     @property
     def move(self):
-        """次の攻撃（W=風 / T=扇 / P=花びら / G=大風）"""
-        rage = C.BOSS2_GALE_RAGE_PATTERN if "G" in self.pattern else C.BOSS2_RAGE_PATTERN
+        """次の攻撃（W=風 / T=扇 / P=花びら / G=低い大風 / H=高い大風）"""
+        rage = C.BOSS2_GALE_RAGE_PATTERN if set("GH") & set(self.pattern) else C.BOSS2_RAGE_PATTERN
         seq = rage if self.rage else self.pattern
         return seq[self.count % len(seq)]
 
@@ -1846,7 +1848,8 @@ class Boss2(Boss):
             if abs(pr.centerx - self.cx) > P["near"]:
                 self.cx = max(self.x_min, min(self.cx + self.facing * P["speed"], self.x_max))
             if self.st >= P["rage_walk_frames" if self.rage else "walk_frames"]:
-                self._set({"W": "wind_ready", "T": "throw_ready", "P": "petal_ready", "G": "gale_ready"}[self.move])
+                self.gale_high = self.move == "H"
+                self._set({"W": "wind_ready", "T": "throw_ready", "P": "petal_ready", "G": "gale_ready", "H": "gale_ready"}[self.move])
                 self.count += 1
         elif s == "wind_ready":
             if self.st >= P["wind_ready"]:
@@ -1858,10 +1861,11 @@ class Boss2(Boss):
                                          self.facing, self.a))
             if self.st >= P["wind_frames"]:
                 self._after_wind(pr)        # 風で押し戻して、すぐ、扇を投げる（連携）
-        elif s == "gale_ready":     # 大風の予告: 扇を高く上げて、止まる。床に、弱い風が流れ始める（Gale が描く）
+        elif s == "gale_ready":     # 大風の予告: 扇を高く上げて、止まる。風の帯が、うすく現れる（低いか、高いかは、帯の場所で分かる。Gale が描く）
             if self.st == 1:
                 snd("charge")
-                self.spawned.append(Gale(self.x_min - self.w / 2, self.x_max + self.w / 2, self.floor, self.facing, self.a))
+                self.spawned.append(Gale(self.x_min - self.w / 2, self.x_max + self.w / 2, self.floor, self.facing, self.a,
+                                         high=self.gale_high))
             if self.st >= C.GALE["warn"]:
                 self._set("gale")
         elif s == "gale":           # 扇を振り下ろす。風は、このあとも、吹き続ける
@@ -2130,15 +2134,20 @@ class HillGust(Gust):
 
 
 class Gale(Shot):
-    """大風（月見坂の基衡）: ボスの間の、端から端まで、床ぞいに吹く、強い風。ダメージは無いが、床にいると、吹いている間、押され続ける。
-    風の高さは、足場より低い（足場の上は、静か）。吹く前に、弱い風の筋と、木の葉が、床を流れ始める（予告）。刀では消せない"""
+    """大風（月見坂の基衡）: ボスの間の、端から端まで、横に吹く、強い風。ダメージは無いが、風の帯の中にいると、吹いている間、押され続ける。
+    低い大風は、床ぞい（足場の上は、静か）。高い大風（high）は、足場の高さ（床は、静か。跳ぶと、流される）。
+    吹く前に、うすい風の帯と、弱い風の筋と、木の葉が、現れる（予告。帯の場所で、低いか高いかが分かる）。刀では消せない"""
     cuttable = False
 
-    def __init__(self, x0, x1, floor, direction, assets):
+    def __init__(self, x0, x1, floor, direction, assets, high=False):
+        K = C.GALE
         self.a = assets
         self.x0, self.x1, self.floor = round(x0), round(x1), round(floor)
         self.dir = direction
-        self.px, self.py = (x0 + x1) / 2, floor - C.GALE["h"] / 2
+        self.high = high
+        self.h = K["high_h"] if high else K["h"]                                  # 帯の高さ
+        self.top = self.floor - (K["high_bottom"] + self.h if high else self.h)    # 帯の上の縁
+        self.px, self.py = (x0 + x1) / 2, self.top + self.h / 2
         self.t = 0
         self.alive = True
         self._band = None       # 風の帯の絵（描くときに作って、使い回す）
@@ -2155,7 +2164,7 @@ class Gale(Shot):
     def rect(self):
         if not self.blowing:
             return pygame.Rect(-100, -100, 0, 0)      # 予告の間は、当たらない
-        return pygame.Rect(self.x0, self.floor - C.GALE["h"], self.x1 - self.x0, C.GALE["h"])
+        return pygame.Rect(self.x0, self.top, self.x1 - self.x0, self.h)
 
     def update(self, stage_w):
         self.t += 1
@@ -2165,28 +2174,31 @@ class Gale(Shot):
             self.alive = False
 
     def draw(self, surface, cam_x):
-        """床の帯（当たり判定と同じ高さ）を、うすい白で塗って、風の筋と、木の葉を流す。上の縁に、波打つ線（足場は、それより上）。
+        """風の帯（当たり判定と同じ場所）を、うすい白で塗って、風の筋と、木の葉を流す。縁に、波打つ線（帯の場所が、ひと目で分かる）。
         予告は、帯がだんだん濃くなり、筋は、少なく・短く・ゆっくり。吹いている間は、帯が濃く、筋は、多く・長く・速く"""
         K = C.GALE
         blow = self.blowing
         n, ln0, speed, leaves = ((K["streaks"], K["long"], K["speed"], K["leaves"]) if blow
                                  else (K["warn_streaks"], K["warn_long"], K["warn_speed"], K["warn_leaves"]))
-        W, top = self.x1 - self.x0, self.floor - K["h"]
+        W, top, H = self.x1 - self.x0, self.top, self.h
         left, right = self.x0 - cam_x, self.x1 - cam_x
         if self._band is None:
-            self._band = pygame.Surface((W, K["h"]), pygame.SRCALPHA)
+            self._band = pygame.Surface((W, H), pygame.SRCALPHA)
         grow = 1.0 if blow else min(1.0, self.t / (K["warn"] * 0.6))      # 予告のはじめに、すっと現れる
         self._band.fill((214, 236, 255, round((K["alpha"] if blow else K["warn_alpha"]) * grow)))
-        for x in range(0, W, 4):        # 上の縁: 波が、風下へ流れる
+        for x in range(0, W, 4):        # 縁: 波が、風下へ流れる（高い大風は、下の縁にも。低い大風の下は、床）
             wob = round(math.sin((x - self.dir * self.t * (speed * 0.6)) / 9) * 1.5)
-            pygame.draw.rect(self._band, (244, 252, 255, round((235 if blow else 170) * grow)), (x, 2 + wob, 4, 2))
+            edge = (244, 252, 255, round((235 if blow else 170) * grow))
+            pygame.draw.rect(self._band, edge, (x, 2 + wob, 4, 2))
+            if self.high:
+                pygame.draw.rect(self._band, edge, (x, H - 4 - wob, 4, 2))
         surface.blit(self._band, (left, top))
 
         def along(u):       # 風上の端からの距離 → 画面の x
             return left + u if self.dir > 0 else right - u
 
         for i in range(n):
-            y = top + 7 + round((K["h"] - 12) * i / (n - 1))
+            y = top + 7 + round((H - 14) * i / (n - 1))
             ln = ln0 + (i * 7) % 14
             head = (i * 97 + self.t * (speed + (i % 3) * 0.7)) % (W + ln)     # 筋の先頭（風下側）
             xa, xb = sorted((along(head - ln), along(head)))
@@ -2197,7 +2209,7 @@ class Gale(Shot):
         for i in range(leaves):     # 木の葉（回りながら、流れる）
             u = (i * 131 + self.t * (speed * 0.8 + (i % 2) * 0.5)) % W
             lx = round(along(u))
-            ly = self.floor - 7 - round(abs(math.sin((self.t + i * 13) / 6)) * (K["h"] - 16))
+            ly = top + H - 9 - round(abs(math.sin((self.t + i * 13) / 6)) * (H - 18))
             pygame.draw.ellipse(surface, (24, 52, 24), (lx - 1, ly - 1, 9, 6))
             pygame.draw.ellipse(surface, (150, 210, 110), (lx, ly, 7, 4))
             pygame.draw.rect(surface, (214, 240, 150), (lx + 1 + (self.t // 4 + i) % 3, ly + 1, 2, 2))    # 葉の、光る面（回って見える）
