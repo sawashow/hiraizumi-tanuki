@@ -2247,6 +2247,7 @@ def make_enemy(kind, x, assets=None, terrain=None):
 
 
 class Shuriken:
+    damage = C.SHURIKEN_DAMAGE
     throw_id = None     # 何回目の投げか（Game が付ける。三方手裏剣の3つは、同じ番号。無ければ、1つずつ別の投げ）
 
     def __init__(self, x, y, direction, assets, vy=0.0):
@@ -2311,6 +2312,8 @@ class Wave(Shot):
 
 class SlashWave:
     """強化中の、刀の光波。敵に当たると消える"""
+    damage = C.SLASH["damage"]
+    throw_id = None     # 投げの番号は、無い（当たれば、必ずダメージ）
 
     def __init__(self, x, y, direction, assets):
         self.a = assets
