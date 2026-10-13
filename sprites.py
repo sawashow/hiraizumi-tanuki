@@ -160,6 +160,7 @@ class Assets:
         self.life_text = {n: _load(f"life_{n}.png") for n in (1, 2, 3, 4)}   # 「のこり 2」など
         self.oneup = _load("oneup.png")
         self.torii = {False: _load("items/torii_off.png"), True: _load("items/torii_on.png")}   # 中間地点（通る前・通った後）
+        self.howto = _load("howto.png") if os.path.exists(os.path.join(IMG, "howto.png")) else None     # 操作説明（メニューから開く）
         self.title_logo = _load("title_logo.png")       # 題名「平泉 タヌキ侍」（昔のゲームのロゴ風）
         self.title_prompt = _load("title_prompt.png")   # 「PUSH ENTER KEY」
         # スタート画面の絵（無ければ、1面の景色で代わりにする）
@@ -185,6 +186,13 @@ class Assets:
         self.gameover = _load("gameover.png")             # 「無念…」（ドット風フォントで書き出した絵）
         self.gameover_prompt = _load("gameover_prompt.png")  # 「Enterキーで再開」
         self.thanks_sub = _load(C.THANKS_SUB) if os.path.exists(os.path.join(IMG, C.THANKS_SUB)) else None
+
+        def opt(name):      # あれば読む（エンドロールの絵は、無くても、図形で代わりにする）
+            return _load(name) if os.path.exists(os.path.join(IMG, name)) else None
+        R = C.ROLL_IMAGES
+        self.roll_bg, self.credits = opt(R["bg"]), opt(R["credits"])
+        self.roll_cars = [c for c in (opt(n) for n in R["cars"]) if c]
+        self.hime_walk = [opt(n) for n in R["hime_walk"]] if all(opt(n) for n in R["hime_walk"]) else []
         if all(os.path.exists(os.path.join(IMG, n)) for n in C.HIME_IMAGES):
             self.hime = [_load(n) for n in C.HIME_IMAGES]
         else:       # 姫の絵が、まだ無い: タヌキ侍（左向き）を、桃色に染めて、代わりにする

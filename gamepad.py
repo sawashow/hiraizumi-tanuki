@@ -22,7 +22,7 @@ RELEASE = {"A": ("jump_release",)}
 
 
 def stick_held(x, y):
-    """スティックの倒し具合（-1〜1）から、押している方向（left / right / down）"""
+    """スティックの倒し具合（-1〜1）から、押している方向（left / right / up / down）。up は、メニューの項目選びに使う"""
     held = set()
     if x <= -DEADZONE:
         held.add("left")
@@ -30,6 +30,8 @@ def stick_held(x, y):
         held.add("right")
     if y >= DEADZONE:
         held.add("down")
+    if y <= -DEADZONE:
+        held.add("up")
     return held
 
 
@@ -121,6 +123,8 @@ class Pad:
                     out.add("right")
                 if c.get_button(pygame.CONTROLLER_BUTTON_DPAD_DOWN):
                     out.add("down")
+                if c.get_button(pygame.CONTROLLER_BUTTON_DPAD_UP):
+                    out.add("up")
             except Exception:
                 pass
         for j in list(self.fallback.values()):
@@ -131,11 +135,13 @@ class Pad:
                     hx, hy = j.get_hat(0)
                     if hx:
                         out.add("right" if hx > 0 else "left")
-                    if hy < 0:
-                        out.add("down")
+                    if hy:
+                        out.add("down" if hy < 0 else "up")
                 if WEB and j.get_numbuttons() >= 16:    # ブラウザ: 十字キーは、ボタン12〜15（上・下・左・右）で届く
                     if j.get_button(WEB_DPAD["down"]):
                         out.add("down")
+                    if j.get_button(WEB_DPAD["up"]):
+                        out.add("up")
                     if j.get_button(WEB_DPAD["left"]):
                         out.add("left")
                     if j.get_button(WEB_DPAD["right"]):

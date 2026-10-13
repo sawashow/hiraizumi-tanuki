@@ -1329,7 +1329,73 @@ run(g, 1 + C.THUNDER_DELAY)
 check("2回目の雷鳴", g.sfx == [C.SFX_THUNDER] and g.thunder_n == 2)
 g.sfx.clear()
 run(g, 1, (), {"restart"})
-check("Enterで、刀の音が鳴る（すぐには始まらず、少し間がある）", g.sfx == [C.SFX_SWORD] and g.title and g.start_t == C.TITLE_START)
+check("Enterで、メニューが開く（まだ始まらない。決める音が鳴る）",
+      g.menu_on and g.menu_page == "main" and g.menu_i == 0 and g.title and not g.start_t and g.sfx == [C.SFX["decide"]])
+check("メニューは、STORY / OPTION / HOW TO PLAY", C.MENU["pages"]["main"] == ("story", "option", "howto"))
+snap(g, "title menu")
+
+
+def tap(held=(), pressed=()):
+    """1回だけ押して、離す"""
+    run(g, 1, held, pressed)
+    run(g, 1, ())
+
+
+def cur():
+    return C.MENU["pages"][g.menu_page][g.menu_i]
+
+
+g.sfx.clear()
+tap({"down"})
+check("下で、次の項目（OPTION）へ移る。選ぶ音が鳴る", cur() == "option" and g.sfx == [C.SFX["cursor"]])
+g.sfx.clear()
+tap({"up"}, {"jump"})
+check("上キー（ジャンプと同じキー）は、決定にならない。上の項目（STORY）へ戻って、選ぶ音が鳴る",
+      cur() == "story" and not g.start_t and g.sfx == [C.SFX["cursor"]])
+tap({"up"}, {"jump"})
+check("いちばん上で、上を押すと、いちばん下（HOW TO PLAY）へ回る", cur() == "howto")
+tap((), {"restart"})
+check("HOW TO PLAY で決定すると、操作説明が出る（絵がある）", g.howto and g.a.howto is not None and g.title and not g.start_t)
+snap(g, "howto")
+tap({"down"})
+check("操作説明の間は、項目は動かない", g.howto and cur() == "howto")
+tap((), {"attack"})
+check("もう一度決定すると、メニューに戻る（始まらない）", not g.howto and g.menu_on and not g.start_t and cur() == "howto")
+tap({"up"})
+tap((), {"restart"})
+check("OPTION で決定すると、設定の画面へ移る（LEVEL / MUSIC / SOUND / BACK）",
+      g.menu_page == "option" and cur() == "level" and C.MENU["pages"]["option"] == ("level", "music", "sound", "back"))
+snap(g, "title option")
+tap({"right"})
+check("LEVEL で右を押すと、難しさが上がる（残機も、その難しさの数になる）", g.level == "hard" and g.lives == C.LEVELS["hard"]["lives"])
+tap({"right"})
+check("右の端では、止まる", g.level == "hard")
+tap({"left"})
+check("左で、戻る", g.level == "normal")
+tap((), {"restart"})
+tap((), {"restart"})
+check("LEVEL は、決定でも送れる（端まで行ったら、最初へ回る）", g.level == "easy" and g.menu_page == "option")
+tap((), {"restart"})
+check("もう一度で、もとの難しさ", g.level == "normal")
+tap({"down"})
+tap({"left"})
+check("MUSIC で左を押すと、曲の音量が1段下がる（効果音は、そのまま）", g.vol_bgm == C.MENU["steps"] - 1 and g.vol_sfx == C.MENU["steps"])
+tap({"right"})
+tap({"right"})
+check("音量は、いちばん上の段より、上がらない", g.vol_bgm == C.MENU["steps"])
+tap({"down"})
+for _ in range(C.MENU["steps"] + 2):
+    tap({"left"})
+check("SOUND で左を押し続けると、効果音が消える（0 より下がらない）", g.vol_sfx == 0 and g.vol_bgm == C.MENU["steps"])
+snap(g, "title menu sound")
+g.vol_sfx = C.MENU["steps"]
+tap({"down"})
+tap((), {"restart"})
+check("BACK で決定すると、最初のメニューへ戻る（OPTION を選んだまま。始まらない）", g.menu_page == "main" and cur() == "option" and not g.start_t)
+tap({"up"})
+g.sfx.clear()
+run(g, 1, (), {"restart"})
+check("STORY で決定すると、刀の音が鳴る（すぐには始まらず、少し間がある）", g.sfx == [C.SFX_SWORD] and g.title and g.start_t == C.TITLE_START)
 run(g, 5, (), {"restart"})
 check("間のあいだに押しても、刀の音は1回だけ", g.sfx == [C.SFX_SWORD])
 run(g, C.TITLE_START)
@@ -1379,8 +1445,9 @@ run(g, 30, {"right"})
 check("始まると、動かせる", g.player.px > x0)
 g = Game(title=True)
 run(g, 1, (), {"attack"})
+run(g, 1, (), {"attack"})
 run(g, C.TITLE_START)
-check("刀のキーでも、語りへ進む", not g.title and g.story)
+check("刀のキーでも、メニューを開いて、語りへ進める", not g.title and g.story)
 run(g, 5, (), {"restart"})
 check("語りは、始まってすぐはキーを受け付けない", g.story and g.story_run == 0)
 run(g, C.STORY_SKIP_WAIT)
@@ -1411,7 +1478,47 @@ check("途中で押すと、文が全部出る（まだ、先へは進まない�
 run(g, C.THANKS["wait"] + 1)
 snap(g, "thanks")
 run(g, 1, (), {"restart"})
-check("もう一度押すと、エンディングの絵が出る", g.ending_screen and not g.thanks and g.a.ending_image is not None)
+RL = C.ROLL
+check("もう一度押すと、エンドロールが始まる（エンディングの絵は、まだ）", g.roll and not g.thanks and not g.ending_screen and g.roll_state == "walk")
+check("エンドロールの文字の絵がある", g.a.credits is not None)
+run(g, 5, (), {"restart"})
+check("エンドロールは、始まってすぐは、飛ばせない", g.roll)
+x_r = g.roll_x
+run(g, 30)
+check("二人は、右へ歩いていく（景色が流れる）", g.roll_x > x_r and g.roll_state == "walk" and g.roll_side == 0)
+snap(g, "roll walk")
+run_until(g, lambda q: q.roll_state == "stop", (), 2000)
+x_stop = g.roll_x
+check("横断歩道に来ると、止まる", g.roll_state == "stop" and g.roll_car is None)
+run(g, RL["car_wait"] + 12)
+check("止まっている間に、車が来る（二人は、動かない）", g.roll_car is not None and g.roll_x == x_stop and g.roll_state == "stop")
+snap(g, "roll car")
+run_until(g, lambda q: q.roll_state == "look", (), 600)
+check("車が通りすぎてから、右・左を見る（まだ渡らない）", g.roll_car is None and g.roll_x == x_stop)
+run(g, RL["look"] + 3)
+snap(g, "roll look")
+run_until(g, lambda q: q.roll_state == "cross", (), 600)
+check("3回見てから、渡りはじめる", g.roll_st <= 1 and g.roll_x == x_stop)
+run(g, RL["cross"] // 2)
+check("渡っている間は、車が来ない", g.roll_car is None and g.roll_state == "cross")
+snap(g, "roll cross")
+run_until(g, lambda q: q.roll_state == "walk", (), 600)
+check("渡りきると、向こうの歩道を、また歩く", g.roll_side == 1 and g.roll_n == 1)
+run_until(g, lambda q: q.roll_n == 2 and q.roll_state == "walk", (), 3000)
+check("次の横断歩道で、もとの歩道へ渡る（くり返す）。車は、1回ごとに、反対から来る", g.roll_side == 0)
+n_cross = 0
+for _ in range(20000):
+    g.step(set())
+    if not g.roll:
+        break
+check("文字が流れきると、エンディングの絵に替わる（渡っている途中では、替わらない）",
+      not g.roll and g.ending_screen and g.roll_state == "walk" and g._roll_done(), "渡った回数 %d" % g.roll_n)
+gr = Game(title=True)
+gr.title = False
+gr._start_roll()
+run(gr, RL["skip"] + 1)
+run(gr, 1, (), {"restart"})
+check("エンドロールは、決定のキーで飛ばせる（エンディングの絵へ）", not gr.roll and gr.ending_screen and gr.a.ending_image is not None)
 run(g, 5, (), {"restart"})
 check("エンディングは、しばらくはEnterを受け付けない", g.ending_screen)
 snap(g, "ending screen")
@@ -1915,7 +2022,7 @@ if pad.sdl:
     check("割り当てのないボタンは、何もしない", pad.handle(ev("CONTROLLERBUTTONDOWN", button=_pg.CONTROLLER_BUTTON_LEFTSTICK, instance_id=0)) == set())
 check("スティックを倒すと、その向きに動く（少し倒しただけでは動かない）",
       gamepad.stick_held(0.9, 0.0) == {"right"} and gamepad.stick_held(-0.9, 0.0) == {"left"} and gamepad.stick_held(0.0, 0.9) == {"down"}
-      and gamepad.stick_held(0.2, -0.3) == set() and gamepad.stick_held(0.0, -0.9) == set())
+      and gamepad.stick_held(0.2, -0.3) == set() and gamepad.stick_held(0.0, -0.9) == {"up"})
 check("抜き差しのイベントが来ても、止まらない", pad.handle(ev("CONTROLLERDEVICEADDED", device_index=99)) == set()
       and pad.handle(ev("CONTROLLERDEVICEREMOVED", instance_id=99)) == set())
 pad2 = gamepad.Pad.__new__(gamepad.Pad)    # コントローラの部品が無い環境（ブラウザ版など）の想定
@@ -2338,8 +2445,13 @@ check("ボス・中ボスの体力は、やさしい < ふつう < むずかし�
 gt = Game(title=True)
 gt.title_t = 999
 gt.step({"right"})
+check("メニューを開く前は、左右を押しても、難しさは変わらない", gt.level == "normal")
+gt.step(set(), {"restart"})
+gt.step({"down"})
+gt.step(set(), {"restart"})
 gt.step({"right"})
-check("スタート画面で、右を押すと、難しさが1つ上がる（押しっぱなしでは、進まない）", gt.level == "hard" and gt.lives == C.LEVELS["hard"]["lives"])
+gt.step({"right"})
+check("メニューの LEVEL で、右を押すと、難しさが1つ上がる（押しっぱなしでは、進まない）", gt.level == "hard" and gt.lives == C.LEVELS["hard"]["lives"])
 gt.step(set())
 gt.step({"left"})
 gt.step(set())

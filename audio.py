@@ -13,6 +13,7 @@ class Audio:
         self.ok = False
         self.playing = None   # いま鳴らしている曲の名前
         self.sounds = {}      # 読み込んだ効果音
+        self.gain = (1.0, 1.0)    # 曲と効果音の、音量の倍率（スタート画面のメニューで変える）
         try:
             if not pygame.mixer.get_init():
                 pygame.mixer.init()
@@ -25,7 +26,7 @@ class Audio:
             return
         try:
             pygame.mixer.music.load(os.path.join(DIR, name))
-            pygame.mixer.music.set_volume(C.BGM_VOLUMES.get(name, C.BGM_VOLUME))
+            pygame.mixer.music.set_volume(C.BGM_VOLUMES.get(name, C.BGM_VOLUME) * self.gain[0])
             pygame.mixer.music.play(-1)
             self.playing = name
         except (pygame.error, FileNotFoundError):
@@ -37,10 +38,25 @@ class Audio:
         try:
             if name not in self.sounds:
                 self.sounds[name] = pygame.mixer.Sound(os.path.join(DIR, name))
-                self.sounds[name].set_volume(C.SFX_VOLUME.get(name, 0.3))
+                self.sounds[name].set_volume(C.SFX_VOLUME.get(name, 0.3) * self.gain[1])
             self.sounds[name].play()
         except (pygame.error, FileNotFoundError):
             pass   # 効果音が鳴らせなくても、続ける
+
+    def set_gain(self, bgm, sfx):
+        """曲と効果音の音量の倍率（0〜1）を変える。鳴っている曲と、読み込み済みの効果音にも、すぐ効く"""
+        if (bgm, sfx) == self.gain:
+            return
+        self.gain = (bgm, sfx)
+        if not self.ok:
+            return
+        try:
+            if self.playing:
+                pygame.mixer.music.set_volume(C.BGM_VOLUMES.get(self.playing, C.BGM_VOLUME) * bgm)
+            for name, snd in self.sounds.items():
+                snd.set_volume(C.SFX_VOLUME.get(name, 0.3) * sfx)
+        except pygame.error:
+            pass
 
     def set_paused(self, on):
         """曲を、止める・続きから鳴らす（ポーズ）"""

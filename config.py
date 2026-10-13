@@ -228,7 +228,8 @@ TALK_TANUKI = "talk_tanuki1.png"    # タヌキ侍のせりふ
 TALK_CELL = 24                  # せりふの絵の、1文字のますの幅（tools/make_talk_text.py と合わせる）
 # 考えごとの吹き出し（返事の代わりに、食べ物を思い浮かべる面。stage.py の thought）。数は、せりふの「文字」と同じ刻み（ENDING の type フレーム）で数える
 #   grow: 丸が出て、雲がふくらみきるまで / per: 食べ物が1つ浮かぶごとの間
-THOUGHT = dict(grow=10, per=8)
+#   lift: 頭のてっぺんから、雲の下端までのすき間（雲が、頭や兜に重ならないように）/ head: 姫を助ける場面での、足元から頭のてっぺんまでの高さ
+THOUGHT = dict(grow=10, per=8, lift=12, head=44)
 TALK_PAUSE = {"reply": (3, 90)}   # せりふの途中の間: (何文字目のあとで, 何フレーム止まるか)。「・・・」のあと、間をおいて「姫？」
 TALK_BOSS_Y = 40                # ボスの吹き出しの、しっぽの先（足元からの高さ）
 
@@ -289,7 +290,7 @@ SFX_GAME = dict(
     die=0.18, wave=0.16, cut=0.18, caw=0.16, dive=0.16, draw=0.14, arrow=0.18, snap=0.18,                    # ザコ敵
     thud=0.3, boss_wave=0.22, leap=0.2, boss_hit=0.22, boss_die=0.32, roar=0.3, thrust=0.22,                 # ボス
     fan=0.18, gust=0.2, petal=0.14, bead=0.16, ring=0.22, charge=0.2, pillar_warn=0.09, beam=0.12, warp=0.2, warp_in=0.2,
-    select=0.14, clear=0.26, gameover=0.26,                                                                  # 画面
+    select=0.14, cursor=0.16, decide=0.18, clear=0.26, gameover=0.26,                                                                  # 画面
 )
 SFX = {k: "sfx_%s.ogg" % k for k in SFX_GAME}
 SFX_VOLUME.update({SFX[k]: v for k, v in SFX_GAME.items()})
@@ -343,8 +344,20 @@ ENDING_SCREEN = dict(fade=90, wait=240)
 # 暗い堂の中。タヌキ侍が左から歩いてきて、奥で待っていた姫の前で止まる。姫が跳ねて喜び、礼の文が、1文字ずつ出る。
 #   walk: 歩く速さ / stop_x・hime_x: 二人が立つ場所 / hop: 姫が跳ねるフレーム数（2回） / type: 1文字が出る間隔 / gap: 行と行の間 / wait: 文が出きってから、キーを受け付けるまで
 THANKS = dict(walk=1.3, stop_x=178, hime_x=298, floor=198, hop=44, type=4, gap=26, wait=70,
-              lines=("THANK YOU TANUKI!", "YOUR QUEST IS OVER."), text_y=(34, 62), sub_y=94,
+              lines=("THANK YOU TANUKI!", "YOUR QUEST IS OVER."), text_y=(24, 52), sub_y=82,
               dream=40, dream_swap=70)     # dream: 文が出きってから、タヌキ侍の頭の上に、食べ物の吹き出しが出るまで / dream_swap: おにぎりと団子が入れ替わる間隔
+# エンドロール（姫を助ける場面のあと、エンディングの絵の前）。平和になった、いまの平泉の道を、タヌキ侍と姫が、右へ歩いていく。
+# 道は、手前と奥に歩道があって、間を車道が横に通っている。横断歩道に来ると、二人は止まる。車が通りすぎるのを待って、
+# 右・左を見てから、向こうの歩道へ渡る。これを、くり返す。その間、画面の右半分を、エンドロールの文字が、下から上へ流れる。
+#   x・hime_dx: タヌキ侍の立つ所と、姫が、そのうしろに付く距離 / far・near: 奥と手前の歩道の、足元の高さ / road: 車道の上端と下端
+#   speed: 歩く速さ（景色が流れる速さ）/ every: 横断歩道の間隔 / zebra: 横断歩道の幅
+#   car_wait: 止まってから、車が来るまで / car_speed: 車の速さ / look: 右・左を見る1回の長さ（3回見る）/ cross: 渡りきるまでのフレーム数
+#   scroll: 文字が流れる速さ / window: 文字が見える範囲（上端, 下端）/ skip: 決定のキーで飛ばせるようになるまで / tail: 文字が流れきってから、絵に替わるまで
+#   view_w: 左の、動きを見せる枠の幅。画面の左半分で、二人が歩き、右半分（暗い地）を、文字が流れる
+ROLL = dict(view_w=240, x=140, hime_dx=-46, far=166, near=252, road=(176, 240), speed=0.9, every=330, zebra=46,
+            car_wait=24, car_speed=3.4, look=26, cross=76, scroll=0.35, window=(0, 270), skip=90, tail=120)
+ROLL_IMAGES = dict(bg="ending_bg.png", cars=("ending_car_0.png", "ending_car_1.png"), credits="credits.png",
+                   hime_walk=("hime_walk_0.png", "hime_walk_1.png", "hime_walk_2.png", "hime_walk_3.png"))   # 無い絵は、図形や、いまの絵で代わりにする
 HIME_IMAGES = ("hime_0.png", "hime_1.png")      # 姫の絵（立つ・跳ねる）。無ければ、タヌキ侍の絵を、桃色にして代わりにする
 THANKS_SUB = "thanks_sub.png"                   # 英語の文の下に出す、日本語の一行（tools/make_text_image.py）   # 明るくなるまでのフレーム数 / Enter を受け付けるまで
 
@@ -390,7 +403,15 @@ LEVELS = {
 }
 LEVEL_ORDER = ("easy", "normal", "hard")
 LEVEL = "normal"        # 最初に選ばれている難しさ
-LEVEL_LABEL = (150, 252)    # スタート画面の、難しさの表示（左右の中心と上端）
+LEVEL_LABEL = (150, 252)    # （前の、難しさの表示の場所。いまは、メニューの中に出す）
+# スタート画面のメニュー: 決定のキーで開く。上下で項目を選び、決定で進む。
+#   main:   STORY（始める）/ OPTION（設定の画面へ）/ HOW TO PLAY（操作説明。assets/images/howto.png。tools/make_howto.py で作る）
+#   option: LEVEL（難しさ。左右で変える）/ MUSIC・SOUND（音量。左右で変える）/ BACK（戻る）
+#   cx = 行の中心（題名と同じ。どの行も、中央ぞろえ。右の大きなタヌキ侍は、x=265 あたりから。行の幅は、200 まで）
+#   y = 1行目の上端 / row・row_option = 行の間隔 / head = 見出しを、1行目より、どれだけ上に出すか / gap = 項目名と値の間 / steps = 音量の段の数
+MENU = dict(cx=150, y=196, row=18, row_option=15, head=18, gap=10, steps=5,
+            pages=dict(main=("story", "option", "howto"), option=("level", "music", "sound", "back")),
+            label=dict(story="STORY", option="OPTION", howto="HOW TO PLAY", level="LEVEL", music="MUSIC", sound="SOUND", back="BACK"))
 RESPAWN_AT = 215        # 倒れてから、中間地点で再開するまでのフレーム数（残機が残っているとき）
 RESPAWN_CLEAR = 160     # 再開した場所から、この距離までの敵は置かない（再開してすぐ、ぶつからないように）
 CHECKPOINT_W = 24       # 中間地点（鳥居）に触れる範囲の幅
