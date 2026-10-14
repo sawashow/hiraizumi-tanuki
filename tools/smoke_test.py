@@ -1856,7 +1856,24 @@ def _can_jump(s1, s2):
     return False
 
 
-_GROUNDED = ("ochimusha", "miira", "yumihei", "tachiojo")
+# 天狗: かがんでから跳び、プレイヤーの方へ近づく。穴の手前では跳ばない
+from sprites import Tengu  # noqa: E402
+_e = Tengu(600, None, C.FLOOR_Y)
+_pr = pygame.Rect(400, 0, 20, 40)
+_air = _crouch = False
+for _ in range(200):
+    _e.update(_pr, 5000, None)
+    _crouch = _crouch or bool(_e.crouch_t)
+    _air = _air or _e.air
+check("天狗は、かがんでから、跳んで、プレイヤーへ近づく", _crouch and _air and _e.cx < 600 and _e.cy <= C.FLOOR_Y - _e.h / 2 + 0.01)
+_e = Tengu(600, None, C.FLOOR_Y)
+_t = type("T", (), {"height_at": staticmethod(lambda x: C.FLOOR_Y if x > 560 else None)})
+for _ in range(200):
+    _e.update(_pr, 5000, _t)
+check("天狗は、着地する先が穴なら、跳ばない", _e.cx == 600 and not _e.air)
+
+
+_GROUNDED = ("ochimusha", "miira", "yumihei", "tachiojo", "tengu")
 bad = [(st.name, k, x) for st in PROD_STAGES for k, x in st.spawns if k in _GROUNDED
        and len({st.terrain().height_at(x + d) for d in (-16, 0, 16)} - {None}) != 1 or
        k in _GROUNDED and None in [st.terrain().height_at(x + d) for d in (-16, 0, 16)]]

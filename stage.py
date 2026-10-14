@@ -568,17 +568,17 @@ ITEMS3 = _lowered(ITEMS3, 1) + (
 # 仕組み（sprites.py の Benkei、config.py の BENKEI）と絵は、残してある。戻すときは、STAGE3 に gates=((2820, "benkei"),) を足す
 SPAWNS3 = (   # 区画（ZONES3）ごとに、かたまりで置く。区画と区画の間は、空ける（等間隔に、1体ずつ並べない）
     ("yumihei", 740),                                                   # 弓兵の崖: 弓兵1体だけ。登りながら、矢を覚える
-    ("ochimusha", 1180), ("yumihei", 1340),                             # 谷: 落ち武者と戦う所を、先の段の上から撃たれる
+    ("tengu", 960), ("ochimusha", 1180), ("yumihei", 1340),            # 谷: 天狗の跳びかかりのあと、落ち武者。先の段の上から撃たれる
     ("karasu", 1470), ("yumihei", 1570), ("karasu", 1660),              # 見晴らしの岩場: 頂上の弓兵と、烏2羽（最初の山）
     ("kitsunebi_high", 2150),                                           # 崖渡り: 足場の上を横切る狐火が1つだけ
     ("kitsunebi_high", 2560), ("kitsunebi_low", 2600), ("yumihei", 2700),                       # 高台: 狐火をくぐって、弓兵へ
-    ("ochimusha", 2960), ("karasu", 3020), ("ochimusha", 3090), ("yumihei", 3230),              # 関: 落ち武者2体の奥から、弓兵が撃つ。上から烏
+    ("tengu", 2820), ("ochimusha", 2960), ("karasu", 3020), ("ochimusha", 3090), ("yumihei", 3230),              # 関: 落ち武者2体の奥から、弓兵が撃つ。上から烏
     # 鳥居のまわりには、置かない
     # 崖登り: 一段目に落ち武者。二段目の弓兵が、下の段へ撃ち下ろす。
     # 垂直の壁（4020〜）には、敵を置かない（跳ぶのが主役。矢で落とされると、登り直しが、理不尽に感じる）
     ("ochimusha", 3790), ("yumihei", 3960),
     ("ochimusha", 4560), ("karasu", 4620), ("yumihei", 4700),           # 頂上: いちばんの山。弓兵・落ち武者2・烏2・狐火
-    ("ochimusha", 4820), ("karasu", 4900), ("kitsunebi_low", 4950),
+    ("ochimusha", 4820), ("karasu", 4900), ("kitsunebi_low", 4950), ("tengu", 4940),
     # ボス前（5140〜）には、置かない
 )
 # 区画: (左端, 右端, 名前, 役目, ねらいの強さ)。tools/difficulty.py 2 で、実際の強さと比べる

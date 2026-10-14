@@ -911,6 +911,69 @@ class Miira(Ochimusha):
         return f[(self.t // 14) % len(f)]
 
 
+class Tengu(Enemy):
+    """天狗: 地面を、ぴょんぴょん跳んで近づく。「待つ → かがむ（予告）→ 跳ぶ」をくり返す。体力2。
+    着地する先に、同じ高さの地面が無いとき（穴・段差）は、跳ばずに、向きを変える"""
+    P = C.TENGU
+    KIND = "tengu"
+    DEATH_TICKS = 8
+
+    def __init__(self, x, assets=None, floor=None):
+        self.floor = float(floor if floor is not None else C.FLOOR_Y)
+        super().__init__(x, y=self.floor - C.TENGU["h"] / 2, assets=assets)
+        self.vy = 0.0
+        self.air = False
+        self.crouch_t = 0
+        self.rest_t = self.P["rest"]
+        self.dir = -1
+
+    def _land_ok(self, x, terrain):
+        """x の地面が、いま立っている高さと同じか"""
+        if not terrain:
+            return True
+        h = terrain.height_at(x)
+        return h is not None and abs(h - self.floor) <= 1
+
+    def think(self, pr, stage_w, terrain=None):
+        P = self.P
+        if self.air:
+            self.vy += C.GRAVITY
+            self.cx += self.dir * P["hop_vx"]
+            self.cy += self.vy
+            if self.vy > 0 and self.cy >= self.floor - P["h"] / 2:
+                self.cy = self.floor - P["h"] / 2
+                self.air = False
+                self.rest_t = P["rest"]
+            return
+        dx = pr.centerx - self.cx
+        if abs(dx) > P["active"] and not self.crouch_t:
+            return
+        if self.crouch_t:
+            self.crouch_t -= 1
+            if not self.crouch_t:       # 跳ぶ
+                self.air, self.vy = True, -P["hop_vy"]
+                snd("jump")
+            return
+        self.facing = self.dir = 1 if dx > 0 else -1
+        if self.rest_t:
+            self.rest_t -= 1
+            return
+        reach = 2 * P["hop_vx"] * P["hop_vy"] / C.GRAVITY        # 着地までに進む距離
+        if self._land_ok(self.cx + self.dir * reach, terrain) and 0 < self.cx + self.dir * reach < stage_w:
+            self.crouch_t = P["crouch"]
+        else:
+            self.rest_t = P["rest"]      # 先が穴: 跳ばずに、また待つ
+
+    def image(self):
+        if self.dying:
+            f = self._frames("death")
+            return f[min(self.dead_t // self.DEATH_TICKS, len(f) - 1)]
+        f = self._frames("walk")
+        if self.air:
+            return f[1]
+        return f[2] if self.crouch_t else f[0]
+
+
 class Archer(Enemy):
     """弓兵: その場から動かない。主人公が近づくと、弓を引いて（予告）、主人公をねらって、矢をまっすぐ撃つ。
     矢は、刀で斬ると消せる。撃ったあとは、しばらく撃たない（近づいて斬る隙）。体力2"""
@@ -2350,6 +2413,8 @@ def make_enemy(kind, x, assets=None, terrain=None):
             if kind != "karasu":
                 e.base_y = e.cy
         return e
+    if kind == "tengu":
+        return Tengu(x, assets, terrain.height_at(x) if terrain else None)
     if kind == "yumihei":
         return Archer(x, assets, terrain.height_at(x) if terrain else None)
     if kind == "tachiojo":
