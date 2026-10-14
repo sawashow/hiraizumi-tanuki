@@ -2936,10 +2936,21 @@ def _lit_frames(b):
 
 both = [len(_lit_frames(a) & _lit_frames(b)) for a, b in zip(bl, bl[1:])]
 check("となりどうしの光の足場は、60フレーム以上、一緒に点いている（乗り移る間がある）", min(both) >= 60, str(both))
+def run_hop(cur, nxt):
+    """走って渡る: 右を押したまま、足場の端で跳ぶ（橋は、立ち止まらずに渡る）"""
+    p = gc.player
+    for i in range(200):
+        edge = p.px >= cur[1] - 14
+        climb_step({"right", "jump"} if edge else {"right"}, {"jump"} if edge and p.on_ground else ())
+        if i > 6 and p.on_ground and p.px > cur[1]:
+            break
+    return p.on_ground and p.py == nxt[2] and nxt[0] - 6 <= p.px <= nxt[1] + 6
+
+
 # 実際に、光の橋を渡る（点いたばかりの足場へ、順に跳ぶ）
 gc = gk
 B = C.FLOOR_Y + gk.terrain.climb[2]
-BRIDGE = [(6360, 6500, B), bl[0][:3], (6640, 6690, B - 44), bl[1][:3], bl[2][:3], (6900, 7000, B - 16)]
+BRIDGE = [(6360, 6500, B), bl[0][:3], bl[1][:3], bl[2][:3], (6900, 7000, B - 16)]
 check("光の橋の足場が、面のデータにある", all(s3 in gk.terrain.ground or s3 in gk.terrain.platforms or s3 in [b[:3] for b in bl] for s3 in BRIDGE))
 climb_at(6440, B)
 hp0, lost = gk.player.hp, []
@@ -2949,7 +2960,7 @@ for cur, nxt in zip(BRIDGE, BRIDGE[1:]):
         if not blink or (gk.intro_t + blink[0][3]) % K["period"] < 12:
             break
         climb_step(())
-    if not hop(cur, nxt):
+    if not run_hop(cur, nxt):
         lost.append((nxt, round(gk.player.px), round(gk.player.py)))
         break
 check("光の橋: 点いた足場へ、順に跳んで、向こう岸まで渡れる（操作を入れて、確かめる。落ちない）", not lost and gk.player.hp == hp0, str(lost))
