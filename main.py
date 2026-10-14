@@ -75,7 +75,8 @@ class Game:
         self.start_t = 0         # 決定してから、始まるまでの残りフレーム
         self.menu_on = False     # スタート画面で、メニューを開いている
         self.menu_i = 0          # 選んでいる項目
-        self.menu_page = "main"  # メニューの画面（main = STORY・OPTION・HOW TO PLAY / option = 難しさ・音量）
+        self.menu_page = "main"  # メニューの画面（main = STORY・OPTION・DISCOGRAPHY・HOW TO PLAY / option = 難しさ・音量 / disco = 曲の一覧）
+        self.disco_song = None   # ディスコグラフィで、いま鳴らしている曲のファイル名
         self.howto = False       # 操作説明を出している
         self._fade_cache = {}    # 崖の縁の、中景の入れ替えに使う、濃さの帯（幅ごとに作る）
         self._roll_fade = None   # エンドロールの、左の枠の右の端を暗くぼかす帯
@@ -497,8 +498,15 @@ class Game:
             if decide and row == "option":
                 self.menu_page, self.menu_i = "option", 0
                 self.sfx.append(C.SFX["decide"])
+            elif decide and row == "disco":
+                self.menu_page, self.menu_i = "disco", 0
+                self.sfx.append(C.SFX["decide"])
+            elif decide and self.menu_page == "disco" and row != "back":     # 曲を選んで決定: その曲を鳴らす（もう一度で、止める）
+                song = C.DISCO[int(row[1:])][0]
+                self.disco_song = None if self.disco_song == song else song
             elif decide and row == "back":
-                self.menu_page, self.menu_i = "main", C.MENU["pages"]["main"].index("option")
+                came = "disco" if self.menu_page == "disco" else "option"
+                self.menu_page, self.menu_i, self.disco_song = "main", C.MENU["pages"]["main"].index(came), None
                 self.sfx.append(C.SFX["decide"])
             elif decide and row == "howto" and self.a.howto:
                 self.howto = True
@@ -552,7 +560,8 @@ class Game:
             if self.over_t >= C.RESPAWN_AT:
                 self.respawn()
         elif "restart" in pressed and self.over_t >= C.GAMEOVER_WAIT:
-            self.reset(self.stage_i)   # ゲームオーバーは、いまの面を最初から（残機は戻る）
+            self.reset()               # ゲームオーバーは、スタート画面へ戻る（残機は戻る）
+            self._enter_title(self.use_title)
 
     def _hit_foes(self, p, foes, sword):
         """主人公の攻撃（刀・手裏剣・光波）が、敵に当たる（step から呼ぶ）。"""
@@ -895,7 +904,7 @@ class Game:
         if self.ending_screen or self.thanks or self.roll:
             return self._song(C.BGM_ENDING) or story
         if self.title:
-            return self._song(C.BGM_TITLE)
+            return self.disco_song or self._song(C.BGM_TITLE)
         if self.player.hp <= 0 or self.cleared or self.ending:
             return None
         if self.map_on:
@@ -1744,14 +1753,21 @@ class Game:
         if option:      # 画面の見出し
             head = "- OPTION -"
             text(head, M["cx"] - font.size(head)[0] // 2, M["y"] - M["head"], (214, 168, 72))
-        gap = M["row_option"] if option else M["row"]
-        for n, row in enumerate(M["pages"][self.menu_page]):
-            y = M["y"] + n * gap
+        rows = M["pages"][self.menu_page]
+        gap = M["row"] if self.menu_page == "main" else M["row_option"]
+        top = M["y"] - max(0, len(rows) - 4) * gap       # 行が多いページは、上へ伸ばす（画面の下に出ないように）
+        if self.menu_page == "disco":
+            head = "- DISCOGRAPHY -"
+            text(head, M["cx"] - font.size(head)[0] // 2, top - M["head"], (214, 168, 72))
+        for n, row in enumerate(rows):
+            y = top + n * gap
             on = n == self.menu_i
             color = gold if on else grey
             if on and row == "story" and self.start_t and (self.start_t // 4) % 2:      # 決定したあとは、STORY が速く点滅する
                 continue
             label, value, boxes = M["label"][row], "", None
+            if self.menu_page == "disco" and row != "back" and C.DISCO[int(row[1:])][0] == self.disco_song:
+                label += " *"        # いま鳴っている曲
             if row == "level":
                 i = C.LEVEL_ORDER.index(self.level)
                 value = ("< " if i > 0 else "  ") + self.L["label"] + (" >" if i < len(C.LEVEL_ORDER) - 1 else "  ")

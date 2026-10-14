@@ -423,9 +423,14 @@ LEVEL_LABEL = (150, 252)    # （前の、難しさの表示の場所。いま�
 #   option: LEVEL（難しさ。左右で変える）/ MUSIC・SOUND（音量。左右で変える）/ BACK（戻る）
 #   cx = 行の中心（題名と同じ。どの行も、中央ぞろえ。右の大きなタヌキ侍は、x=265 あたりから。行の幅は、200 まで）
 #   y = 1行目の上端 / row・row_option = 行の間隔 / head = 見出しを、1行目より、どれだけ上に出すか / gap = 項目名と値の間 / steps = 音量の段の数
+# ディスコグラフィ（スタート画面のメニュー）: 曲のファイルと、曲名。ファイルが無い曲は、並べない
+DISCO = (("bgm_story.ogg", "Evening at the Border Post"), ("bgm_map.ogg", "Steps Into the Morning Sun"),
+         ("bgm_stage1.ogg", "Clash of the Iron Fan"), ("bgm_boss.ogg", "Crimson Temple Breach"), ("bgm_super.ogg", "Seven Blades High"))
 MENU = dict(cx=150, y=196, row=18, row_option=15, head=18, gap=10, steps=5,
-            pages=dict(main=("story", "option", "howto"), option=("level", "music", "sound", "back")),
-            label=dict(story="STORY", option="OPTION", howto="HOW TO PLAY", level="LEVEL", music="MUSIC", sound="SOUND", back="BACK"))
+            pages=dict(main=("story", "option", "disco", "howto"), option=("level", "music", "sound", "back"),
+                       disco=tuple("t%d" % i for i in range(len(DISCO))) + ("back",)),
+            label=dict(story="STORY", option="OPTION", disco="DISCOGRAPHY", howto="HOW TO PLAY", level="LEVEL", music="MUSIC", sound="SOUND", back="BACK",
+                       **{"t%d" % i: name for i, (_, name) in enumerate(DISCO)}))
 RESPAWN_AT = 215        # 倒れてから、中間地点で再開するまでのフレーム数（残機が残っているとき）
 RESPAWN_CLEAR = 160     # 再開した場所から、この距離までの敵は置かない（再開してすぐ、ぶつからないように）
 CHECKPOINT_W = 24       # 中間地点（鳥居）に触れる範囲の幅
