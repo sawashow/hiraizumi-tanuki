@@ -98,6 +98,9 @@ OCHI = dict(w=20, h=40, hp=3, touch=1, speed=0.6, active=240, ready_dist=110, re
 # 動きは、落ち武者と同じ仕組み（ready_dist=0 で、構えない）
 MIIRA = dict(w=18, h=40, hp=1, touch=1, speed=0.4, active=260, ready_dist=0, ready_frames=1, swing_frames=1, wave_at=0, cooldown=0,
              turn_frames=120, patrol=30)
+# 天狗（高館）: 地面を、ぴょんぴょん跳んで近づく。跳ぶ前に、かがむ（予告）。着地の隙は、狙い目。触れるとダメージ。体力2
+#   crouch: かがむフレーム数 / rest: 着地してから、次にかがむまで / hop_vx・hop_vy: 跳ぶ速さ（横・上向き）。着地までの距離は、およそ 2*vx*vy/GRAVITY
+TENGU = dict(w=20, h=40, hp=2, touch=1, active=260, crouch=22, rest=34, hop_vx=2.4, hop_vy=5.6)
 # 狐火（浮遊する炎）: 小さく、空中を上下に揺れながら横に進む。高さは低め・高めの2通り
 KITSUNEBI = dict(w=14, h=14, hp=1, touch=1, speed=0.9, active=380, bob=12, period=90,
                  low=FLOOR_Y - 36, high=FLOOR_Y - 92)
@@ -114,7 +117,7 @@ ENEMY_DIFFICULTY = {
     "kitsunebi": 2, "karakasa": 2, "kocho": 2,          # 狐火・唐傘小僧・金の蝶
     "karasu": 3, "koi": 3, "natsukusa": 3,              # 烏・鯉の怨霊・夏草の亡者
     "tachiojo": 4, "oboro": 4,                          # 立ち往生・朧
-    "ochimusha": 5, "yumihei": 5,                       # 落ち武者・弓兵
+    "ochimusha": 5, "yumihei": 5, "tengu": 4,           # 落ち武者・弓兵・天狗
 }
 BOSS_DIFFICULTY = {"boss": 6, "boss2": 7, "boss3": 8, "boss4": 9, "benkei": 5}   # 泰衡・基衡・秀衡・清衡・弁慶（中ボス）
 # 面の出来を測るときの物差し（tools/difficulty.py）。面を区画（stage.py の zones。無ければ window ごと）に分けて、単調な所を見つける
@@ -141,6 +144,7 @@ DENSITY_TOLERANCE = 0.25
 ENEMY_FRAMES = {
     "ochimusha": {"walk": 4, "stance": 3, "swing": 2, "death": 3},
     "miira": {"walk": 4, "death": 3},
+    "tengu": {"walk": 4, "death": 3},                    # 天狗: 絵ができるまでは、落ち武者の絵を赤く塗って借りる（ENEMY_STANDIN）
     "kitsunebi": {"flicker": 4, "death": 4},
     "karasu": {"flap": 4, "dive": 2, "death": 2},
     # 泰衡（tools/make_boss1.py）: 歩く・立ち・高い構え・振る・かがむ・跳ぶ・やられ（のけぞる・倒れる）
@@ -152,10 +156,11 @@ ENEMY_FRAMES = {
 }
 # w,h = 枠の大きさ / ax = 枠の中の、体の中心の左右位置 / ay = 足元（bottom）か中心（center）の上下位置
 # 絵がまだ無い敵の、代わりの絵: 種類 → (借りる種類, 塗り替える色)。assets/images/enemies/種類_*.png を置けば、そちらを使う
-ENEMY_STANDIN = {}      # 例: {"種類": ("ochimusha", (236, 222, 180))}。ミイラは、2026-10-12 に、絵ができた
+ENEMY_STANDIN = {"tengu": ("ochimusha", (224, 72, 56))}      # 天狗の絵が来たら、assets/images/enemies/tengu_*.png を置く。例: {"種類": ("ochimusha", (236, 222, 180))}。ミイラは、2026-10-12 に、絵ができた
 ENEMY_ART = {
     "ochimusha": dict(w=62, h=51, ax=31, ay=51, mode="bottom"),
     "miira": dict(w=47, h=42, ax=23, ay=42, mode="bottom"),      # ミイラ（tools/make_miira.py）
+    "tengu": dict(w=62, h=51, ax=31, ay=51, mode="bottom"),      # 天狗（いまは、落ち武者の絵と同じ大きさ）
     "kitsunebi": dict(w=16, h=18, ax=8, ay=9, mode="center"),
     "karasu": dict(w=42, h=25, ax=21, ay=12, mode="center"),
     "yumihei": dict(w=49, h=48, ax=24, ay=48, mode="bottom"),
