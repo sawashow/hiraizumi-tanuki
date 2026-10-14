@@ -1451,9 +1451,28 @@ class Game:
         done = self._thanks_at("done")
         if t >= done + K["dream"]:      # 礼を言われている間も、タヌキ侍は、食べ物のことを考えている（おにぎりと団子が、かわるがわる浮かぶ）
             # 頭のてっぺんの高さから、上へ置く（前は、ここで、礼の文の絵の高さを使っていて、雲が、頭に重なっていた）
-            bx, by = self._cloud(screen, round(x), K["floor"] - C.THOUGHT["head"], 36, 26)
-            food = self.a.item[self.a.foods[((t - done - K["dream"]) // K["dream_swap"]) % len(self.a.foods)]]
-            screen.blit(food, (bx - food.get_width() // 2, by - food.get_height() // 2))
+            u = t - done - K["dream"]
+            grow = min(1.0, u / 12)
+            bx, by = self._cloud(screen, round(x), K["floor"] - C.THOUGHT["head"], K["cloud"][0] * grow, K["cloud"][1] * grow)
+            rows = [self.a.foods[i:i + K["cols"]] for i in range(0, len(self.a.foods), K["cols"])]
+            shown = max(0, (u - 12) // K["food_every"] + 1)     # 食べ物が、1つずつ浮かぶ
+            n = 0
+            for r, row in enumerate(rows):
+                for c, kind in enumerate(row):
+                    n += 1
+                    if n > shown:
+                        break
+                    img = self.a.item[kind]
+                    fx = bx + round((c - (len(row) - 1) / 2) * K["food_dx"])
+                    fy = by + round((r - (len(rows) - 1) / 2) * K["food_dy"]) + round(math.sin((t + n * 20) / 14) * 1.5)
+                    screen.blit(img, (fx - img.get_width() // 2, fy - img.get_height() // 2))
+            h = u - K["heart_after"]
+            if h > 0:       # 姫は、ハートを浮かべる（ドキドキと、ふくらむ）
+                hw, hh = K["heart_cloud"]
+                g = min(1.0, h / 12)
+                hx, hy = self._cloud(screen, K["hime_x"] - 6, K["floor"] - hime.get_height(), hw * g, hh * g)
+                if g >= 1.0:
+                    self._heart(screen, hx, hy, 1 + (h // 10) % 2)
         if t >= done + 10 and self.a.thanks_sub:
             sub = self.a.thanks_sub
             screen.blit(sub, (C.BASE_W // 2 - sub.get_width() // 2, K["sub_y"]))
@@ -1852,6 +1871,17 @@ class Game:
                 img = self.a.item[kind]
                 fx = bx + round((i - (len(foods) - 1) / 2) * 22)
                 screen.blit(img, (fx - img.get_width() // 2, by - img.get_height() // 2 + round(math.sin((self.ending + i * 20) / 14) * 1.5)))
+
+    def _heart(self, screen, cx, cy, size=1):
+        """ハートを、ドットで描く（赤。縁は暗く）。size=2 で、少し大きい（鼓動）"""
+        rows = ("0110110", "1111111", "1111111", "0111110", "0011100", "0001000")
+        d = 2
+        w, h = len(rows[0]) * d, len(rows) * d
+        for color, pad in ((C.BLACK, 1), ((236, 64, 96), 0)):
+            for j, row in enumerate(rows):
+                for i, ch in enumerate(row):
+                    if ch == "1":
+                        pygame.draw.rect(screen, color, (cx - w // 2 + i * d - pad, cy - h // 2 + j * d - pad - (size - 1), d + 2 * pad, d + 2 * pad))
 
     def _cloud(self, screen, x, top, w, h, dots=2):
         """雲形の吹き出し（考えごと）。(x, top) は、頭のてっぺん。そこから上へ、小さな丸が2つ、その先に、もこもこした雲（幅 w・高さ h）。
