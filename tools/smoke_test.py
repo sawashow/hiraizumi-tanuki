@@ -1305,7 +1305,14 @@ g.player.hp = 1
 g.player.take_damage(g.player.px + 5, 1)
 run(g, C.GAMEOVER_WAIT + 5)
 run(g, 1, (), {"restart"})
-check("次の面でゲームオーバーになったら、その面を最初から（残機は戻る）", g.stage_i == 1 and g.lives == C.LIVES and g.player.hp == C.PLAYER_HP and g.score == 0)
+check("スタート画面が無ければ、ゲームオーバーのあと、最初の面から（残機は戻る）", g.stage_i == 0 and g.lives == C.LIVES and g.player.hp == C.PLAYER_HP and g.score == 0)
+gt = Game(title=True)
+gt.title = False
+gt.lives, gt.player.hp = 1, 1
+gt.player.take_damage(gt.player.px + 5, 1)
+run(gt, C.GAMEOVER_WAIT + 5)
+run(gt, 1, (), {"restart"})
+check("スタート画面がある遊びでは、ゲームオーバーのあと、スタート画面へ戻る", gt.title and gt.lives == C.LIVES and gt.player.hp == C.PLAYER_HP)
 
 # ---------------------------------------------------------------- 16. スタート画面
 g = Game()
@@ -1331,7 +1338,7 @@ g.sfx.clear()
 run(g, 1, (), {"restart"})
 check("Enterで、メニューが開く（まだ始まらない。決める音が鳴る）",
       g.menu_on and g.menu_page == "main" and g.menu_i == 0 and g.title and not g.start_t and g.sfx == [C.SFX["decide"]])
-check("メニューは、STORY / OPTION / HOW TO PLAY", C.MENU["pages"]["main"] == ("story", "option", "howto"))
+check("メニューは、STORY / OPTION / DISCOGRAPHY / HOW TO PLAY", C.MENU["pages"]["main"] == ("story", "option", "disco", "howto"))
 snap(g, "title menu")
 
 
@@ -1361,6 +1368,7 @@ tap({"down"})
 check("操作説明の間は、項目は動かない", g.howto and cur() == "howto")
 tap((), {"attack"})
 check("もう一度決定すると、メニューに戻る（始まらない）", not g.howto and g.menu_on and not g.start_t and cur() == "howto")
+tap({"up"})
 tap({"up"})
 tap((), {"restart"})
 check("OPTION で決定すると、設定の画面へ移る（LEVEL / MUSIC / SOUND / BACK）",
@@ -1392,6 +1400,20 @@ g.vol_sfx = C.MENU["steps"]
 tap({"down"})
 tap((), {"restart"})
 check("BACK で決定すると、最初のメニューへ戻る（OPTION を選んだまま。始まらない）", g.menu_page == "main" and cur() == "option" and not g.start_t)
+tap({"down"})
+tap((), {"restart"})
+check("DISCOGRAPHY で決定すると、曲の一覧が出る（曲＋BACK）", g.menu_page == "disco" and cur() == "t0" and len(C.MENU["pages"]["disco"]) == len(C.DISCO) + 1)
+tap({"down"})
+tap((), {"restart"})
+check("曲で決定すると、その曲が鳴る", g.bgm == C.DISCO[1][0])
+snap(g, "disco")
+tap((), {"restart"})
+check("もう一度決定すると、止まる", g.bgm is None)
+tap({"up"})
+tap({"up"})
+tap((), {"restart"})
+check("DISCOGRAPHY の BACK で、最初のメニューへ戻る（曲は止まる）", g.menu_page == "main" and cur() == "disco" and g.bgm is None and g.disco_song is None)
+tap({"up"})
 tap({"up"})
 g.sfx.clear()
 run(g, 1, (), {"restart"})
@@ -2271,7 +2293,7 @@ check("やられて再開するときは、地図を出さない", not gm.map_on
 gm.player.hp, gm.lives = 0, 1
 run(gm, C.GAMEOVER_WAIT + 5)
 run(gm, 1, (), {"restart"})
-check("ゲームオーバーのやり直しも、地図を出さない", not gm.map_on and gm.stage.name == "高館")
+check("ゲームオーバーのやり直しも、地図を出さない", not gm.map_on)
 # 高館がまだ無い間は、寄らずに、分かれ道を通って月見坂へ（高館を一時的に外して確かめる）
 _keep = list(STAGES)
 STAGES[:] = [STAGES[0], STAGES[2]]
