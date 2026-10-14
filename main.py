@@ -287,7 +287,8 @@ class Game:
                 self.taken.add(it.idx)
                 if it.kind == "dango":
                     self.score += C.SCORE_DANGO      # 団子: 手裏剣を投げられる数が増える（持てる数まで）
-                    self.dango += 1
+                    if it.idx >= 0:      # 敵が落とした団子は、数えない（配置した数 = 分母と、合わせる）
+                        self.dango += 1
                     self.last_food = it.food
                     p.ammo = min(C.AMMO["max"], p.ammo + C.AMMO["dango"])
                     self.sfx.append(C.SFX["dango"])
@@ -1890,7 +1891,7 @@ class Game:
         veil.set_alpha(min(C.GAMEOVER_DIM, self.clear_t * 4))
         screen.blit(veil, (0, 0))
         sec = self.frames // C.FPS
-        lines = ["STAGE CLEAR", "", "SCORE  %06d" % self.score, "DANGO  %d/%d" % (self.dango, self.stage.dango_total),
+        lines = ["STAGE CLEAR", "", "SCORE  %06d" % self.score, "FOOD   %d/%d" % (self.dango, self.stage.dango_total),
                  "TIME   %d:%02d" % (sec // 60, sec % 60)]
         if self.clear_t >= C.CLEAR_WAIT and (self.clear_t // 30) % 2 == 0:
             lines += ["", "PRESS ENTER"]
