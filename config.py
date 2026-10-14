@@ -350,7 +350,9 @@ STORY_BG = "story_bg.png"       # 始まりの語りの背景（夜の平泉。t
 THANKS_BG = "thanks_bg.png"     # 姫を助ける場面の背景（夜明けの参道。地面ごと描いた1枚絵。tools/make_thanks_bg.py）。無ければ、真っ暗な背景に、タイルの床
 THANKS = dict(walk=1.3, stop_x=178, hime_x=298, floor=238, hop=44, type=4, gap=26, wait=70,
               lines=("THANK YOU TANUKI!", "YOUR QUEST IS OVER."), text_y=(24, 52), sub_y=82,
-              dream=40, dream_swap=45)     # dream: 文が出きってから、タヌキ侍の頭の上に、食べ物の吹き出しが出るまで / dream_swap: 食べ物（FOODS）が入れ替わる間隔
+              dream=40, dream_swap=45,     # dream: 文が出きってから、タヌキ侍の頭の上に、食べ物の吹き出しが出るまで / dream_swap: 食べ物（FOODS）が入れ替わる間隔
+              cloud=(120, 62), cols=3, food_dx=34, food_dy=26, food_every=14,   # タヌキ侍の吹き出し: 大きさ / 食べ物を並べる列数・間隔 / 1つずつ浮かぶ間隔
+              heart_after=30, heart_cloud=(36, 28))    # 姫の吹き出し（ハート）: タヌキ侍の吹き出しから、遅れて出るフレーム数 / 大きさ
 # エンドロール（姫を助ける場面のあと、エンディングの絵の前）。平和になった、いまの平泉の道を、タヌキ侍と姫が、右へ歩いていく。
 # 道は、手前と奥に歩道があって、間を車道が横に通っている。横断歩道に来ると、二人は止まる。車が通りすぎるのを待って、
 # 右・左を見てから、向こうの歩道へ渡る。これを、くり返す。その間、画面の右半分を、エンドロールの文字が、下から上へ流れる。
