@@ -1867,10 +1867,26 @@ for _ in range(200):
     _air = _air or _e.air
 check("天狗は、かがんでから、跳んで、プレイヤーへ近づく", _crouch and _air and _e.cx < 600 and _e.cy <= C.FLOOR_Y - _e.h / 2 + 0.01)
 _e = Tengu(600, None, C.FLOOR_Y)
+_pr = pygame.Rect(540 - 8, C.FLOOR_Y - C.PLAYER_H, C.PLAYER_W, C.PLAYER_H)
+_touch, _seen_air = 0, False
+for _ in range(200):
+    _e.update(_pr, 5000, None)
+    _touch += _e.rect.colliderect(_pr)
+    _seen_air = _seen_air or _e.air
+    if _seen_air and not _e.air:      # 最初の着地
+        break
+check("天狗は、主人公を飛び越えて、うしろに降りる（跳んでいる間は、当たらない。下をくぐれる）", _e.cx < _pr.centerx - 20 and _touch == 0, "x=%.0f 当たり %d" % (_e.cx, _touch))
+_e = Tengu(600, None, C.FLOOR_Y)
+_t2 = type("T2", (), {"height_at": staticmethod(lambda x: C.FLOOR_Y if (x > 520 or x < 430) else None)})
+_pr = pygame.Rect(380, C.FLOOR_Y - C.PLAYER_H, C.PLAYER_W, C.PLAYER_H)
+for _ in range(400):
+    _e.update(_pr, 5000, _t2)
+check("天狗は、穴を越えて、向こう岸の主人公に近づく", _e.cx < 430, "x=%.0f" % _e.cx)
+_e = Tengu(600, None, C.FLOOR_Y)
 _t = type("T", (), {"height_at": staticmethod(lambda x: C.FLOOR_Y if x > 560 else None)})
 for _ in range(200):
     _e.update(_pr, 5000, _t)
-check("天狗は、着地する先が穴なら、跳ばない", _e.cx == 600 and not _e.air)
+check("天狗は、穴には、降りない（地面の端までしか、跳ばない）", _e.cx > 560 and _e.cy <= C.FLOOR_Y - _e.h / 2 + 0.01)
 
 
 _GROUNDED = ("ochimusha", "miira", "yumihei", "tachiojo", "tengu")

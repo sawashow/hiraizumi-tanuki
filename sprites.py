@@ -926,21 +926,34 @@ class Tengu(Enemy):
         self.crouch_t = 0
         self.rest_t = self.P["rest"]
         self.dir = -1
+        self.vx = 0.0
+        self.land_floor = self.floor
 
-    def _land_ok(self, x, terrain):
-        """x の地面が、いま立っている高さと同じか"""
+    def _air_frames(self, dh):
+        """跳んでから、いまより dh だけ低い（正）地面に着くまでのフレーム数（横の速さを決めるのに使う）"""
+        n, v, y = 0, -self.P["hop_vy"], 0.0
+        while True:
+            v += C.GRAVITY
+            y += v
+            n += 1
+            if v > 0 and y >= dh:
+                return n
+
+    def _ground(self, x, terrain):
+        """x に降りられる地面の高さ（降りられなければ None）。いまより、少し高い所〜深く低い所まで、降りられる（穴は、越える）"""
         if not terrain:
-            return True
+            return self.floor
         h = terrain.height_at(x)
-        return h is not None and abs(h - self.floor) <= 1
+        return h if h is not None and -self.P["step_up"] <= h - self.floor <= self.P["step_down"] else None
 
     def think(self, pr, stage_w, terrain=None):
         P = self.P
         if self.air:
             self.vy += C.GRAVITY
-            self.cx += self.dir * P["hop_vx"]
+            self.cx += self.vx
             self.cy += self.vy
-            if self.vy > 0 and self.cy >= self.floor - P["h"] / 2:
+            if self.vy > 0 and self.cy >= self.land_floor - P["h"] / 2:
+                self.floor = self.land_floor
                 self.cy = self.floor - P["h"] / 2
                 self.air = False
                 self.rest_t = P["rest"]
@@ -958,11 +971,26 @@ class Tengu(Enemy):
         if self.rest_t:
             self.rest_t -= 1
             return
-        reach = 2 * P["hop_vx"] * P["hop_vy"] / C.GRAVITY        # 着地までに進む距離
-        if self._land_ok(self.cx + self.dir * reach, terrain) and 0 < self.cx + self.dir * reach < stage_w:
-            self.crouch_t = P["crouch"]
-        else:
-            self.rest_t = P["rest"]      # 先が穴: 跳ばずに、また待つ
+        land = self._pick_land(pr, dx, terrain, stage_w)
+        if land is None:
+            self.rest_t = P["rest"]      # 跳べる先が無い: また待つ
+            return
+        x, self.land_floor = land
+        self.vx = (x - self.cx) / self._air_frames(self.land_floor - self.floor)
+        self.crouch_t = P["crouch"]
+
+    def _pick_land(self, pr, dx, terrain, stage_w):
+        """着地する場所（x）。主人公が近ければ、飛び越えて、うしろに降りる（下を、くぐれる）。遠ければ、近づく。
+        うしろが、穴・段差なら、手前（主人公の少し前）に降りる。どこにも降りられなければ None"""
+        P = self.P
+        d = self.dir
+        far = min(P["hop_max"], abs(dx) + P["over"])
+        for dist in (far, abs(dx) - P["over"] * 0.7, abs(dx) - 8, *range(int(far) - 8, 7, -8)):       # 飛び越える（または、近づく）→ ダメなら、手前 → 目の前まで → 降りられる所まで、少しずつ手前へ
+            x = self.cx + d * dist
+            h = self._ground(x, terrain) if 8 <= dist <= P["hop_max"] and 0 < x < stage_w else None
+            if h is not None:
+                return x, h
+        return None
 
     def image(self):
         if self.dying:

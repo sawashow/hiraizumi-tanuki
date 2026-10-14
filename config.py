@@ -99,8 +99,10 @@ OCHI = dict(w=20, h=40, hp=3, touch=1, speed=0.6, active=240, ready_dist=110, re
 MIIRA = dict(w=18, h=40, hp=1, touch=1, speed=0.4, active=260, ready_dist=0, ready_frames=1, swing_frames=1, wave_at=0, cooldown=0,
              turn_frames=120, patrol=30)
 # 天狗（高館）: 地面を、ぴょんぴょん跳んで近づく。跳ぶ前に、かがむ（予告）。着地の隙は、狙い目。触れるとダメージ。体力2
-#   crouch: かがむフレーム数 / rest: 着地してから、次にかがむまで / hop_vx・hop_vy: 跳ぶ速さ（横・上向き）。着地までの距離は、およそ 2*vx*vy/GRAVITY
-TENGU = dict(w=20, h=40, hp=2, touch=1, active=260, crouch=22, rest=34, hop_vx=2.4, hop_vy=5.6)
+#   crouch: かがむフレーム数 / rest: 着地してから、次にかがむまで
+#   hop_vy: 跳ぶ上向きの速さ（頂点が、主人公の頭より高くなる = 下を、くぐれる）/ over: 主人公を飛び越えて、うしろに降りる距離 /
+#   hop_max: 1回で跳べる横の距離の上限（遠いときは、この距離ずつ近づく） / step_up・step_down: 降りられる地面の、高さの差（穴や崖は、越えて跳ぶ）
+TENGU = dict(w=20, h=40, hp=2, touch=1, active=260, crouch=22, rest=34, hop_vy=6.8, over=44, hop_max=130, step_up=30, step_down=100)
 # 狐火（浮遊する炎）: 小さく、空中を上下に揺れながら横に進む。高さは低め・高めの2通り
 KITSUNEBI = dict(w=14, h=14, hp=1, touch=1, speed=0.9, active=380, bob=12, period=90,
                  low=FLOOR_Y - 36, high=FLOOR_Y - 92)
