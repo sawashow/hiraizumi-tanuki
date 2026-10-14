@@ -144,7 +144,7 @@ DENSITY_TOLERANCE = 0.25
 ENEMY_FRAMES = {
     "ochimusha": {"walk": 4, "stance": 3, "swing": 2, "death": 3},
     "miira": {"walk": 4, "death": 3},
-    "tengu": {"walk": 4, "death": 3},                    # 天狗: 絵ができるまでは、落ち武者の絵を赤く塗って借りる（ENEMY_STANDIN）
+    "tengu": {"walk": 4, "death": 3},                    # 天狗（tools/make_tengu.py）。walk の 0 = 待つ / 1 = 空中 / 2 = かがむ / 3 = 着地（いまは使わない）
     "kitsunebi": {"flicker": 4, "death": 4},
     "karasu": {"flap": 4, "dive": 2, "death": 2},
     # 泰衡（tools/make_boss1.py）: 歩く・立ち・高い構え・振る・かがむ・跳ぶ・やられ（のけぞる・倒れる）
@@ -156,11 +156,11 @@ ENEMY_FRAMES = {
 }
 # w,h = 枠の大きさ / ax = 枠の中の、体の中心の左右位置 / ay = 足元（bottom）か中心（center）の上下位置
 # 絵がまだ無い敵の、代わりの絵: 種類 → (借りる種類, 塗り替える色)。assets/images/enemies/種類_*.png を置けば、そちらを使う
-ENEMY_STANDIN = {"tengu": ("ochimusha", (224, 72, 56))}      # 天狗の絵が来たら、assets/images/enemies/tengu_*.png を置く。例: {"種類": ("ochimusha", (236, 222, 180))}。ミイラは、2026-10-12 に、絵ができた
+ENEMY_STANDIN = {}      # 例: {"種類": ("ochimusha", (236, 222, 180))}。ミイラは、2026-10-12 に、絵ができた
 ENEMY_ART = {
     "ochimusha": dict(w=62, h=51, ax=31, ay=51, mode="bottom"),
     "miira": dict(w=47, h=42, ax=23, ay=42, mode="bottom"),      # ミイラ（tools/make_miira.py）
-    "tengu": dict(w=62, h=51, ax=31, ay=51, mode="bottom"),      # 天狗（いまは、落ち武者の絵と同じ大きさ）
+    "tengu": dict(w=43, h=46, ax=22, ay=46, mode="bottom"),      # 天狗（tools/make_tengu.py）
     "kitsunebi": dict(w=16, h=18, ax=8, ay=9, mode="center"),
     "karasu": dict(w=42, h=25, ax=21, ay=12, mode="center"),
     "yumihei": dict(w=49, h=48, ax=24, ay=48, mode="bottom"),
