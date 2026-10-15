@@ -2071,7 +2071,7 @@ if pad.sdl:
     check("Aで、ジャンプ（と、決定）", pad.handle(ev("CONTROLLERBUTTONDOWN", button=A, instance_id=0)) == {"jump", "restart"})
     check("Aを離すと、ジャンプを切る（長押しで高く跳べる）", pad.handle(ev("CONTROLLERBUTTONUP", button=A, instance_id=0)) == {"jump_release"})
     check("Xで刀", pad.handle(ev("CONTROLLERBUTTONDOWN", button=X, instance_id=0)) == {"attack"})
-    check("BとYで手裏剣", pad.handle(ev("CONTROLLERBUTTONDOWN", button=B, instance_id=0)) == {"throw"}
+    check("Bで手裏剣（と、決定）、Yで手裏剣", pad.handle(ev("CONTROLLERBUTTONDOWN", button=B, instance_id=0)) == {"throw", "restart"}
           and pad.handle(ev("CONTROLLERBUTTONDOWN", button=Y, instance_id=0)) == {"throw"})
     check("Startで、再開と、ポーズ（遊んでいる間は、ポーズ。それ以外の画面では、決定）", pad.handle(ev("CONTROLLERBUTTONDOWN", button=S, instance_id=0)) == {"restart", "pause"})
     check("割り当てのないボタンは、何もしない", pad.handle(ev("CONTROLLERBUTTONDOWN", button=_pg.CONTROLLER_BUTTON_LEFTSTICK, instance_id=0)) == set())
