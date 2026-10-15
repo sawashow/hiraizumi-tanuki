@@ -4,7 +4,7 @@ Xbox・PlayStation・Switch Pro・8BitDo など、SDL が知っているコン�
 コントローラが使えない環境でも、ゲームは止めない。
 ブラウザ版は、汎用の割り当てで動かす（十字キーは、ボタン12〜15）。ブラウザは、ページを開いたあと、ボタンを一度押すまで、コントローラを見つけない。
 
-割り当て:  十字キー・左スティック＝移動／下＝しゃがむ    A＝ジャンプ（決定）    X＝刀    B・Y＝手裏剣    Start＝再開（決定）
+割り当て:  十字キー・左スティック＝移動／下＝しゃがむ    A＝ジャンプ（決定）    X＝刀    B・Y＝手裏剣（Bは決定も）    Start＝再開（決定）
 """
 import sys
 
@@ -14,9 +14,9 @@ WEB = sys.platform == "emscripten"   # ブラウザ版（pygbag）で動いて�
 WEB_DPAD = {"up": 12, "down": 13, "left": 14, "right": 15}   # ブラウザの「標準の並び」での、十字キーのボタン番号
 DEADZONE = 0.45   # スティックを倒したとみなす量（0〜1）
 
-# 「どのボタンを押したら、何になるか」（押した瞬間）。A は、ジャンプと決定（再開）を兼ねる
+# 「どのボタンを押したら、何になるか」（押した瞬間）。A は、ジャンプと決定（再開）を兼ねる。B（PlayStation の○）も決定にする
 PRESS = {
-    "A": ("jump", "restart"), "X": ("attack",), "B": ("throw",), "Y": ("throw",), "START": ("restart", "pause"),
+    "A": ("jump", "restart"), "X": ("attack",), "B": ("throw", "restart"), "Y": ("throw",), "START": ("restart", "pause"),
 }
 RELEASE = {"A": ("jump_release",)}
 
