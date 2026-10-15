@@ -538,7 +538,12 @@ class Game:
     def _step_cleared(self, pressed):
         """面をクリアしたあとの、結果の画面（step から呼ぶ）。"""
         self.clear_t += 1
-        if "restart" in pressed and self.clear_t >= C.CLEAR_WAIT:
+        count_end = C.CLEAR_SCORE_AT + C.CLEAR_COUNT
+        if C.CLEAR_SCORE_AT < self.clear_t < count_end and self.clear_t % 3 == 0:
+            self.sfx.append(C.SFX["cursor"])    # 数字が増える間の「ピ」
+        if "restart" in pressed and C.CLEAR_SCORE_AT <= self.clear_t < count_end:
+            self.clear_t = count_end            # 増えている間に押すと、最終値へ飛ぶ
+        elif "restart" in pressed and self.clear_t >= C.CLEAR_WAIT:
             if self.stage_i + 1 < len(STAGES):
                 self.advance()
             elif self.use_title:    # 最後の面: 姫を助ける場面へ（そのあと、エンディングの絵）
@@ -1937,13 +1942,24 @@ class Game:
         veil.set_alpha(min(C.GAMEOVER_DIM, self.clear_t * 4))
         screen.blit(veil, (0, 0))
         sec = self.frames // C.FPS
-        lines = ["STAGE CLEAR", "", "SCORE  %06d" % self.score, "FOOD   %d/%d" % (self.dango, self.stage.dango_total),
-                 "TIME   %d:%02d" % (sec // 60, sec % 60)]
-        if self.clear_t >= C.CLEAR_WAIT and (self.clear_t // 30) % 2 == 0:
-            lines += ["", "PRESS ENTER"]
-        for i, line in enumerate(lines[:1 + self.clear_t // 20]):   # 1行ずつ出てくる
-            img = font.render(line, False, C.TEXT)
-            screen.blit(img, (C.BASE_W // 2 - img.get_width() // 2, 70 + i * 18))
+        t, cx = self.clear_t, C.BASE_W // 2
+        shown = int(self.score * min(1, max(0, t - C.CLEAR_SCORE_AT) / C.CLEAR_COUNT))   # 0 から最終値まで増える
+        rows = [("SCORE", "%06d" % shown, C.CLEAR_SCORE_AT),
+                ("FOOD", "%d/%d" % (self.dango, self.stage.dango_total), C.CLEAR_SCORE_AT + C.CLEAR_COUNT + 20),
+                ("TIME", "%d:%02d" % (sec // 60, sec % 60), C.CLEAR_SCORE_AT + C.CLEAR_COUNT + 40)]
+        def draw(text, x, y, right=False):
+            img = font.render(text, False, C.TEXT)
+            screen.blit(img, (x - img.get_width() if right else x, y))
+        img = font.render("STAGE CLEAR", False, C.TEXT)
+        screen.blit(img, (cx - img.get_width() // 2, 70))
+        width = font.size("SCORE  000000")[0]     # 表の幅（ラベルは左揃え、数字は右揃え）
+        for i, (label, value, at) in enumerate(rows):
+            if t >= at:
+                draw(label, cx - width // 2, 106 + i * 18)
+                draw(value, cx + width // 2, 106 + i * 18, right=True)
+        if t >= C.CLEAR_WAIT and (t // 30) % 2 == 0:
+            img = font.render("PRESS ENTER", False, C.TEXT)
+            screen.blit(img, (cx - img.get_width() // 2, 106 + 4 * 18))
 
     def _draw_dim(self, screen):
         """画面を、少しずつ暗くする"""
