@@ -216,7 +216,9 @@ BOSS_PATTERN = "LHHLHLLH"       # 光波の順番（L=低い / H=高い）。く
 BOSS_X = STAGE_W - 110          # ボスが降ってくる場所
 ARENA_X0 = STAGE_W - BASE_W     # ボスの場所の左端（ここで画面が止まる）
 SCORE_BOSS = 2000
-CLEAR_WAIT = 120                # クリアしてから、Enter を受け付けるまでのフレーム数
+CLEAR_SCORE_AT = 40             # クリアしてから、SCORE の行が出て、数字が増え始めるまでのフレーム数
+CLEAR_COUNT = 60                # SCORE が 0 から最終値まで増える長さ（点数の大きさによらず同じ）
+CLEAR_WAIT = CLEAR_SCORE_AT + CLEAR_COUNT + 60   # クリアしてから、Enter を受け付けるまでのフレーム数（FOOD・TIME が出たあと）
 # ボスを倒したあとの寸劇: ボスが決まった場所へ吹っ飛ぶ → タヌキ侍が決まった場所へ歩く → 間 → 倒れたボスがひとこと → 光になって消える → タヌキ侍が返す → 右へ駆け抜ける → 結果
 #   skip: せりふを、キーで送れるようになるまでのフレーム数（字が出ている途中なら、まず全部出す）。type: 字を1文字出すフレーム数。exit: 画面の外へ、どこまで走るか
 ENDING = dict(wait=30, boss=270, fade=70, reply=280, skip=20, type=8, exit=40)
