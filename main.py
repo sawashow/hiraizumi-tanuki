@@ -2009,6 +2009,10 @@ async def main():
     flags = 0 if sys.platform == "emscripten" else pygame.RESIZABLE
     window = pygame.display.set_mode((C.BASE_W * C.SCALE, C.BASE_H * C.SCALE), flags)
     pygame.display.set_caption(C.TITLE)
+    if sys.platform == "emscripten":
+        # 画面の大きさを決めたあとに、ページの側の大きさ合わせを呼ぶ（呼ばないと、決める前の正方形の縦横比のままで、画面が小さくなる）
+        import platform
+        platform.window.window_resize()
     screen = pygame.Surface((C.BASE_W, C.BASE_H))
     clock = pygame.time.Clock()
     font = pygame.font.Font(None, 20)
