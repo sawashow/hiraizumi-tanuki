@@ -145,7 +145,8 @@ class Touch:
         sticks = [f for f in self.fingers.values() if isinstance(f, Stick)]
         R = round(wh * K["ring"])
         if not sticks:          # 目印: 「ここに触って、動かす」
-            self._stick(window, max(side // 2, R + 6), round(wh * 0.62), R, set(), alpha=K["hint_alpha"])    # 帯が細くても、画面の端で切れないように
+            # 画面の端ではなく、内側に出す（そこへ指を置くよう、誘う。端で操作すると、指が画面の外へ出て、移動が止まりやすい）
+            self._stick(window, round(ww * K["hint_x"]), round(wh * 0.62), R, set(), alpha=K["hint_alpha"])
         for f in sticks:
             self._stick(window, f.ox, f.oy, R, dirs, alpha=K["ring_alpha"], knob=(f.x, f.y))
         # 右の帯: 高さの帯ごとに、ボタン（親指の弧: 下ほど内側）
@@ -175,6 +176,7 @@ class Touch:
         size = R * 2 + 8
         surf = pygame.Surface((size, size), pygame.SRCALPHA)
         c = size // 2
+        pygame.draw.circle(surf, (16, 16, 24, alpha // 2), (c, c), R + 1, 4)     # 暗い縁（明るい背景の上でも、見えるように）
         pygame.draw.circle(surf, K["mark"] + (alpha,), (c, c), R, 2)
         s = max(4, R // 4)
         for name, (vx, vy) in (("left", (-1, 0)), ("right", (1, 0)), ("down", (0, 1)), ("up", (0, -1))):
