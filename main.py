@@ -14,6 +14,7 @@ import config as C
 from stage import STAGE1_LEGACY, STAGES
 from audio import DIR as AUDIO_DIR, Audio
 from gamepad import Pad
+from splash import Splash
 import sprites
 from sprites import Assets, Benkei, HillGust, Pillar, Boss, Boss2, Boss3, Boss4, Checkpoint, draw_zzz, HitEffect, Item, Lantern, Player, Shuriken, SlashWave, Wave, make_enemy
 
@@ -2035,6 +2036,8 @@ async def main():
     audio = Audio()
     audio.preload(sorted(f for f in os.listdir(AUDIO_DIR) if f.startswith("sfx_")))    # 効果音は先に読んでおく
     pad = Pad()   # コントローラ（挿すと、すぐ使える）
+    # 起動したときの会社のロゴ（確認用の起動 s2・boss・cp などでは出さない）
+    splash = None if (start or {"boss", "cp", "roll", "thanks"} & set(sys.argv[1:])) else Splash()
 
     while True:
         pressed = set()
@@ -2042,6 +2045,9 @@ async def main():
             if event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
                 pygame.quit()
                 return
+            if splash and event.type in (pygame.KEYDOWN, pygame.MOUSEBUTTONDOWN, getattr(pygame, "CONTROLLERBUTTONDOWN", -1), pygame.JOYBUTTONDOWN):
+                splash.skip()       # 何かを押すと、ロゴを飛ばす（そのキーは、ゲームには渡さない）
+                continue
             if event.type == pygame.KEYDOWN and event.key in KEYDOWN_MAP:
                 pressed.add(KEYDOWN_MAP[event.key])
             if event.type == pygame.KEYUP and event.key in (pygame.K_SPACE, pygame.K_UP):
@@ -2049,6 +2055,16 @@ async def main():
             if event.type == getattr(pygame, "WINDOWFOCUSLOST", -1):     # 窓が後ろに回ったら、止める
                 pressed.add("pause_on")
             pressed |= pad.handle(event)
+        if splash:      # ロゴ画面の間は、ゲームを動かさない
+            if splash.done:
+                splash = None
+            else:
+                splash.step()
+                splash.draw(pygame.display.get_surface())
+                pygame.display.flip()
+                clock.tick(C.FPS)
+                await asyncio.sleep(0)
+                continue
         game.step(keys_to_input(pygame.key.get_pressed()) | pad.held(), pressed)
         audio.set_gain(game.vol_bgm / C.MENU["steps"], game.vol_sfx / C.MENU["steps"])    # 音を鳴らす前に（変えた音量で、鳴るように）
         for name in dict.fromkeys(game.sfx + sprites.SOUNDS):     # 同じ音は、1フレームに1回だけ
