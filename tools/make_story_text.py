@@ -2,7 +2,7 @@
 
 使い方: python tools/make_story_text.py フォント.ttf assets/story_intro.txt 出力.png [行の間=26]
   - 文章は、テキストファイルに書く（1行が、画面の1行。空の行は、段落の間）
-  - 各行を、左右の中央にそろえる。白い字に、暗い縁取り。アンチエイリアスなし
+  - 各行を、左右の中央にそろえる。白い字（横に1ドット太らせる）に、暗い縁取り。アンチエイリアスなし
 使っているフォント: DotGothic16（SIL Open Font License 1.1）https://github.com/fontworks-fonts/DotGothic16
 """
 import sys
@@ -23,7 +23,9 @@ def main(font_path, text_path, out, pitch=26):
     d = ImageDraw.Draw(mask)
     d.fontmode = "1"
     for i, ln in enumerate(lines):
-        d.text(((width - int(font.getlength(ln))) // 2, i * pitch + 2), ln, font=font, fill=255)
+        x = (width - int(font.getlength(ln))) // 2
+        d.text((x, i * pitch + 2), ln, font=font, fill=255)
+        d.text((x + 1, i * pitch + 2), ln, font=font, fill=255)    # 1ドット右にも描いて、線を太くする（1ドットの線は、細くて読みにくい）
     mask = mask.point(lambda v: 255 if v >= 128 else 0)
     img = Image.new("RGBA", (width + 2, mask.height + 2), (0, 0, 0, 0))
     for dy in (0, 1, 2):
