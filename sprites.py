@@ -151,7 +151,6 @@ class Assets:
             if os.path.exists(os.path.join(IMG, "items", f"food_{k}.png")):
                 self.item[k] = _load(f"items/food_{k}.png")
         self.foods = [k for k in C.FOODS if k in self.item]      # 夢の吹き出しに、順に浮かべる食べ物
-        self.snacks = [k for k in self.foods if k != "onigiri"]      # 拾うと、手裏剣が増える食べ物（おにぎりは、回復なので入れない）
         self.dango_straight = self.item["dango"]      # 団子のゲージ（左上）は、縦の絵のまま
         if os.path.exists(os.path.join(IMG, "items", "dango_tilt.png")):       # 拾える団子・吹き出しの団子は、斜めの絵（tools/make_dango_tilt.py）
             self.item["dango"] = _load("items/dango_tilt.png")
@@ -2560,9 +2559,7 @@ class Item:
         self.cx, self.cy = float(x), float(y)
         self.t = 0
         self.alive = True
-        snacks = getattr(assets, "snacks", None) if assets else None
-        # 手裏剣の元（dango）は、いろんな食べ物の絵で出る。置き場所で、食べ物が決まる（やり直しても、同じ）
-        self.food = snacks[(idx if idx >= 0 else int(x) // 7) % len(snacks)] if kind == "dango" and snacks else kind
+        self.food = kind    # 面に出る食べ物は、団子（手裏剣の元）とおにぎり（回復）だけ。いろんな食べ物は、夢の吹き出しだけに出す
 
     @property
     def rect(self):

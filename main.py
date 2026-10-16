@@ -172,7 +172,6 @@ class Game:
 
     def _begin_stage(self):
         self.dango = 0
-        self.last_food = "dango"      # 最後に拾った食べ物（左上のゲージの絵）
         self.intro_t = 0        # 面の名前を出してからのフレーム数（遊び始めてから数える）
         self.taken = set()          # 取ったアイテム（配置表の番号）
         self.toro_broken = set()    # 壊した石灯籠（配置表の番号）。やられて再開しても、壊れたまま
@@ -291,7 +290,6 @@ class Game:
                     self.score += C.SCORE_DANGO      # 団子: 手裏剣を投げられる数が増える（持てる数まで）
                     if it.idx >= 0:      # 敵が落とした団子は、数えない（配置した数 = 分母と、合わせる）
                         self.dango += 1
-                    self.last_food = it.food
                     p.ammo = min(C.AMMO["max"], p.ammo + C.AMMO["dango"])
                     self.sfx.append(C.SFX["dango"])
                 elif it.kind == "onigiri":
@@ -1239,8 +1237,8 @@ class Game:
             pygame.draw.rect(screen, (252, 208, 40), (x + 1, 11, 40 * p.super_t // C.SUPER_FRAMES, 4))
         text = font.render("%06d" % self.score, False, C.TEXT)
         screen.blit(text, (C.BASE_W - text.get_width() - 8, 8))
-        # 腹ペコゲージ（手裏剣を投げられる数）。左端は、最後に拾った食べ物。体力の赤い四角とは、形と色を変える（串に刺さった、丸い団子）
-        icon = self.a.item.get(self.last_food, self.a.item["dango"])
+        # 腹ペコゲージ（手裏剣を投げられる数）。左端は、団子。体力の赤い四角とは、形と色を変える（串に刺さった、丸い団子）
+        icon = self.a.dango_straight
         w, h = icon.get_size()
         k = min(14 / w, 14 / h)
         icon = pygame.transform.scale(icon, (max(1, round(w * k)), max(1, round(h * k))))
