@@ -1,16 +1,31 @@
-# ブラウザ版を GitHub 側で作る。
-# いまは「作る部分だけ」の確認用（手動実行のみ・公開しない）。成功を確かめてから、公開の部分を足す。
+# ブラウザ版を GitHub 側で作り、そのまま GitHub Pages に公開する。
+# main へ push したとき、ゲームの中身が変わっていれば動く。手でも動かせる。
 name: build-web
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - "*.py"
+      - "assets/images/**"
+      - "assets/audio/**"
+      - "tools/build_web.py"
+      - "tools/web_template.tmpl"
+      - ".github/workflows/pages.yml"
   workflow_dispatch:
 
 permissions:
   contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04   # latest は 2026-10-19 に別の版へ移るため、固定する
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -29,7 +44,16 @@ jobs:
           cp docs/CNAME _site/
           touch _site/.nojekyll
           ls -l _site
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-pages-artifact@v3
         with:
-          name: site
           path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-24.04
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
