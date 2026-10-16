@@ -3,13 +3,14 @@
 使い方: python tools/thin_outline.py 入力.png ...      （上書きする。元に戻すときは git checkout）
   外側（透明に接する）の、黒に近いドットだけを置き換える。中の黒い線・影は、そのまま。
   タヌキ侍（player_00〜36）の縁が、ほかのキャラより黒く目立つので、これで弱めた（2026-10-16）。
-  もっと弱めたいときは、置き換えでなく消す（REMOVE = True）。ただし、絵が一回り小さく見える。
+  最初は置き換え（REMOVE = False）にしたが、変化がわかりにくかったので、消す（REMOVE = True）にした。絵が一回り小さく見える。
+  やり直すときは、元の絵に戻してから流す: git checkout 06e6c33^ -- assets/images/player_*.png
 """
 import sys
 
 from PIL import Image
 
-REMOVE = False       # True: 縁を消す
+REMOVE = True        # True: 縁を消す（いまの設定）/ False: 縁を、体の色を暗くした色に置き換える
 DARKEN = 0.6         # 置き換える色の明るさ（隣の色に掛ける）
 NEAR = ((1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (-1, -1), (1, -1), (-1, 1))
 
