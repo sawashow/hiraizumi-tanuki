@@ -1,0 +1,35 @@
+# ブラウザ版を GitHub 側で作る。
+# いまは「作る部分だけ」の確認用（手動実行のみ・公開しない）。成功を確かめてから、公開の部分を足す。
+name: build-web
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install pygbag==0.9.3
+      - run: python tools/build_web.py
+      - name: pygbag でビルド
+        env:
+          PYTHONUTF8: "1"
+        run: python -m pygbag --build --PYBUILD 3.12 --template tools/web_template.tmpl web
+      - name: 公開用のファイルを集める
+        run: |
+          mkdir _site
+          cp web/build/web/index.html web/build/web/web.tar.gz web/build/web/favicon.png _site/
+          cp docs/CNAME _site/
+          touch _site/.nojekyll
+          ls -l _site
+      - uses: actions/upload-artifact@v4
+        with:
+          name: site
+          path: _site
