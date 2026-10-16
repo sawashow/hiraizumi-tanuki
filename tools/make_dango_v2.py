@@ -2,8 +2,8 @@
 
 使い方: python tools/make_dango_v2.py [出力フォルダ=assets/images/items]
   dango.png      縦の串（左上のゲージ用）
-  dango_tilt.png 斜めの串（面に置く団子・吹き出しの団子）。団子の形はそのまま、串に沿って位置を斜めに並べる
-元は Gemini の絵（丸い団子3つ・白いハイライト・短い串）。細かすぎて縮めると崩れるので、見本にして描き直した（2026-10-16）。
+  dango_tilt.png 斜めの串（面に置く団子・吹き出しの団子）
+縦は、Gemini の絵（丸い団子3つ・白いハイライト・短い串）を見本に、描き直した。斜めは、Gemini の斜めの絵を縮めて、手で直した（2026-10-16）。
 """
 import os
 import sys
@@ -49,45 +49,35 @@ def render(rows):
     return im
 
 
-def balls_rows():
-    """団子3つ（下から緑・白・赤）の、1つぶんの絵（上の輪郭つき。幅11・高さ7）"""
-    out = []
-    for f, s, h in (("g", "G", "h"), ("w", "W", "x"), ("p", "P", "q")):
-        out.append(["...KKKKK..."] + [r.replace("f", f).replace("s", s).replace("h", h) for r in BALL])
-    return out
-
-
-def tilt_im(slope=0.5, w=20, h=25):
-    """斜めの串。団子の形はそのまま（回転しない）、串に沿って位置だけを斜めに並べる。串は右上がり（1行で slope ドット）"""
-    im = Image.new("RGBA", (w, h), (0, 0, 0, 0))
-    px = im.load()
-
-    def put(x, y, c):
-        if 0 <= x < w and 0 <= y < h:
-            px[x, y] = PAL[c] + (255,)
-
-    def sx(y):          # 串の、y 行目の中心の x
-        return 3.5 + (h - 1 - y) * slope
-    for y in range(h):  # 串（輪郭つき）
-        x = round(sx(y))
-        put(x - 1, y, "K")
-        put(x + 1, y, "K")
-        put(x, y, "S" if y < h - 3 else "s")
-    put(round(sx(0)), 0, "K")
-    put(round(sx(h - 1)) , h - 1, "K")
-    for (rows, cy) in zip(balls_rows(), (18, 12, 6)):      # 緑・白・赤。下から重ねる
-        cx = round(sx(cy))
-        for j, r in enumerate(rows):
-            for i, c in enumerate(r):
-                if c in PAL:
-                    put(cx - 5 + i, cy - 3 + j, c)
-    return im
+# 斜めの串（19×20）。Gemini の斜めの絵（38×40）を、半分に縮めて、欠けた所（輪郭の穴・串）を、手で直したもの
+TILT = [
+    "..............KK.KK",
+    "............KKppKSK",
+    "...........KpppppK.",
+    "...........KppppppK",
+    "...........KpppppPK",
+    ".........KKPPppppK.",
+    "........KKwwPPPPPK.",
+    ".......KKKKwwPPPK..",
+    ".......KwwwwwWKK...",
+    ".......KwwwwwK.....",
+    "....KKKhWwwwWK.....",
+    "...KKKKgGWWKK......",
+    "...KgggggKK........",
+    "..KggggggK.........",
+    "..KGggggGK.........",
+    "...KGgggK..........",
+    "..KKKGGK...........",
+    ".KSK.KK............",
+    "KSK................",
+    "s..................",
+]
 
 
 if __name__ == "__main__":
     out = sys.argv[1] if len(sys.argv) > 1 else os.path.join(os.path.dirname(__file__), "..", "assets", "images", "items")
     a = render(build())
     a.save(os.path.join(out, "dango.png"))
-    t = tilt_im()
+    t = render(TILT)
     t.save(os.path.join(out, "dango_tilt.png"))
     print("書き出し:", out, a.size, t.size)
