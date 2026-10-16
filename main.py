@@ -15,6 +15,7 @@ from stage import STAGE1_LEGACY, STAGES
 from audio import DIR as AUDIO_DIR, Audio
 from gamepad import Pad
 from splash import Splash
+from touch import Touch
 import sprites
 from sprites import Assets, Benkei, HillGust, Pillar, Boss, Boss2, Boss3, Boss4, Checkpoint, draw_zzz, HitEffect, Item, Lantern, Player, Shuriken, SlashWave, Wave, make_enemy
 
@@ -2067,6 +2068,7 @@ async def main():
     audio = Audio()
     audio.preload(sorted(f for f in os.listdir(AUDIO_DIR) if f.startswith("sfx_")))    # 効果音は先に読んでおく
     pad = Pad()   # コントローラ（挿すと、すぐ使える）
+    touch = Touch()   # スマホのタッチ（一度触ると、左右の帯にボタンが出る）
     # 起動したときの会社のロゴ（確認用の起動 s2・boss・cp などでは出さない）
     splash = None if (start or {"boss", "cp", "roll", "thanks"} & set(sys.argv[1:])) else Splash()
     # 重さの計測（ブラウザ版: アドレスの末尾に ?perf=1 を付けると、1秒ごとに、フレームの時間を window.perflog に溜める。ふだんは何もしない）
@@ -2087,13 +2089,24 @@ async def main():
             if name.startswith(("_draw", "_blit")):
                 setattr(game, name, _timed(getattr(game, name), name))
 
+    def fit_to_page():
+        """ブラウザ版: 窓の縦横比を、ページ（スマホの画面）に合わせる。ずれていたら、作り直す（向きを持ち替えたときも）。
+        縦向き（縦のほうが長い）のときは、何もしない（ページの側で「横向きに」と出す）"""
+        import platform
+        pw, ph = float(platform.window.innerWidth), float(platform.window.innerHeight)
+        ww, wh = pygame.display.get_surface().get_size()
+        if ph <= 0 or pw <= ph or abs(pw / ph - ww / wh) < 0.02:
+            return
+        pygame.display.set_mode((round(C.BASE_H * C.SCALE * pw / ph), C.BASE_H * C.SCALE))
+        platform.window.window_resize()
+
     while True:
         pressed = set()
         for event in pygame.event.get():
             if event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
                 pygame.quit()
                 return
-            if splash and event.type in (pygame.KEYDOWN, pygame.MOUSEBUTTONDOWN, getattr(pygame, "CONTROLLERBUTTONDOWN", -1), pygame.JOYBUTTONDOWN):
+            if splash and event.type in (pygame.KEYDOWN, pygame.MOUSEBUTTONDOWN, pygame.FINGERDOWN, getattr(pygame, "CONTROLLERBUTTONDOWN", -1), pygame.JOYBUTTONDOWN):
                 splash.skip()       # 何かを押すと、ロゴを飛ばす（そのキーは、ゲームには渡さない）
                 continue
             if event.type == pygame.KEYDOWN and event.key in KEYDOWN_MAP:
@@ -2103,6 +2116,9 @@ async def main():
             if event.type == getattr(pygame, "WINDOWFOCUSLOST", -1):     # 窓が後ろに回ったら、止める
                 pressed.add("pause_on")
             pressed |= pad.handle(event)
+            pressed |= touch.handle(event, pygame.display.get_surface().get_size())
+        if touch.active and sys.platform == "emscripten":
+            fit_to_page()       # タッチ: 窓の横幅を、スマホの画面の縦横比に合わせる（左右の帯にボタンを置くため）
         if splash:      # ロゴ画面の間は、ゲームを動かさない
             if splash.done:
                 splash = None
@@ -2114,7 +2130,7 @@ async def main():
                 await asyncio.sleep(0)
                 continue
         t_step = pygame.time.get_ticks()
-        game.step(keys_to_input(pygame.key.get_pressed()) | pad.held(), pressed)
+        game.step(keys_to_input(pygame.key.get_pressed()) | pad.held() | touch.held(), pressed)
         perf_step += pygame.time.get_ticks() - t_step
         audio.set_gain(game.vol_bgm / C.MENU["steps"], game.vol_sfx / C.MENU["steps"])    # 音を鳴らす前に（変えた音量で、鳴るように）
         for name in dict.fromkeys(game.sfx + sprites.SOUNDS):     # 同じ音は、1フレームに1回だけ
@@ -2135,7 +2151,12 @@ async def main():
         ww, wh = window.get_size()
         k = min(ww / C.BASE_W, wh / C.BASE_H)   # 16:9 を保って、余白は黒
         w, h = round(C.BASE_W * k), round(C.BASE_H * k)
-        if (w, h) == (ww, wh):      # 窓の大きさぴったり（ブラウザ版は、いつもこう）: 作り直さずに、窓へ直接引き伸ばす（毎フレームの、大きな絵の作成を省く）
+        if touch.active:            # タッチ: ゲームの絵は、左右の帯を除いた所に。帯には、ボタン
+            r = Touch.game_rect(ww, wh)
+            window.fill((0, 0, 0))
+            pygame.transform.scale(screen, r.size, window.subsurface(r))
+            touch.draw(window)
+        elif (w, h) == (ww, wh):      # 窓の大きさぴったり（ブラウザ版は、いつもこう）: 作り直さずに、窓へ直接引き伸ばす（毎フレームの、大きな絵の作成を省く）
             pygame.transform.scale(screen, (w, h), window)
         else:
             window.fill((0, 0, 0))
