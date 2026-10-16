@@ -70,7 +70,7 @@ python main.py
 - `main.py` / `config.py` / `sprites.py` / `stage.py`: ゲーム本体（`stage.py` は地形とアイテムの配置）。操作感の数値は `config.py` にまとめています
 - `assets/images/`: ゲームで使う絵
 - `tools/`: 絵の変換ツールと、画面なしの動作テスト（`python tools/smoke_test.py`）
-- `docs/`: ブラウザ版の公開用ファイル（pygbag で作成）
+- `.github/workflows/pages.yml`: ブラウザ版を作って公開する（push で自動）。`docs/CNAME` は独自ドメイン名
 - `assets/ドット絵基準.md`: 絵の基準
 - `assets/ストーリー設定.md`: 筋書きと、ボスの設定
 - `assets/ステージコンセプト.md`: 面ごとのコンセプトと、面を作る手順
