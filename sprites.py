@@ -2384,11 +2384,6 @@ class Fan(Shot):
         spun = _rimmed(spun)                            # 白い縁取り（どの背景でも、見えるように）
         x, y = round(self.px) - cam_x, round(self.py)
         surface.blit(spun, (x - spun.get_width() // 2, y - spun.get_height() // 2))
-        if self.turn_t:                                 # 戻る向きの印（小さな三角）
-            d = 1 if self.owner.cx > self.px else -1
-            tip = x + d * 18
-            pygame.draw.polygon(surface, C.BLACK, ((tip + d * 2, y), (tip - d * 5, y - 6), (tip - d * 5, y + 6)))
-            pygame.draw.polygon(surface, (255, 236, 120), ((tip, y), (tip - d * 4, y - 4), (tip - d * 4, y + 4)))
 
 
 class Petal(Shot):
