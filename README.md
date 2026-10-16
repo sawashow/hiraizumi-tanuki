@@ -3,7 +3,7 @@
 平泉（月見坂・毛越寺・金色堂）を舞台にした、2D 横スクロールアクション。Python と pygame で作っています。
 刀で斬り、木の葉手裏剣を投げて進みます。
 
-**ブラウザで遊ぶ**: https://sawashow.github.io/hiraizumi-tanuki/
+**ブラウザで遊ぶ**: https://hiraizumi-tanuki.ponpoco-works.com/
 （初回は実行環境の読み込みに 20〜30 秒かかります。開いたら、画面を一度クリックして始めます）
 
 ## 操作

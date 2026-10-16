@@ -163,18 +163,7 @@ config = {
 }
 
 function show_infobox() {
-    infobox.style.display = "block";
-
-    // Measure box
-    const w = infobox.offsetWidth;
-    const h = infobox.offsetHeight;
-
-    // Center in viewport
-    const left = (window.innerWidth - w) / 2;
-    const top = (window.innerHeight - h) / 2;
-
-    infobox.style.left = left + "px";
-    infobox.style.top = top + "px";
+    infobox.style.display = "block";    // 位置は、CSS（#infobox）で中央に固定している
 }
 
 </script>
@@ -207,6 +196,9 @@ function show_infobox() {
 
         #infobox {
             position: fixed; /* center relative to viewport */
+            left: 50%;      /* 文字が替わって幅が変わっても、いつも中央（JS で幅を測って位置を決めると、ずれる） */
+            top: 50%;
+            transform: translate(-50%, -50%);
             background: transparent;
             color: #f2e8c9;
             font-family: "Yu Mincho", "Hiragino Mincho ProN", serif;
