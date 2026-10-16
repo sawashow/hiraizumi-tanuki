@@ -11,7 +11,12 @@ IMG = os.path.join(os.path.dirname(__file__), "assets", "images")
 
 
 def _load(name):
-    return pygame.image.load(os.path.join(IMG, name)).convert_alpha()
+    img = pygame.image.load(os.path.join(IMG, name)).convert_alpha()
+    # 全面が不透明な絵（空・タイトルなどの、画面いっぱいの絵）は、透明度なしの形式にする。見た目は同じで、貼るのが速い
+    # （ブラウザ版は、1フレームの描画が重く、透明度の計算がその大部分を占めていた）
+    if pygame.mask.from_surface(img, 254).count() == img.get_width() * img.get_height():
+        return img.convert()
+    return img
 
 
 def _rimmed(img, color=(252, 252, 252)):

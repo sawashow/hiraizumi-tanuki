@@ -2061,6 +2061,23 @@ async def main():
     pad = Pad()   # コントローラ（挿すと、すぐ使える）
     # 起動したときの会社のロゴ（確認用の起動 s2・boss・cp などでは出さない）
     splash = None if (start or {"boss", "cp", "roll", "thanks"} & set(sys.argv[1:])) else Splash()
+    # 重さの計測（ブラウザ版: アドレスの末尾に ?perf=1 を付けると、1秒ごとに、フレームの時間を window.perflog に溜める。ふだんは何もしない）
+    perf = False
+    if sys.platform == "emscripten":
+        import platform
+        perf = "perf=1" in str(platform.window.location.search)
+    perf_ms, perf_t, perf_parts, perf_step, perf_blit = [], 0, {}, 0, 0
+    if perf:        # 描く処理を、部品ごとに測る（_draw・_blit で始まるもの）
+        def _timed(f, name):
+            def wrapper(*a, **k):
+                t0 = pygame.time.get_ticks()
+                r = f(*a, **k)
+                perf_parts[name] = perf_parts.get(name, 0) + pygame.time.get_ticks() - t0
+                return r
+            return wrapper
+        for name in dir(Game):
+            if name.startswith(("_draw", "_blit")):
+                setattr(game, name, _timed(getattr(game, name), name))
 
     while True:
         pressed = set()
@@ -2088,7 +2105,9 @@ async def main():
                 clock.tick(C.FPS)
                 await asyncio.sleep(0)
                 continue
+        t_step = pygame.time.get_ticks()
         game.step(keys_to_input(pygame.key.get_pressed()) | pad.held(), pressed)
+        perf_step += pygame.time.get_ticks() - t_step
         audio.set_gain(game.vol_bgm / C.MENU["steps"], game.vol_sfx / C.MENU["steps"])    # 音を鳴らす前に（変えた音量で、鳴るように）
         for name in dict.fromkeys(game.sfx + sprites.SOUNDS):     # 同じ音は、1フレームに1回だけ
             audio.play_sfx(name)
@@ -2100,15 +2119,35 @@ async def main():
             audio.keep_playing()            # 曲が終わっていたら、かけ直す（ブラウザ版）
         else:
             audio.fade_out(C.BGM_FADE_MS)   # やられたら（クリアしたら）、曲を消していく。再開すると、また始まる
+        t_draw = pygame.time.get_ticks()
         game.draw(screen, font)
+        draw_ms = pygame.time.get_ticks() - t_draw
+        t_blit = pygame.time.get_ticks()
         window = pygame.display.get_surface()
         ww, wh = window.get_size()
         k = min(ww / C.BASE_W, wh / C.BASE_H)   # 16:9 を保って、余白は黒
         w, h = round(C.BASE_W * k), round(C.BASE_H * k)
-        window.fill((0, 0, 0))
-        window.blit(pygame.transform.scale(screen, (w, h)), ((ww - w) // 2, (wh - h) // 2))
+        if (w, h) == (ww, wh):      # 窓の大きさぴったり（ブラウザ版は、いつもこう）: 作り直さずに、窓へ直接引き伸ばす（毎フレームの、大きな絵の作成を省く）
+            pygame.transform.scale(screen, (w, h), window)
+        else:
+            window.fill((0, 0, 0))
+            window.blit(pygame.transform.scale(screen, (w, h)), ((ww - w) // 2, (wh - h) // 2))
         pygame.display.flip()
+        perf_blit += pygame.time.get_ticks() - t_blit
         clock.tick(C.FPS)
+        if perf:
+            perf_ms.append((clock.get_rawtime(), draw_ms))
+            perf_t += 1
+            if perf_t >= 60:
+                raw = sorted(r for r, _ in perf_ms)
+                draws = sorted(d for _, d in perf_ms)
+                top = sorted(perf_parts.items(), key=lambda kv: -kv[1])[:5]
+                line = "stage=%d boss=%s | per1s: step=%d draw=%d scale+flip=%d | draw median=%d max=%d | over16=%d | %s" % (
+                    game.stage_i, bool(game.boss), perf_step, sum(draws), perf_blit, draws[len(draws) // 2], draws[-1],
+                    sum(r > 16 for r in raw), " ".join("%s=%d" % kv for kv in top))
+                perf_parts, perf_step, perf_blit = {}, 0, 0
+                platform.window.perflog = str(platform.window.perflog or "") + line + "\n"      # ページの変数に溜める（console.log へは出ないため）
+                perf_ms, perf_t = [], 0
         await asyncio.sleep(0)   # ブラウザ版では、毎フレームここで制御をブラウザに返す
 
 
