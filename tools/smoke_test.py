@@ -1009,6 +1009,12 @@ def _purpose(st, p):
 
 idle = [(st.name, p[0], p[1]) for st in PROD_STAGES for p in st.platforms if not _purpose(st, p)]
 check("[本番] 意味の無い足場が無い（どの足場も、穴を渡るか、上に物があるか、ボスの間にある）", not idle, str(idle))
+# 配置の意図: 見直しの済んだ面は、足場・動く足場・消える足場・敵・区画の、すべてに意図がある（tools/stage_intent.py で一覧にする）
+INTENT_DONE = ("金色堂",)
+_blank = [(st.name, what) for st in PROD_STAGES if st.name in INTENT_DONE
+          for what, notes in (("足場", st.platform_notes), ("動く足場", st.mover_notes), ("消える足場", st.blink_notes), ("敵", st.spawn_notes), ("区画", st.zone_notes))
+          for n in notes if not n]
+check("[本番] 見直しの済んだ面は、すべての足場・敵・区画に、意図が書いてある", not _blank, str(_blank[:5]))
 _f4 = [k for k, x in PROD_STAGES[3].spawns if x < 3740]
 check("[本番] 金色堂の前半は、天狗・弓兵も出る（敵が単調でない）", {"tengu", "yumihei"} <= set(_f4), str(sorted(set(_f4))))
 
