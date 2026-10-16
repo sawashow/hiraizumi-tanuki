@@ -48,7 +48,8 @@ class Game:
         self.thanks = False          # いま、姫を助ける場面（THANK YOU TANUKI!）を出している
         self.thanks_t = 0
         self.roll = False            # いま、エンドロール（平泉の道を歩く場面）を出している
-        self.ending_screen = False   # いま、エンディング画面を出している
+        self.ending_screen = False   # いま、エンディング画面を出している（いまは使っていない。エンドロールのあとは、ロゴ画面へ戻る）
+        self.logo_again = False      # 真なら、メインループが、ロゴ画面を出し直す（エンドロールのあと）
         self.ending_t = 0
         self.map_on = False      # いま、地図を出している
         self.map_t = 0
@@ -1533,12 +1534,11 @@ class Game:
         return self.roll_t * R["scroll"] >= h + R["window"][1] - R["window"][0]
 
     def _end_roll(self):
+        # エンドロールが終わったら、リセットして、起動したときと同じ、ロゴ画面からやり直す（絵は出さない）
         self.roll = False
-        if self.a.ending_image:
-            self.ending_screen, self.ending_t = True, 0
-        else:
-            self.reset()
-            self._enter_title(self.use_title)
+        self.reset()
+        self._enter_title(self.use_title)
+        self.logo_again = True
 
     def _step_roll(self, pressed):
         R = C.ROLL
@@ -2130,6 +2130,10 @@ async def main():
             C.COYOTE, C.JUMP_BUFFER = C.TOUCH["coyote"], C.TOUCH["jump_buffer"]
         if touch.active and sys.platform == "emscripten":
             fit_to_page()       # タッチ: 窓の横幅を、スマホの画面の縦横比に合わせる（左右の帯にボタンを置くため）
+        if game.logo_again:     # エンドロールのあと: 曲を消して、ロゴ画面から、やり直す
+            game.logo_again = False
+            audio.fade_out(600)
+            splash = Splash()
         if splash:      # ロゴ画面の間は、ゲームを動かさない
             if splash.done:
                 splash = None

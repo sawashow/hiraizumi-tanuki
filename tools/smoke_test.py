@@ -1599,22 +1599,15 @@ for _ in range(20000):
     g.step(set())
     if not g.roll:
         break
-check("文字が流れきると、エンディングの絵に替わる（渡っている途中では、替わらない）",
-      not g.roll and g.ending_screen and g.roll_state == "walk" and g._roll_done(), "渡った回数 %d" % g.roll_n)
+check("文字が流れきると、ロゴ画面からやり直す（絵は出さない）。スタート画面に戻り、雷も最初から数え直す",
+      not g.roll and not g.ending_screen and g.logo_again and g.title and not g.story and not g.cleared
+      and g.player.px == 60 and g.score == 0 and g.title_t == 0 and g.thunder_n == 0, "渡った回数 %d" % g.roll_n)
 gr = Game(title=True)
 gr.title = False
 gr._start_roll()
 run(gr, RL["skip"] + 1)
 run(gr, 1, (), {"restart"})
-check("エンドロールは、決定のキーで飛ばせる（エンディングの絵へ）", not gr.roll and gr.ending_screen and gr.a.ending_image is not None)
-run(g, 5, (), {"restart"})
-check("エンディングは、しばらくはEnterを受け付けない", g.ending_screen)
-snap(g, "ending screen")
-run(g, C.ENDING_SCREEN["wait"])
-run(g, 1, (), {"restart"})
-check("エンディングのあと、Enterで、スタート画面へ戻る（雷も、最初から数え直す）", g.title and not g.story and not g.cleared and not g.ending_screen
-      and g.player.px == 60 and g.score == 0 and g.title_t == 0 and g.thunder_n == 0)
-
+check("エンドロールは、決定のキーで飛ばせる（ロゴ画面からやり直す）", not gr.roll and not gr.ending_screen and gr.title and gr.logo_again)
 # ---------------------------------------------------------------- 17. 回復・落とし物・強化3種類・中間地点の演出
 class FixedRng:
     """くじを、決まった値にする"""
