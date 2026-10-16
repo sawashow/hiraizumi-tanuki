@@ -1989,7 +1989,7 @@ class Boss2(Boss):
             if self.st == P["throw_at"]:
                 snd("fan")
                 self.spawned.append(Fan(self.cx + self.facing * (self.w / 2 + 6), self.floor - C.FAN["y"],
-                                        self.facing, self.a, self))
+                                        self.facing, self.a, self, target=pr.center))   # 主人公のいる所へ（足場の上なら、斜め上へ）
             if self.rage and self.st == P["throw_at"] + P["fan2_delay"]:      # 体力が半分以下: 2枚目（足元）
                 snd("fan")
                 self.spawned.append(Fan(self.cx + self.facing * (self.w / 2 + 6), self.floor - P["fan2_y"],
@@ -2335,15 +2335,23 @@ class Gale(Shot):
 
 
 class Fan(Shot):
-    """投げた扇: ボスの向きに飛んで、距離まで行くと、その場で止まって白く光り（戻る予告）、ボスのところへ戻る。
-    刀で消せる。当たるとダメージ"""
+    """投げた扇: 投げた瞬間の主人公の位置へ向けて、まっすぐ飛ぶ（上へも、斜めにも。下向きにはしない）。
+    距離まで行くと、その場で止まって白く光り（戻る予告）、そのときのボスの所へ、まっすぐ戻る。
+    target が無ければ、水平に飛ぶ（2枚目の、足元の扇）。刀で消せる。当たるとダメージ"""
     cuttable = True
     damage = C.FAN["damage"]
 
-    def __init__(self, x, y, direction, assets, owner):
+    def __init__(self, x, y, direction, assets, owner, target=None):
         self.a = assets
         self.px, self.py = float(x), float(y)
         self.dir = direction
+        dx, dy = (direction, 0.0) if target is None else (target[0] - x, min(0.0, target[1] - y))
+        if dx * direction <= 0:     # 主人公が真上・うしろにいても、前へ投げる
+            dx = direction
+        dy = max(dy, -abs(dx) * C.FAN["steep"])     # 急すぎる角度にしない
+        n = math.hypot(dx, dy)
+        self.vx, self.vy = dx / n * C.FAN["speed"], dy / n * C.FAN["speed"]
+        self.home_y = float(y)      # 戻る高さ（ボスの、投げた所）
         self.owner = owner
         self.travel = 0.0
         self.back = False
@@ -2360,7 +2368,8 @@ class Fan(Shot):
         K = C.FAN
         self.t += 1
         if not self.back:
-            self.px += self.dir * K["speed"]
+            self.px += self.vx
+            self.py += self.vy
             self.travel += K["speed"]
             if self.travel >= K["range"] or not (0 <= self.px <= stage_w):
                 self.back = True
@@ -2368,11 +2377,13 @@ class Fan(Shot):
         elif self.turn_t:       # 折り返す前に、止まって光る（うしろから戻ってくるので、先に知らせる）
             self.turn_t -= 1
         else:
-            d = self.owner.cx - self.px
-            if abs(d) <= K["speed"] + 4 or not self.owner.active:
+            dx, dy = self.owner.cx - self.px, self.home_y - self.py
+            d = math.hypot(dx, dy)
+            if d <= K["speed"] + 4 or not self.owner.active:
                 self.alive = False
                 return
-            self.px += K["speed"] if d > 0 else -K["speed"]
+            self.px += dx / d * K["speed"]
+            self.py += dy / d * K["speed"]
 
     def draw(self, surface, cam_x):
         if not (self.a and self.a.boss2):
