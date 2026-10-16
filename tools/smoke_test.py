@@ -97,12 +97,12 @@ check("ジャンプ後に着地する", g.player.on_ground)
 oc, ki, ka = Ochimusha(0), Kitsunebi(0, "low"), Karasu(0)
 sizes = {(e.w, e.h) for e in (oc, ki, ka)}
 check("3種類の当たり判定の大きさが、すべて違う", len(sizes) == 3, str(sorted(sizes)))
-check("体力: 落ち武者3・狐火1・烏1（飛ぶ敵は、もろい）", (oc.max_hp, ki.max_hp, ka.max_hp) == (3, 1, 1))
+check("体力: 落ち武者2・狐火1・烏1（飛ぶ敵は、もろい）", (oc.max_hp, ki.max_hp, ka.max_hp) == (2, 1, 1))
 check("刀は手裏剣より強い", C.SWORD_DAMAGE > C.SHURIKEN_DAMAGE, "刀%d / 手裏剣%d" % (C.SWORD_DAMAGE, C.SHURIKEN_DAMAGE))
-check("刀の回数: 落ち武者2回・狐火1回・烏1回",
-      tuple(-(-e.max_hp // C.SWORD_DAMAGE) for e in (oc, ki, ka)) == (2, 1, 1))
-check("手裏剣の発数: 落ち武者3発・狐火1発・烏1発",
-      tuple(-(-e.max_hp // C.SHURIKEN_DAMAGE) for e in (oc, ki, ka)) == (3, 1, 1))
+check("刀の回数: 落ち武者1回・狐火1回・烏1回",
+      tuple(-(-e.max_hp // C.SWORD_DAMAGE) for e in (oc, ki, ka)) == (1, 1, 1))
+check("手裏剣の発数: 落ち武者2発・狐火1発・烏1発",
+      tuple(-(-e.max_hp // C.SHURIKEN_DAMAGE) for e in (oc, ki, ka)) == (2, 1, 1))
 check("落ち武者が一番大きい", oc.w * oc.h > max(ki.w * ki.h, ka.w * ka.h))
 check("烏は横長・狐火は小さい", ka.w > ka.h * 1.5 and ki.w * ki.h < ka.w * ka.h)
 kinds = [k for k, _ in ENEMY_SPAWNS]
@@ -221,8 +221,7 @@ for _ in range(30):
         sword_seen = True
         snap(g, "sword active")
 check("刀の判定が出る", sword_seen)
-check("刀で落ち武者のHPが2減る（3→1）", e.hp == 1, "HP=%d" % e.hp)
-check("1振りで、同じ敵に1回だけ（2回当たっていない）", e.hp == 1)
+check("刀で落ち武者を、1振りで倒す（2→0）", e.hp <= 0, "HP=%d" % e.hp)
 e2 = Ochimusha(0)
 e2.hit(C.SWORD_DAMAGE)
 check("被弾すると光って、少し止まる", e2.flash == C.HIT_FLASH and e2.stun == C.HIT_STUN)
@@ -246,7 +245,7 @@ for k in range(3):
             snap(g, "shuriken hit")
     hits.append(max(e.hp, 0))
 check("手裏剣が発射される", released)
-check("落ち武者は手裏剣3発で倒れる（3→2→1→倒れる）", hits == [2, 1, 0], str(hits))
+check("落ち武者は手裏剣2発で倒れる（2→1→倒れる）", hits == [1, 0, 0], str(hits))
 check("命中の破片が出る", effect_seen)
 
 # ---------------------------------------------------------------- 6. 狐火
@@ -1750,6 +1749,7 @@ def swing_at(gap):
     gg = fresh(px=200)
     e = Ochimusha(200 + C.PLAYER_W / 2 + gap + C.OCHI["w"] / 2)
     e.stun = 999      # 動かないようにしておく
+    e.hp = e.max_hp = 9      # 1振りで倒れないようにする（当たったかを、体力の減りで見る）
     gg.enemies = [e]
     gg.player.invincible = 999
     hp = e.hp

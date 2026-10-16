@@ -93,7 +93,7 @@ HIT_FLASH = 6    # 攻撃を受けたとき白く光るフレーム数
 HIT_STUN = 8     # 攻撃を受けたとき動きが止まるフレーム数
 
 # 落ち武者（地上の歩兵）: 大きく、遅く、体力が多い。近づくと一度止まって構える
-OCHI = dict(w=20, h=40, hp=3, touch=1, speed=0.6, active=240, ready_dist=110, ready_frames=30, swing_frames=26, wave_at=6, cooldown=120, turn_frames=150, patrol=40)
+OCHI = dict(w=20, h=40, hp=2, touch=1, speed=0.6, active=240, ready_dist=110, ready_frames=30, swing_frames=26, wave_at=6, cooldown=120, turn_frames=150, patrol=40)
 # ミイラ（亡者）: ゆっくり歩いて近づくだけ。攻撃はしない（触れると、ダメージ）。体力1。最初に出会う、いちばん弱い敵。
 # 動きは、落ち武者と同じ仕組み（ready_dist=0 で、構えない）
 MIIRA = dict(w=18, h=40, hp=1, touch=1, speed=0.4, active=260, ready_dist=0, ready_frames=1, swing_frames=1, wave_at=0, cooldown=0,
