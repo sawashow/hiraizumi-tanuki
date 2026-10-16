@@ -22,10 +22,15 @@ class Splash:
 
     @property
     def done(self):
-        return self.logo is None or self.t >= C.LOGO["fade"] * 2 + C.LOGO["hold"]
+        return self.logo is None or self.t >= self.total()
+
+    @staticmethod
+    def total():
+        """ロゴ画面の長さ: 現れる → 止まる → 消える → 白いまま待つ（余韻）"""
+        return C.LOGO["fade"] * 2 + C.LOGO["hold"] + C.LOGO["after"]
 
     def skip(self):
-        self.t = C.LOGO["fade"] * 2 + C.LOGO["hold"]
+        self.t = self.total()
 
     def alpha(self):
         """いまの濃さ（0〜255）: ふわっと現れる → 止まる → ふわっと消える"""

@@ -3116,7 +3116,7 @@ _n = 0
 while not _sp.done:
     _sp.step()
     _n += 1
-check("ロゴ画面は、約2秒で終わる（現れる・止まる・消える）", _n == C.LOGO["fade"] * 2 + C.LOGO["hold"] and _sp.logo is not None, "frames=%d" % _n)
+check("ロゴ画面は、約4秒で終わる（現れる・止まる・消える・余韻）", _n == C.LOGO["fade"] * 2 + C.LOGO["hold"] + C.LOGO["after"] and _sp.logo is not None, "frames=%d" % _n)
 _sp = Splash()
 _a0 = _sp.alpha()
 _sp.t = C.LOGO["fade"] + 5
