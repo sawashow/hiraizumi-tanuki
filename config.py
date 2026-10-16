@@ -304,7 +304,7 @@ SFX_GAME = dict(
     die=0.18, wave=0.16, cut=0.18, caw=0.16, dive=0.16, draw=0.14, arrow=0.18, snap=0.18,                    # ザコ敵
     thud=0.3, boss_wave=0.22, leap=0.2, boss_hit=0.22, boss_die=0.32, roar=0.3, thrust=0.22,                 # ボス
     fan=0.18, gust=0.2, petal=0.14, bead=0.16, ring=0.22, charge=0.2, pillar_warn=0.09, beam=0.12, warp=0.2, warp_in=0.2,
-    select=0.14, cursor=0.16, decide=0.18, clear=0.26, gameover=0.26,                                                                  # 画面
+    select=0.14, cursor=0.16, decide=0.18, clear=0.26, gameover=0.26, logo=0.09,                                                                  # 画面
 )
 SFX = {k: "sfx_%s.ogg" % k for k in SFX_GAME}
 SFX_VOLUME.update({SFX[k]: v for k, v in SFX_GAME.items()})

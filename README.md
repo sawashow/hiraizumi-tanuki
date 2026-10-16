@@ -93,6 +93,10 @@ Google Drive に置いてあります。元絵を増やしたら、Drive にも�
 - スーパータヌキの曲: 「Seven Blades High」（`assets/audio/bgm_super.ogg`）
 - 地図の曲: 「Steps Into the Morning Sun」（`assets/audio/bgm_map.ogg`）
 
+効果音は、`tools/make_sfx.py` で、計算して作っています。
+ただし、ロゴ画面の音（`assets/audio/sfx_logo.ogg`）は、「Springin’ Sound Stock」の素材「チェレスタグリッサンド1」を、切り出して使っています。
+効果音：Springin’ Sound Stock（https://www.springin.org/sound-stock/）
+
 「無念…」などの文字の絵は、ドット風フォント DotGothic16（SIL Open Font License 1.1）で書き出したものです。
 フォントのファイル自体は、ゲームにもリポジトリにも含めていません。
 https://github.com/fontworks-fonts/DotGothic16
