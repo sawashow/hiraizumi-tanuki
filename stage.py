@@ -255,8 +255,9 @@ class StageDef:
     def __init__(self, name, width, ground, platforms, items, checkpoint, spawns, bgm, bgm_boss,
                  sky="bg_sky.png", mid="bg_mid.png", tiles="", boss_x=None,
                  boss_title=C.BOSS_TITLE, boss_name=C.BOSS_NAME, boss_pattern=C.BOSS_PATTERN,
-                 talk_boss=C.TALK_BOSS, talk_tanuki=C.TALK_TANUKI, number=1, stele_x=150, boss_kind="boss", pit=(8, 6, 18), gates=(), lanterns=(), zones=(), gilt=False, haze=None, winds=(), traps=(), thought=(), pit_deep=None, climb=None, blinks=(), mid_follow=None, fill_rows=(), movers=()):
+                 talk_boss=C.TALK_BOSS, talk_tanuki=C.TALK_TANUKI, number=1, stele_x=150, boss_kind="boss", pit=(8, 6, 18), gates=(), lanterns=(), zones=(), gilt=False, haze=None, winds=(), traps=(), thought=(), pit_deep=None, climb=None, blinks=(), mid_follow=None, fill_rows=(), movers=(), boss_hp=1.0):
         self.name, self.width = name, width
+        self.boss_hp = boss_hp      # この面のボスの体力の倍率（難しさの倍率に、さらに掛ける）
         # 行の末尾の意図は、切り分けて *_notes に持つ（遊びには使わない。設計の管理用）
         platforms, self.platform_notes = split_intent(platforms)
         spawns, self.spawn_notes = split_intent(spawns)
@@ -408,8 +409,7 @@ SPAWNS1B = (   # 月見坂は、落ち武者の面。区画（ZONES1）ごとに
     ("ochimusha", 2460, "中の坂: 坂の落ち武者"),
     ("kitsunebi_low", 2500, "中の坂: 落ち武者のうしろの、低い狐火"),
     ("ochimusha", 2820, "落ち武者の関: 最初の山。落ち武者の1体目"),
-    ("karasu", 2880, "落ち武者の関: 上から烏"),
-    ("ochimusha", 2900, "落ち武者の関: 落ち武者の2体目。台の上のおにぎりで立て直す"),
+    ("ochimusha", 2990, "落ち武者の関: 石垣の上の、落ち武者の2体目。1体目を倒し、台のおにぎりで立て直してから"),
     ("kitsunebi_high", 3000, "落ち武者の関: 穴の手前の、高い狐火"),
     ("miira", 3250, "ひと息: ミイラ3体。山のあとの、気持ちよく斬れる所"),
     ("miira", 3300, "ひと息: ミイラの2体目"),
@@ -426,15 +426,13 @@ SPAWNS1B = (   # 月見坂は、落ち武者の面。区画（ZONES1）ごとに
     ("karasu", 5450, "月の坂: 頂上の手前の烏"),
     ("karasu", 5560, "月の坂: 頂上の烏の2羽目"),
     ("ochimusha", 5590, "月の坂: 頂上の落ち武者。動く足場へ跳ぶ前の、最後の一体"),
-    ("miira", 5840, "尾根の下り: 動く足場を越えた先のミイラ2体"),
+    ("miira", 5840, "尾根の下り: 昇降機で上がった先のミイラ"),
     ("kitsunebi_high", 5850, "尾根の下り: ミイラの上の、高い狐火"),
-    ("miira", 5860, "尾根の下り: ミイラの2体目"),
-    ("ochimusha", 5955, "尾根の下り: 下りの落ち武者"),
+    ("ochimusha", 6060, "尾根の下り: 下りの落ち武者（ミイラと狐火を片付けたあと）"),
     ("karasu", 6250, "尾根の下り: 烏"),
     ("kitsunebi_low", 6480, "最後の関: いちばんの山。全種類を混ぜる。低い狐火"),
     ("ochimusha", 6500, "最後の関: 落ち武者の1体目"),
-    ("karasu", 6520, "最後の関: 上から烏"),
-    ("ochimusha", 6560, "最後の関: 落ち武者の2体目"),
+    ("ochimusha", 6800, "最後の関: 穴を越えた先の、落ち武者の2体目"),
     ("kitsunebi_high", 6750, "最後の関: 穴を越えた先の、高い狐火"),
 )
 # 区画: (左端, 右端, 名前, 役目, ねらいの強さ, この区画でしてほしい動き)。tools/difficulty.py 3 で、実際の強さと比べる
@@ -546,9 +544,7 @@ SPAWNS2 = (   # 毛越寺は、最初の面。池と飛び石（ジャンプ）�
     ("karasu", 2860, "築山の先: 三つ目の池の手前で、急降下してくる烏（池に入る前に片付ける）"),
     ("ochimusha", 3340, "山越え: 反橋の手前の落ち武者。入口の台の上で、かわせる"),
     ("kitsunebi_low", 3420, "山越え: 反橋の登りの、低い狐火（跳び越える）"),
-    ("kitsunebi_high", 3560, "山越え: 反橋の上の、高い狐火（くぐる）"),
-    ("karasu", 3600, "山越え: 反橋の頂上で、上から烏"),
-    ("karasu", 3700, "山越え: 反橋の降りで、2羽目の烏。この面の山場"),
+    ("karasu", 3600, "山越え: 反橋の頂上で、上から烏。この面の山場（最初の面なので、3体まで）"),
     ("kitsunebi_high", 3990, "最後の池の手前: 強化への足場の道を邪魔する狐火"),
 )
 # 区画: (左端, 右端, 名前, 役目, ねらいの強さ, この区画でしてほしい動き)。tools/difficulty.py 1 で、実際の強さと比べる
@@ -567,7 +563,8 @@ ZONES2 = (
 STAGE2 = StageDef("毛越寺", 5000, GROUND2, PLATFORMS2, thin_dango(ITEMS2, PLATFORMS2), (2170, T - 32), SPAWNS2, C.BGM_STAGE1, C.BGM_BOSS,
                   lanterns=(("triple", 300), ("onigiri", 2310), ("onigiri", 4370)),   # 石灯籠: 入口（強化）・中間地点の先（回復）・ボスの前（回復）
                   sky="stage2/bg_sky.png", mid="stage2/bg_mid.png", tiles="stage2/",
-                  number=1, stele_x=130, zones=ZONES2, thought=("wanko",), movers=MOVERS2)   # ボスは、1面の泰衡（遊ぶ順で決まる）。絵が無いあいだは、1面の絵で代わりにする
+                  number=1, stele_x=130, zones=ZONES2, thought=("wanko",), movers=MOVERS2,
+                  boss_hp=0.8)   # 最初の面（教える面）: ボスは、体力を8割に   # ボスは、1面の泰衡（遊ぶ順で決まる）。絵が無いあいだは、1面の絵で代わりにする
 # ---------------------------------------------------------------- 2面（高館）
 # 義経堂のある高台。北上川と衣川を見下ろす崖の道。夏の昼。高低差が大きく、遠くから撃たれる面（敵の絵・弓兵は、まだ無いので、いまは既存の敵）
 W3 = 6000
@@ -679,7 +676,6 @@ SPAWNS3 = (   # 区画（ZONES3）ごとに、かたまりで置く。区画と�
     ("karasu", 1660, "見晴らしの岩場: 頂上の先の烏。切れ目2を跳ぶ前に来る"),
     ("miira", 2340, "崖渡りの先: 渡りきった谷のミイラ。跳ぶ緊張のあとの、軽い一体"),
     ("kitsunebi_high", 2150, "崖渡り: 動く足場の上を横切る狐火。乗り移るタイミングを、少しだけ難しくする"),
-    ("miira", 2550, "高台: 切れ目3を越えた先のミイラ"),
     ("kitsunebi_high", 2560, "高台: 段を登る所の、高い狐火（くぐる）"),
     ("kitsunebi_low", 2600, "高台: 低い狐火（跳び越える）。狐火の高低を続けて出す"),
     ("yumihei", 2700, "高台: 狐火の先の弓兵。段の上から撃つ"),
@@ -695,8 +691,7 @@ SPAWNS3 = (   # 区画（ZONES3）ごとに、かたまりで置く。区画と�
     ("yumihei", 4700, "頂上: 下りの先から撃つ弓兵"),
     ("ochimusha", 4820, "頂上: 落ち武者の2体目"),
     ("karasu", 4900, "頂上: 烏の2羽目"),
-    ("tengu", 4940, "頂上: 最後に、天狗の跳びかかり"),
-    ("kitsunebi_low", 4950, "頂上: 天狗と一緒に、低い狐火。全種類を混ぜる、この面の山場"),
+    ("tengu", 5060, "頂上: 最後に、天狗の跳びかかり（烏をさばいたあと、間をおいて）"),
 )
 # 区画: (左端, 右端, 名前, 役目, ねらいの強さ, この区画でしてほしい動き)。tools/difficulty.py 2 で、実際の強さと比べる
 ZONES3 = (
@@ -855,8 +850,7 @@ SPAWNS4 = _shift4((   # 堂の中は、敵が少なめ（主役は、ボス）�
     ("ochimusha", 3990, "金の登り: 塔の下を歩く落ち武者。登っていれば安全"),
     ("ochimusha", 4230, "金の登り: 塔の先の段の落ち武者。塔から降りた所で、構えを見て斬る"),
     ("karasu", 4350, "金の登り: 頂上の烏。穴を跳ぶ前に来る（跳ぶ前に片付ける）"),
-    ("kitsunebi_low", 4600, "下り: 狐火の対（低い）。台のおにぎりの手前"),
-    ("kitsunebi_high", 4640, "下り: 狐火の対（高い）"),
+    ("kitsunebi_low", 4600, "下り: 低い狐火。台のおにぎりの手前"),
     ("miira", 4680, "下り: ミイラの列。台（4700〜）の上のおにぎりを取りつつ、まとめて斬る"),
     ("miira", 4730, "下り: ミイラの列の2体目"),
     ("ochimusha", 4830, "下り: ミイラの列の奥の落ち武者。ミイラを斬った勢いのまま"),

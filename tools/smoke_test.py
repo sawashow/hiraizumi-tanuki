@@ -31,6 +31,7 @@ _L1.boss_title, _L1.boss_name, _L1.boss_pattern = C.BOSS_TITLE, C.BOSS_NAME, C.B
 _L1.talk_boss, _L1.talk_tanuki = C.TALK_BOSS, C.TALK_TANUKI
 _L2 = copy.copy(STAGE2)
 _L2.number, _L2.boss_kind, _L2.boss_pattern = 2, "boss2", C.BOSS2_PATTERN
+_L2.boss_hp = 1.0     # 写しは「2面の基衡」として使う（本番の毛越寺の、ボスを弱める倍率は、持ち込まない）
 _L2.boss_title, _L2.boss_name = "enemies/boss2_title.png", "enemies/boss2_name.png"
 _L2.talk_boss, _L2.talk_tanuki = "talk_boss2.png", "talk_tanuki2.png"
 STAGES[:] = [_L1, _L2]
@@ -1065,6 +1066,13 @@ check("清衡は、斬られる範囲が、体より広い（横に広く、下�
 _ar4 = PROD_STAGES[3].arenas[-1]
 check("清衡の間には、左右に台がある（地面と台を行き来して戦う）",
       len([pl for pl in PROD_STAGES[3].platforms if _ar4["x0"] < pl[0] < _ar4["x1"]]) == 2)
+# 敵を、団子のように固めて置かない（120 の幅に、3体以上を置かない。1体ずつ相手にできるように）
+_crowd = []
+for st in PROD_STAGES:
+    _xs = sorted(x for k, x in st.spawns)
+    _crowd += [(st.name, _xs[i]) for i in range(len(_xs) - 2) if _xs[i + 2] - _xs[i] <= 120]
+check("[本番] 敵を、固めて置かない（120 の幅に、3体以上を置かない）", not _crowd, str(_crowd))
+check("1面（毛越寺）は、ボスの体力が弱め（教える面）", PROD_STAGES[0].boss_hp < 1 and all(st.boss_hp == 1 for st in PROD_STAGES[1:]))
 _f4 = [k for k, x in PROD_STAGES[3].spawns if x < 3740]
 check("[本番] 金色堂の前半は、天狗・弓兵も出る（敵が単調でない）", {"tengu", "yumihei"} <= set(_f4), str(sorted(set(_f4))))
 

@@ -868,7 +868,7 @@ class Game:
             pattern = self.stage.boss_pattern if final else {"boss3": C.BOSS3_PATTERN, "benkei": C.BENKEI_PATTERN}.get(ar["kind"])
             self.boss = cls(ar["boss_x"], self.a, self.terrain.height_at(ar["boss_x"]), ar["x0"], ar["x1"],
                             quick=self.boss_state is not None or not final, end_x=ar["boss_x"], pattern=pattern)
-            self.boss.max_hp = self.boss.hp = max(1, round(self.boss.max_hp * self.L["boss_hp"]))
+            self.boss.max_hp = self.boss.hp = max(1, round(self.boss.max_hp * self.L["boss_hp"] * self.stage.boss_hp))   # 面ごとの倍率（1面は、教える面なので、弱め）
             if not final:
                 self.boss.midway = True     # 面の途中の相手（影のボス・中ボス）: 倒すと、先へ進める
                 if ar["kind"] != "benkei":
