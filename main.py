@@ -2117,6 +2117,8 @@ async def main():
                 pressed.add("pause_on")
             pressed |= pad.handle(event)
             pressed |= touch.handle(event, pygame.display.get_surface().get_size())
+        if touch.active and C.COYOTE != C.TOUCH["coyote"]:     # タッチで遊ぶ人は、ジャンプを受け付ける時間を、少し長く
+            C.COYOTE, C.JUMP_BUFFER = C.TOUCH["coyote"], C.TOUCH["jump_buffer"]
         if touch.active and sys.platform == "emscripten":
             fit_to_page()       # タッチ: 窓の横幅を、スマホの画面の縦横比に合わせる（左右の帯にボタンを置くため）
         if splash:      # ロゴ画面の間は、ゲームを動かさない
