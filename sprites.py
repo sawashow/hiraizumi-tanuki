@@ -848,7 +848,7 @@ class Ochimusha(Enemy):
         self.swing_t = 0
         self.turn_t = 0     # 端で折り返して歩く残りフレーム
         self.cool = 0
-        self.patrol_dir = 1
+        self.patrol_dir = -1    # 見回りは、主人公が来る側（左）へ歩き出す
         self.spawned = []   # 出した光波（Game が受け取って動かす）
 
     def think(self, pr, stage_w, terrain=None):
@@ -884,6 +884,7 @@ class Ochimusha(Enemy):
                 self.turn_t = P["turn_frames"]      # 進めない（端に来た）: 折り返す
                 self.patrol_dir = -self.facing
         else:
+            self.facing = self.patrol_dir   # 見回りの間は、歩く向きを向く（主人公を向いたまま、後ずさりしない）
             moved = self._step(self.patrol_dir * P["speed"] * 0.5, terrain)
             if not moved or abs(self.cx - self.x0) > P["patrol"]:
                 self.patrol_dir = -self.patrol_dir
