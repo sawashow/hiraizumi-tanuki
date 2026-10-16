@@ -1,26 +1,58 @@
-"""スマホのタッチ操作。画面の左右の帯に、ボタンを出す（ゲームの絵には重ねない）。
-一度でも画面に触ると、ボタンが出る（キーボード・コントローラで遊ぶ人には、出さない）。
+"""スマホのタッチ操作。画面の左右の帯に、目印を出す（ゲームの絵には重ねない）。
+一度でも画面に触ると、目印が出る（キーボード・コントローラで遊ぶ人には、出さない）。
 
-並び:  左の帯＝十字キー（↑↓←→。指を滑らせて、向きを変えられる）
-      右の帯＝上から、手裏剣・刀・ジャンプ（互い違い）、いちばん上に、ポーズ
+決まった小さな場所を、正確に押さなくてよい作りにする（手元を見ずに遊べるように）:
+  左半分＝移動のスティック。触った所が中心になり、指を左右にずらすと歩き、下へずらすと、しゃがむ。
+          中心は、指が離れすぎると、ついてくる（反対へ向きを変えるのに、大きく戻さなくてよい）
+  右半分＝高さで選ぶ3つの帯。上から、手裏剣・刀・ジャンプ（ジャンプが、いちばん広い）。
+          指を滑らせて、別の帯に入ると、そちらが出る。右上の隅だけは、ポーズ（小さい。誤って押さないように）
 ゲームの絵は、窓から左右の帯を除いた所に、16:9 のまま、できるだけ大きく出す（config.TOUCH の side が、帯の幅）。
 コントローラ（gamepad.py）と同じく、「このフレームに押したもの」（handle）と「押している方向」（held）を返す。
 """
-import math
-
 import pygame
 
 import config as C
 
-# ボタンを押した瞬間に、何になるか（コントローラの A・X・B・START と同じ）。ジャンプは、決定も兼ねる
+# 押した瞬間に、何になるか（コントローラの A・X・B・START と同じ）。ジャンプは、決定も兼ねる
 PRESS = {"jump": ("jump", "restart"), "attack": ("attack",), "throw": ("throw",), "pause": ("restart", "pause")}
 RELEASE = {"jump": ("jump_release",)}
+ACTIONS = ("throw", "attack", "jump")       # 右半分の帯（上から）
+
+
+class Stick:
+    """移動のスティック（左半分の指1本）。触った所が中心。中心は、指が離れすぎると、ついてくる"""
+
+    def __init__(self, x, y, wh):
+        self.ox, self.oy = x, y
+        self.x, self.y = x, y
+        self.wh = wh
+
+    def move(self, x, y):
+        K, u = C.TOUCH, self.wh
+        lim, vlim = u * K["stick_max"], u * K["stick_down"] * 1.5     # 縦は、しゃがむのに要る分は、残す
+        self.x, self.y = x, y
+        self.ox = min(max(self.ox, x - lim), x + lim)     # 離れすぎたら、中心が、指についてくる
+        self.oy = min(max(self.oy, y - vlim), y + vlim)
+
+    def dirs(self):
+        K, u = C.TOUCH, self.wh
+        dx, dy = self.x - self.ox, self.y - self.oy
+        out = set()
+        if dx >= u * K["stick_dead"]:
+            out.add("right")
+        elif dx <= -u * K["stick_dead"]:
+            out.add("left")
+        if dy >= u * K["stick_down"]:
+            out.add("down")
+        elif dy <= -u * K["stick_down"]:
+            out.add("up")       # メニューの項目選び
+        return out
 
 
 class Touch:
     def __init__(self):
-        self.active = False     # 一度でも触ったら、ボタンを出す
-        self.fingers = {}       # 指の番号 → いま押しているもの（"jump" など。十字キーは、方向の集まり）
+        self.active = False     # 一度でも触ったら、目印を出す
+        self.fingers = {}       # 指の番号 → Stick（移動）か、"jump" などの名前
 
     # --- 並び（窓の大きさから、毎回計算する） ---
     @staticmethod
@@ -32,46 +64,25 @@ class Touch:
         return pygame.Rect((ww - w) // 2, (wh - h) // 2, w, h)
 
     @staticmethod
-    def buttons(ww, wh):
-        """ボタンの、中心と半径: {名前: (x, y, r)}。十字キーは "dpad"（中心と、外側の半径）"""
-        side = round(wh * C.TOUCH["side"])
-        u = wh                      # 大きさの物差し（窓の高さ）
-        lx, rx = side // 2, ww - side // 2
-        r = round(u * C.TOUCH["button"])
-        s = round(r * 0.35)         # 互い違いのずれ（縦に並べて、親指を滑らせやすく）
-        return {
-            "dpad": (lx, round(u * 0.62), min(round(u * C.TOUCH["dpad"]), side // 2 - 4)),
-            "throw": (rx + s, round(u * 0.36), r),          # 右の帯: 上から、手裏剣・刀・ジャンプ（いちばん押す物を、いちばん下に）
-            "attack": (rx - s, round(u * 0.58), r),
-            "jump": (rx + s, round(u * 0.80), r),
-            "pause": (rx, round(u * 0.10), round(r * 0.5)),
-        }
+    def bands(wh):
+        """右半分の帯の、上端と下端: {名前: (上, 下)}。ポーズは、右上の隅（帯の上の端の、さらに上）"""
+        cut = C.TOUCH["cuts"]           # 手裏剣・刀・ジャンプの境目（窓の高さに対する割合）
+        ys = [round(wh * c) for c in cut] + [wh]
+        return {name: (ys[i], ys[i + 1]) for i, name in enumerate(ACTIONS)}
 
-    def _hit(self, x, y, ww, wh):
-        """窓の上の (x, y) に、何があるか。十字キーは、方向の集まり（frozenset）。何も無ければ None"""
-        bs = self.buttons(ww, wh)
-        cx, cy, R = bs["dpad"]
-        dx, dy = x - cx, y - cy
-        if math.hypot(dx, dy) <= R * C.TOUCH["reach"]:      # 十字キー: 中心からの角度で、向きを決める（斜めは、2つ）
-            dirs = set()
-            if math.hypot(dx, dy) > R * 0.18:
-                a = math.degrees(math.atan2(-dy, dx)) % 360
-                if a < 60 or a > 300:
-                    dirs.add("right")
-                if 120 < a < 240:
-                    dirs.add("left")
-                if 30 < a < 150:
-                    dirs.add("up")
-                if 210 < a < 330:
-                    dirs.add("down")
-            return frozenset(dirs)
-        best = None
-        for name in ("jump", "attack", "throw", "pause"):
-            bx, by, r = bs[name]
-            d = math.hypot(x - bx, y - by)
-            if d <= r * C.TOUCH["reach"] and (best is None or d < best[0]):     # 少し外れても、近いボタンを押したことにする
-                best = (d, name)
-        return best and best[1]
+    @staticmethod
+    def pause_rect(ww, wh):
+        side = round(wh * C.TOUCH["side"])
+        return pygame.Rect(ww - side, 0, side, round(wh * C.TOUCH["cuts"][0]))
+
+    def _action(self, x, y, ww, wh):
+        """右半分の (x, y) が、どの帯か（ポーズの隅なら "pause"）"""
+        if self.pause_rect(ww, wh).collidepoint(x, y):
+            return "pause"
+        for name, (top, bottom) in self.bands(wh).items():
+            if top <= y < bottom:
+                return name
+        return None
 
     # --- イベントから、「このフレームに押した」ものを返す ---
     def handle(self, event, size):
@@ -80,27 +91,40 @@ class Touch:
             return set()
         self.active = True
         ww, wh = size
+        x, y = event.x * ww, event.y * wh
+        fid = event.finger_id
+        before = self.fingers.get(fid)
+        if t == pygame.FINGERDOWN:
+            if x < ww / 2:
+                self.fingers[fid] = Stick(x, y, wh)
+                return set()
+            now = self._action(x, y, ww, wh)
+        elif t == pygame.FINGERMOTION:
+            if isinstance(before, Stick):
+                before.move(x, y)
+                return set()
+            now = self._action(x, y, ww, wh) if before is not None else None
+            if before == "pause" or now == "pause":     # ポーズには、滑らせて入らない（誤って止めない）
+                now = before
+        else:
+            now = None
         out = set()
-        before = self.fingers.get(event.finger_id)
-        now = None if t == pygame.FINGERUP else self._hit(event.x * ww, event.y * wh, ww, wh)
-        if t == pygame.FINGERMOTION and isinstance(before, str) and now != before:
-            now = before        # ボタンから指がずれても、離すまでは、押したまま（十字キーだけ、滑らせて向きを変える）
-        if now != before:
-            if isinstance(before, str):
+        if now != before and not isinstance(before, Stick):
+            if before is not None:
                 out |= set(RELEASE.get(before, ()))
-            if isinstance(now, str):
+            if now is not None:
                 out |= set(PRESS.get(now, ()))
         if now is None:
-            self.fingers.pop(event.finger_id, None)
+            self.fingers.pop(fid, None)
         else:
-            self.fingers[event.finger_id] = now
+            self.fingers[fid] = now
         return out
 
     def held(self):
         out = set()
         for v in self.fingers.values():
-            if isinstance(v, frozenset):
-                out |= v
+            if isinstance(v, Stick):
+                out |= v.dirs()
         if "left" in out and "right" in out:
             out -= {"left", "right"}
         return out
@@ -108,25 +132,40 @@ class Touch:
     # --- 描く（左右の帯の上。帯は黒なので、透明にしなくてよい） ---
     def draw(self, window):
         ww, wh = window.get_size()
-        bs = self.buttons(ww, wh)
-        on = set(self.held()) | {v for v in self.fingers.values() if isinstance(v, str)}
-        base, lit, mark = C.TOUCH["color"], C.TOUCH["lit"], C.TOUCH["mark"]
-        cx, cy, R = bs["dpad"]
-        pygame.draw.circle(window, base, (cx, cy), R, max(2, R // 14))
-        s = round(R * 0.32)
-        for name, (vx, vy) in (("up", (0, -1)), ("down", (0, 1)), ("left", (-1, 0)), ("right", (1, 0))):
-            px, py = cx + vx * round(R * 0.62), cy + vy * round(R * 0.62)
+        K = C.TOUCH
+        side = round(wh * K["side"])
+        base, lit, mark = K["color"], K["lit"], K["mark"]
+        pressed = {v for v in self.fingers.values() if isinstance(v, str)}
+        dirs = self.held()
+        # 左の帯: 移動の目印（左右の矢印と、下の矢印）。押している向きは、光る
+        cx, cy, s = side // 2, round(wh * 0.62), round(wh * 0.05)
+        for name, (vx, vy) in (("left", (-1, 0)), ("right", (1, 0)), ("down", (0, 1))):
+            px, py = cx + vx * round(s * 1.6), cy + vy * round(s * 1.6)
             tip = (px + vx * s, py + vy * s)
-            wing = ((px - vy * s - vx * s // 2, py - vx * s - vy * s // 2), (px + vy * s - vx * s // 2, py + vx * s - vy * s // 2))
-            pygame.draw.polygon(window, lit if name in on else mark, (tip,) + wing)
-        for name in ("jump", "attack", "throw", "pause"):
-            bx, by, r = bs[name]
-            pygame.draw.circle(window, lit if name in on else base, (bx, by), r, 0 if name in on else max(2, r // 10))
-            self._icon(window, name, bx, by, r, (16, 16, 24) if name in on else mark)
+            wing = ((px - vy * s, py - vx * s), (px + vy * s, py + vx * s))
+            pygame.draw.polygon(window, lit if name in dirs else mark, (tip,) + wing)
+        pygame.draw.circle(window, base, (cx, cy), max(3, s // 2))
+        for f in self.fingers.values():         # 指を置いた所（スティックの中心）を、輪で示す（帯の中にいるときだけ）
+            if isinstance(f, Stick) and f.ox < side:
+                pygame.draw.circle(window, base, (round(f.ox), round(f.oy)), round(wh * K["stick_max"]), 2)
+        # 右の帯: 高さの帯ごとに、印。押している帯は、光る
+        rx = ww - side // 2
+        for name, (top, bottom) in self.bands(wh).items():
+            if name != ACTIONS[0]:
+                pygame.draw.line(window, base, (ww - side + 8, top), (ww - 8, top), 1)
+            r = min(side // 2 - 8, (bottom - top) // 2 - 6)
+            my = (top + bottom) // 2
+            on = name in pressed
+            pygame.draw.circle(window, lit if on else base, (rx, my), r, 0 if on else max(2, r // 10))
+            self._icon(window, name, rx, my, r, (16, 16, 24) if on else mark)
+        pr = self.pause_rect(ww, wh)
+        r = min(pr.w, pr.h) // 4
+        pygame.draw.circle(window, lit if "pause" in pressed else base, pr.center, r, max(2, r // 6))
+        self._icon(window, "pause", pr.centerx, pr.centery, r, mark)
 
     @staticmethod
     def _icon(window, name, x, y, r, color):
-        """ボタンの印（字は使わない）: ジャンプ＝上向きの山／刀＝斜めの線／手裏剣＝四方の星／ポーズ＝縦の2本"""
+        """印（字は使わない）: ジャンプ＝上向きの山／刀＝斜めの線／手裏剣＝四方の星／ポーズ＝縦の2本"""
         w = max(2, r // 7)
         if name == "jump":
             pygame.draw.lines(window, color, False, ((x - r * 0.4, y + r * 0.2), (x, y - r * 0.3), (x + r * 0.4, y + r * 0.2)), w)
