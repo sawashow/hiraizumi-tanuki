@@ -1101,18 +1101,21 @@ class Game:
                     row += 1
         screen.set_clip(view)
         # 浮き足場（絵があれば、礎石などの絵。無ければ、地面の上端のタイルを横に並べる）
-        for n, (x0, x1, top_y) in enumerate(self.terrain.platforms):
+        def platform(n, x0, x1, top_y):
             ledge = self.a.ledges.get(x1 - x0 + C.STONE_PAD * 2)
             if ledge:       # 幅に合わせて作ってある、足場の絵（草の上の面に、足が少し沈む）
                 screen.blit(ledge, (x0 - C.STONE_PAD - cam, top_y - C.LEDGE_SINK))
-                continue
+                return
             if self.a.stones:
                 img = self._stone(n, x1 - x0 + C.STONE_PAD * 2)
                 screen.blit(img, (x0 - C.STONE_PAD - cam, top_y - 3))
-                continue
+                return
             screen.set_clip(pygame.Rect(x0 - cam, view.y, x1 - x0, view.h))
             for tx in range(x0, x1, 32):
                 screen.blit(top, (tx - cam, top_y - (C.FLOOR_Y - C.GROUND_Y)))
+            screen.set_clip(view)
+        for n, (x0, x1, top_y) in enumerate(self.terrain.platforms):
+            platform(n, x0, x1, top_y)
         screen.set_clip(view)
         # 動く足場: 動く道すじに、細い点線を引いて（どこを動くかが、分かるように）、いまの位置に、ふつうの足場の絵を出す
         for n, (m, (x0, x1, top_y)) in enumerate(zip(self.terrain.movers, self.terrain.mover_now)):
@@ -1123,13 +1126,7 @@ class Game:
                 px_, py_ = ax + w // 2 + (bx - ax) * i // 20 - cam, ay + (by - ay) * i // 20 + 5
                 if i % 2 == 0:
                     screen.fill((236, 226, 196), (px_, py_, 2, 1))
-            ledge = self.a.ledges.get(x1 - x0 + C.STONE_PAD * 2)
-            if ledge:
-                screen.blit(ledge, (x0 - C.STONE_PAD - cam, top_y - C.LEDGE_SINK))
-            elif self.a.stones:
-                screen.blit(self._stone(100 + n, x1 - x0 + C.STONE_PAD * 2), (x0 - C.STONE_PAD - cam, top_y - 3))
-            else:
-                pygame.draw.rect(screen, (150, 130, 96), (x0 - cam, top_y, x1 - x0, 8))
+            platform(100 + n, x0, x1, top_y)        # ふつうの足場と、同じ絵
         # 消える光の足場: 乗れる間は、明るい金の板。消える前は、点滅。消えている間も、うすい枠を出す（どこに出るかが、分かるように）
         for n, b in enumerate(self.terrain.blinks):
             x0, x1, top_y = b[:3]
