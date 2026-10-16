@@ -757,6 +757,11 @@ class Enemy:
     def rect(self):
         return pygame.Rect(round(self.cx - self.w / 2), round(self.cy - self.h / 2), self.w, self.h)
 
+    @property
+    def hurt_rect(self):
+        """主人公の攻撃が当たる範囲（ふつうは、体と同じ。見た目より体の狭いボスは、広げる）"""
+        return self.rect
+
     def update(self, player_rect, stage_w, terrain=None):
         self.t += 1
         if self.dying:
@@ -1712,6 +1717,13 @@ class Boss4(Boss):
         self.turn = 0                        # 出した攻撃の数（攻撃の順番を決める）
         self.dest = None                     # 転移で、現れる場所
         self.roared = False                  # 体力が半分になったときの、怒りの演出を、もう見せた
+
+    @property
+    def hurt_rect(self):
+        """斬られる範囲: 見た目（後光を背負って座る、大きな絵）に合わせて、体より横に広く、浮いている下の床まで（触れて痛い範囲は、体のまま）"""
+        r = self.rect.inflate(self.P["hurt_w"] - self.w, 0)
+        r.height += self.P["hover"]
+        return r
 
     def _volley(self):
         seq = C.BOSS4_RAGE_VOLLEYS if self.rage else C.BOSS4_VOLLEYS
