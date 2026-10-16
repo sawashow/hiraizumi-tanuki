@@ -3060,6 +3060,22 @@ _Pillar(100, C.FLOOR_Y, gz.a).update(1000)
 check("光の柱の予告の音は、続けて落ちるうちの、最初の1本だけが鳴らす", not loud and len(_sp.SOUNDS) == 1)
 _sp.SOUNDS.clear()
 
+# ---------------------------------------------------------------- 起動時の会社のロゴ画面
+from splash import Splash  # noqa: E402
+_sp = Splash()
+_n = 0
+while not _sp.done:
+    _sp.step()
+    _n += 1
+check("ロゴ画面は、約2秒で終わる（現れる・止まる・消える）", _n == C.LOGO["fade"] * 2 + C.LOGO["hold"] and _sp.logo is not None, "frames=%d" % _n)
+_sp = Splash()
+_a0 = _sp.alpha()
+_sp.t = C.LOGO["fade"] + 5
+check("ロゴは、最初は見えず、止まっている間は、はっきり見える", _a0 == 0 and _sp.alpha() == 255)
+_sp = Splash()
+_sp.skip()
+check("何かを押すと、ロゴを飛ばせる", _sp.done)
+
 cols = 3
 rows = (len(shots) + cols - 1) // cols
 sheet = pygame.Surface((cols * C.BASE_W, rows * C.BASE_H))
