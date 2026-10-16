@@ -355,6 +355,11 @@ class Game:
         self.intro_t += 1
         if self.boss_intro:   # ボスが出てくる場面の間は、動かせない
             held, pressed = set(), set()
+        self.terrain.move(self.intro_t)     # 動く足場を進める。乗っていたら、一緒に運ぶ
+        carry = self.terrain.rider(p.px, p.py) if p.on_ground else None
+        if carry:
+            p.px += carry[0]
+            p.py += carry[1]
         if "jump" in pressed:
             p.jump()
         if "jump_release" in pressed:
@@ -1109,6 +1114,22 @@ class Game:
             for tx in range(x0, x1, 32):
                 screen.blit(top, (tx - cam, top_y - (C.FLOOR_Y - C.GROUND_Y)))
         screen.set_clip(view)
+        # 動く足場: 動く道すじに、細い点線を引いて（どこを動くかが、分かるように）、いまの位置に、ふつうの足場の絵を出す
+        for n, (m, (x0, x1, top_y)) in enumerate(zip(self.terrain.movers, self.terrain.mover_now)):
+            ax, ay, bx, by, w = m[:5]
+            if max(ax, bx) + w - cam < 0 or min(ax, bx) - cam > C.BASE_W:
+                continue
+            for i in range(0, 21):
+                px_, py_ = ax + w // 2 + (bx - ax) * i // 20 - cam, ay + (by - ay) * i // 20 + 5
+                if i % 2 == 0:
+                    screen.fill((236, 226, 196), (px_, py_, 2, 1))
+            ledge = self.a.ledges.get(x1 - x0 + C.STONE_PAD * 2)
+            if ledge:
+                screen.blit(ledge, (x0 - C.STONE_PAD - cam, top_y - C.LEDGE_SINK))
+            elif self.a.stones:
+                screen.blit(self._stone(100 + n, x1 - x0 + C.STONE_PAD * 2), (x0 - C.STONE_PAD - cam, top_y - 3))
+            else:
+                pygame.draw.rect(screen, (150, 130, 96), (x0 - cam, top_y, x1 - x0, 8))
         # 消える光の足場: 乗れる間は、明るい金の板。消える前は、点滅。消えている間も、うすい枠を出す（どこに出るかが、分かるように）
         for n, b in enumerate(self.terrain.blinks):
             x0, x1, top_y = b[:3]

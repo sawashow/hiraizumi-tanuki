@@ -455,6 +455,8 @@ FALL_Y = BASE_H + 40   # 足元がこの高さ（画面の下）を超えたら�
 # 消える光の足場（stage.py の blinks）: period フレームで一巡り。初めの on フレームの間だけ、乗れる。
 # そのうち、終わりの warn フレームは、点滅する（もうすぐ消える予告）。消えている間も、うすい枠が見える（どこに出るかが、分かるように）
 BLINK = dict(period=200, on=130, warn=40)
+# 動く足場（stage の movers）。A から B へ往復する。両端で、dwell（一巡りに対する割合）だけ止まる（乗り降りしやすいように）。period: 往復のフレーム数
+MOVER = dict(period=240, dwell=0.14)
 # 崖登り（縦に進む区画。stage.py の climb）: 画面が、上下にも動く。跳ぶたびには動かさず、着地した高さを、画面の feet の高さに合わせる。
 # 足元が、画面の top より上・bottom より下に出そうなときだけ、すぐ追いかける（落ちたとき）
 CLIMB_CAM = dict(feet=190, speed=4, top=70, bottom=230)
