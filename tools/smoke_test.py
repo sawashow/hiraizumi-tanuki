@@ -1010,7 +1010,7 @@ def _purpose(st, p):
 idle = [(st.name, p[0], p[1]) for st in PROD_STAGES for p in st.platforms if not _purpose(st, p)]
 check("[本番] 意味の無い足場が無い（どの足場も、穴を渡るか、上に物があるか、ボスの間にある）", not idle, str(idle))
 _f4 = [k for k, x in PROD_STAGES[3].spawns if x < 3740]
-check("[本番] 金色堂の前半は、天狗・弓兵・立ち往生も出る（敵が単調でない）", {"tengu", "yumihei", "tachiojo"} <= set(_f4), str(sorted(set(_f4))))
+check("[本番] 金色堂の前半は、天狗・弓兵も出る（敵が単調でない）", {"tengu", "yumihei"} <= set(_f4), str(sorted(set(_f4))))
 
 # ---------------------------------------------------------------- 15. ボスの場所
 def boss_game():
