@@ -581,13 +581,13 @@ class Game:
         # 刀 → 敵（1振りにつき、同じ敵に1回だけ）
         if sword:
             for e in foes:
-                if e.active and e.last_swing != p.swing_id and sword.colliderect(e.rect):
+                if e.active and e.last_swing != p.swing_id and sword.colliderect(e.hurt_rect):
                     e.last_swing = p.swing_id
                     e.hit(C.SWORD_DAMAGE)
         # 手裏剣・強化中の光波 → 敵（当たると、消える）
         for s in self.shurikens + self.slashes:
             for e in foes:
-                if s.alive and e.active and s.rect.colliderect(e.rect):
+                if s.alive and e.active and s.rect.colliderect(e.hurt_rect):
                     s.alive = False
                     if s.throw_id is None or e.last_throw != s.throw_id:   # 手裏剣は、1投げにつき、同じ敵に当たるのは1つだけ（残りは、消えるだけ）
                         e.hit(s.damage)
@@ -651,6 +651,8 @@ class Game:
                     self.sfx.append(C.SFX["cut"])
                     self.effects.append(HitEffect(*w.rect.center, self.a))
                     self._cut_effect(w)
+                    if self.boss_on and self.rng.random() < C.CUT_DROP:     # ボス戦の間だけ: 斬った弾から、ときどき団子（補充できるように）
+                        self.items.append(Item("dango", w.rect.centerx, w.rect.centery, self.a, drop=True))
         # 光波 → 主人公（無敵のあいだは、すり抜ける）
         for w in self.waves:
             if w.alive and not w.push and not p.untouchable and p.rect.colliderect(w.rect):

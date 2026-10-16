@@ -1057,6 +1057,14 @@ _blank = [(st.name, what) for st in PROD_STAGES if st.name in INTENT_DONE
           for what, notes in (("足場", st.platform_notes), ("動く足場", st.mover_notes), ("消える足場", st.blink_notes), ("敵", st.spawn_notes), ("区画", st.zone_notes))
           for n in notes if not n]
 check("[本番] 見直しの済んだ面は、すべての足場・敵・区画に、意図が書いてある", not _blank, str(_blank[:5]))
+# 清衡の斬られる範囲は、見た目に合わせて、体より広い（近づいて斬っても、空振りしない）
+from sprites import Boss4  # noqa: E402
+_b4 = Boss4(500, None, C.FLOOR_Y, 0, 1000)
+check("清衡は、斬られる範囲が、体より広い（横に広く、下は床まで）",
+      _b4.hurt_rect.width > _b4.rect.width and _b4.hurt_rect.bottom >= _b4.rect.bottom + C.BOSS4["hover"] and _b4.rect.width == C.BOSS4["w"])
+_ar4 = PROD_STAGES[3].arenas[-1]
+check("清衡の間には、左右に台がある（地面と台を行き来して戦う）",
+      len([pl for pl in PROD_STAGES[3].platforms if _ar4["x0"] < pl[0] < _ar4["x1"]]) == 2)
 _f4 = [k for k, x in PROD_STAGES[3].spawns if x < 3740]
 check("[本番] 金色堂の前半は、天狗・弓兵も出る（敵が単調でない）", {"tengu", "yumihei"} <= set(_f4), str(sorted(set(_f4))))
 

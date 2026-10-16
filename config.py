@@ -87,6 +87,7 @@ HIT_TICKS = 4        # 命中の破片1コマの長さ
 
 # 攻撃のダメージ。刀は強く、手裏剣は弱い（そのかわり離れて撃てる）
 SWORD_DAMAGE = 2
+CUT_DROP = 0.25    # ボス戦の間、敵の弾を刀で斬ったとき、団子が落ちる確率（道中は落とさない: 弓兵の矢で、いくらでも稼げてしまう）
 SHURIKEN_DAMAGE = 1
 
 # 敵（ザコ）3種類。大きさ・体力・速さ・動きを変えて、見た目も攻略も区別する
@@ -530,7 +531,8 @@ BENKEI = dict(BOSS, w=24, h=60, hp=14, speed=0.0, near=80, wave_speed=2.0, wave_
 BENKEI_PATTERN = "LHLLH"
 # 4面のボス（初代・清衡）。地面から少し浮いて、座ったまま動く。数珠の玉を、高さを変えて飛ばす（低い・真ん中・高い）。
 # 玉は、刀で消せる。体力が半分になると、玉の数が増え、間が短くなる
-BOSS4 = dict(w=44, h=72, hp=36, bob=2, touch=1, speed=0.7, near=110, gravity=0.3, hover=12,
+# hurt_w: 斬られる範囲の幅（体 w より広い。見た目に合わせる）
+BOSS4 = dict(w=44, h=72, hp=36, bob=2, touch=1, speed=0.7, near=110, gravity=0.3, hover=12, hurt_w=72,
              walk_frames=80, rage_walk_frames=52, recover_frames=60, rage_recover_frames=40,
              ready=36, fire_at=8, cast_frames=44, gap=36, rage_gap=30,
              ring_ready=44, pillar_frames=102, warp_out=22, warp_in=26, warp_dist=150, warp_min=90, roar=56)
