@@ -828,6 +828,7 @@ check("落ち武者は、端で折り返して戻る（行ったり来たりす�
 from stage import STAGES  # noqa: E402
 for st in STAGES:
     surf = [(a, b, top) for a, b, top in st.ground] + [(a, b, top) for a, b, top in st.platforms]
+    surf += [s2 for m in st.movers for s2 in ((m[0], m[0] + m[4], m[1]), (m[2], m[2] + m[4], m[3]))]    # 動く足場は、両端の位置を、足場として数える
     ng = len(st.ground)
     reach = {0}
     frontier = [0]
@@ -3020,6 +3021,31 @@ for cur, nxt in zip(BRIDGE, BRIDGE[1:]):
         break
 check("光の橋: 点いた足場へ、順に跳んで、向こう岸まで渡れる（操作を入れて、確かめる。落ちない）", not lost and gk.player.hp == hp0, str(lost))
 check("光の足場は、左から右へ、順に点く", [(-b[3]) % K["period"] for b in bl] == sorted((-b[3]) % K["period"] for b in bl))
+
+# 動く足場（毛越寺の三つ目の池）
+gm4 = Game()
+gm4.reset(0)
+tm = gm4.terrain
+mv = tm.movers[0]
+P = C.MOVER["period"]
+check("動く足場は、時間の最初は A、半周りで B にいる（両端で止まる）",
+      tm.mover_at(mv, 0)[0] == mv[0] and tm.mover_at(mv, P // 2)[0] == mv[2] and tm.mover_at(mv, int(P * 0.05))[0] == mv[0],
+      str([tm.mover_at(mv, t)[0] for t in (0, P // 4, P // 2, P * 3 // 4)]))
+gm4._start(mv[0] + mv[4] / 2, float(mv[1]))
+gm4.enemies = []
+gm4.intro_t = 0
+x_start = gm4.player.px
+rode = True
+for _ in range(P // 2):
+    gm4.step(set())
+    rode = rode and gm4.player.on_ground and abs(gm4.player.py - tm.mover_now[0][2]) < 1.5
+check("動く足場に乗ると、一緒に運ばれる（落ちない・足元が板の上に残る）", rode and gm4.player.px - x_start > (mv[2] - mv[0]) * 0.9,
+      "動いた距離 %.0f（足場は %d）" % (gm4.player.px - x_start, mv[2] - mv[0]))
+gm4._start(mv[0] - 30, float(tm.height_at(mv[0] - 30)))
+gm4.enemies = []
+gm4.intro_t = 0
+gm4.step(set())
+check("岸に立っているときは、動く足場に運ばれない", tm.rider(gm4.player.px, gm4.player.py) is None)
 
 # 手裏剣の射程: 画面の端まで飛ぶ（画面の外に出たら、消える）
 gs = fresh(px=1000)

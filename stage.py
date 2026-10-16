@@ -96,9 +96,14 @@ ITEMS = (
 class Terrain:
     FOOT = 6   # 足元の判定の、中心から左右への幅（端に少しかかっていれば立てる）
 
-    def __init__(self, ground=GROUND, platforms=PLATFORMS, climb=None, blinks=()):
+    def __init__(self, ground=GROUND, platforms=PLATFORMS, climb=None, blinks=(), movers=()):
         self.ground = [tuple(g) for g in ground]
         self.platforms = [tuple(p) for p in platforms]
+        # 動く足場: (左端 ax, 上面 ay, 左端 bx, 上面 by, 幅, ずれ[, 往復のフレーム数])。A と B の間を往復する。横にも縦にも斜めにも動ける
+        self.movers = [tuple(m) for m in movers]
+        self.mover_now = []     # いまの位置 (x0, x1, 上面)（move が、毎フレーム入れ直す）
+        self.mover_prev = []    # 1フレーム前の位置
+        self.move(0)
         # 消える光の足場: (x0, x1, 上面の高さ, ずれ)。点いたり消えたりする（config.BLINK）。ずれは、一巡りの中の、始まりのフレーム
         self.blinks = [tuple(b) for b in blinks]
         self.lit = []       # いま、乗れる光の足場（tick が、毎フレーム入れ直す）
@@ -124,6 +129,31 @@ class Terrain:
     def tick(self, t):
         self.lit = [b[:3] for b in self.blinks if self.blink_state(b, t) != "off"]
 
+    @staticmethod
+    def mover_at(m, t):
+        """動く足場 m の、時刻 t の位置 (x0, x1, 上面)。両端で少し止まり、動くときは、ゆっくり始まってゆっくり止まる"""
+        ax, ay, bx, by, w, shift = m[:6]
+        period = m[6] if len(m) > 6 else C.MOVER["period"]
+        k = ((t + shift) % period) / period
+        u = k * 2 if k < 0.5 else 2 - k * 2          # 0 → 1 → 0
+        d = C.MOVER["dwell"]
+        s = min(1.0, max(0.0, (u - d) / (1 - 2 * d)))
+        s = s * s * (3 - 2 * s)
+        x = ax + (bx - ax) * s
+        return (round(x), round(x) + w, round(ay + (by - ay) * s))
+
+    def move(self, t):
+        """動く足場を、時刻 t の位置にする（1フレーム前の位置も覚えておく。乗っている人を運ぶのに使う）"""
+        self.mover_prev = self.mover_now or [self.mover_at(m, t) for m in self.movers]
+        self.mover_now = [self.mover_at(m, t) for m in self.movers]
+
+    def rider(self, px, py):
+        """(px, py) に立っている人が乗っている、動く足場が、1フレームで動いた量 (dx, dy)。乗っていなければ None"""
+        for (x0, x1, top), (p0, p1, ptop) in zip(self.mover_now, self.mover_prev):
+            if p0 - self.FOOT < px < p1 + self.FOOT and abs(py - ptop) <= 1.5:
+                return x0 - p0, top - ptop
+        return None
+
     def height_at(self, x):
         """x にある地面の上面の高さ（一番高いもの）。地面がなければ None"""
         tops = [top for a, b, top in self.ground if a <= x < b]
@@ -142,7 +172,7 @@ class Terrain:
             if a < x1 and x0 < b and prev_bottom <= top + 1 and new_bottom >= top:
                 if best is None or top < best[0]:
                     best = (top, True)
-        for a, b, top in self.platforms + self.lit:
+        for a, b, top in self.platforms + self.lit + self.mover_now:
             if a < x1 and x0 < b and prev_bottom <= top + 1 and new_bottom >= top:
                 if best is None or top < best[0]:
                     best = (top, False)
@@ -213,9 +243,10 @@ class StageDef:
     def __init__(self, name, width, ground, platforms, items, checkpoint, spawns, bgm, bgm_boss,
                  sky="bg_sky.png", mid="bg_mid.png", tiles="", boss_x=None,
                  boss_title=C.BOSS_TITLE, boss_name=C.BOSS_NAME, boss_pattern=C.BOSS_PATTERN,
-                 talk_boss=C.TALK_BOSS, talk_tanuki=C.TALK_TANUKI, number=1, stele_x=150, boss_kind="boss", pit=(8, 6, 18), gates=(), lanterns=(), zones=(), gilt=False, haze=None, winds=(), traps=(), thought=(), pit_deep=None, climb=None, blinks=(), mid_follow=None, fill_rows=()):
+                 talk_boss=C.TALK_BOSS, talk_tanuki=C.TALK_TANUKI, number=1, stele_x=150, boss_kind="boss", pit=(8, 6, 18), gates=(), lanterns=(), zones=(), gilt=False, haze=None, winds=(), traps=(), thought=(), pit_deep=None, climb=None, blinks=(), mid_follow=None, fill_rows=(), movers=()):
         self.name, self.width = name, width
         self.blinks = tuple(blinks)     # 消える光の足場: (x0, x1, 高さ, ずれ)。Terrain の blinks を見よ
+        self.movers = tuple(movers)     # 動く足場: Terrain の movers を見よ
         self.climb = climb      # 崖登り: (左端, 右端, 高さ)。Terrain の climb を見よ
         # 崖登りで、中景が、画面の動きに、どれだけついてくるか（None なら config.CLIMB_BG の mid。0 なら、画面に貼り付いたまま）。
         # 堂の中の柱は、上から下まで通っているので、沈めると、柱の上の端が、切り口になって見える。0 にする
@@ -275,12 +306,13 @@ class StageDef:
         return sum(1 for k, _, _ in self.items if k == "dango")
 
     def terrain(self):
-        return Terrain(self.ground, self.platforms, self.climb, self.blinks)
+        return Terrain(self.ground, self.platforms, self.climb, self.blinks, self.movers)
 
     @property
     def footholds(self):
         """乗れる足場のすべて（いつもある足場と、消える光の足場）。届くかどうか・跳ぶ難しさを調べるのに使う"""
-        return tuple(self.platforms) + tuple(b[:3] for b in self.blinks)
+        mid = tuple((round((m[0] + m[2]) / 2), round((m[0] + m[2]) / 2) + m[4], round((m[1] + m[3]) / 2)) for m in self.movers)   # 動く足場は、真ん中の位置にあるものとして数える
+        return tuple(self.platforms) + tuple(b[:3] for b in self.blinks) + mid
 
 
 # 古い短い版の月見坂（長さ 4080。動作テストが、この形を前提にしている）。ゲームでは使わない
@@ -408,36 +440,37 @@ GROUND2 = (
 )
 PLATFORMS2 = (
     (560, 600, T - 70),
-    (725, 760, T - 40), (785, 820, T - 52),                    # 池1の飛び石
+    (762, 798, T - 46),                                        # 池1の飛び石（1つ。足場が多いと、跳ぶ緊張が無くなる）
     (1500, 1540, T - 74), (1560, 1600, T - 98),                # 上の道
-    (1785, 1820, T - 42), (1835, 1870, T - 52),                # 池2の飛び石
+    (1813, 1848, T - 47),                                      # 池2の飛び石
     (1960, 2000, T - 60),
     (2400, 2440, T - 56), (2450, 2490, T - 108),               # 庭の塔を登る足場
     (2605, 2645, T - 90), (2800, 2860, T - 72),               # 左の足場は、築山の壁（2600）に付ける
-    (3115, 3150, T - 40), (3170, 3205, T - 52), (3225, 3260, T - 40),   # 池3の飛び石（長い）
+    # 池3（3100〜3290）は、動く足場（MOVERS2）で渡る
     (3330, 3370, T - 60), (3400, 3440, T - 84),
-    (3980, 4040, T - 70), (4100, 4140, T - 96),
-    (4222, 4255, T - 44), (4278, 4311, T - 44),                # 池4の飛び石
+    (3980, 4040, T - 70), (4125, 4165, T - 96),
+    (4248, 4282, T - 44),                                      # 池4の飛び石
 )
+# 動く足場: (A の左端, A の上面, B の左端, B の上面, 幅, ずれ)。池3: 左の岸から右の岸へ、横に往復する（最初の動く足場。端で止まるので、乗り降りしやすい）
+MOVERS2 = ((3115, T - 46, 3235, T - 46, 40, 0),)
 ITEMS2 = (
     ("dango", 150, T - 14), ("dango", 180, T - 14), ("dango", 210, T - 14),
     ("dango", 580, T - 88), ("onigiri", 660, T - 14),
-    ("dango", 742, T - 58), ("dango", 802, T - 70),
+    ("dango", 780, T - 64),
     ("dango", 940, T - 32), ("dango", 970, T - 32),
     ("dango", 1270, T - 50), ("dango", 1330, T - 66),
     ("dango", 1520, T - 92), ("onigiri", 1580, T - 116),
-    ("dango", 1802, T - 60), ("dango", 1852, T - 70),
+    ("dango", 1830, T - 65),
     ("dango", 1980, T - 78),
     ("onigiri", 2180, T - 50),
     ("dango", 2420, T - 74), ("dango", 2470, T - 126),
     ("dango", 2535, T - 158), ("leaf", 2560, T - 160), ("dango", 2585, T - 158),
     ("dango", 2640, T - 108), ("dango", 2830, T - 90),
-    ("dango", 3132, T - 58), ("dango", 3187, T - 70), ("dango", 3242, T - 58),
     ("dango", 3350, T - 78), ("dango", 3420, T - 102),
     ("onigiri", 3590, T - 70),
     ("dango", 3660, T - 82),
-    ("dango", 4010, T - 88), ("triple", 4120, T - 114),
-    ("dango", 4238, T - 62), ("dango", 4295, T - 62),
+    ("dango", 4010, T - 88), ("triple", 4145, T - 114),
+    ("dango", 4265, T - 62),
     ("onigiri", 4400, T - 14),
 )
 SPAWNS2 = (   # 毛越寺は、最初の面。池と飛び石（ジャンプ）が主役で、敵は少なめ。新しい敵は、1種類ずつ、安全な所で見せる
@@ -466,7 +499,7 @@ ZONES2 = (
 STAGE2 = StageDef("毛越寺", 5000, GROUND2, PLATFORMS2, thin_dango(ITEMS2, PLATFORMS2), (2170, T - 32), SPAWNS2, C.BGM_STAGE1, C.BGM_BOSS,
                   lanterns=(("triple", 300), ("onigiri", 2310), ("onigiri", 4370)),   # 石灯籠: 入口（強化）・中間地点の先（回復）・ボスの前（回復）
                   sky="stage2/bg_sky.png", mid="stage2/bg_mid.png", tiles="stage2/",
-                  number=1, stele_x=130, zones=ZONES2, thought=("wanko",))   # ボスは、1面の泰衡（遊ぶ順で決まる）。絵が無いあいだは、1面の絵で代わりにする
+                  number=1, stele_x=130, zones=ZONES2, thought=("wanko",), movers=MOVERS2)   # ボスは、1面の泰衡（遊ぶ順で決まる）。絵が無いあいだは、1面の絵で代わりにする
 # ---------------------------------------------------------------- 2面（高館）
 # 義経堂のある高台。北上川と衣川を見下ろす崖の道。夏の昼。高低差が大きく、遠くから撃たれる面（敵の絵・弓兵は、まだ無いので、いまは既存の敵）
 W3 = 6000
