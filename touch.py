@@ -5,7 +5,7 @@
   左半分＝移動のスティック。触った所が中心になり、指を左右にずらすと歩き、下へずらすと、しゃがむ。
           中心は、指が離れすぎると、ついてくる（反対へ向きを変えるのに、大きく戻さなくてよい）
   右半分＝高さで選ぶ3つの帯。上から、手裏剣・刀・ジャンプ（ジャンプが、いちばん広い）。
-          指を滑らせて、別の帯に入ると、そちらが出る。右上の隅だけは、ポーズ（小さい。誤って押さないように）
+          指を滑らせて、別の帯に入ると、そちらが出る。右上の小さな丸は、ポーズ（丸そのものを押したときだけ。誤って止めないように）
 ゲームの絵は、窓から左右の帯を除いた所に、16:9 のまま、できるだけ大きく出す（config.TOUCH の side が、帯の幅）。
 コントローラ（gamepad.py）と同じく、「このフレームに押したもの」（handle）と「押している方向」（held）を返す。
 """
@@ -71,13 +71,16 @@ class Touch:
         return {name: (ys[i], ys[i + 1]) for i, name in enumerate(ACTIONS)}
 
     @staticmethod
-    def pause_rect(ww, wh):
+    def pause_button(ww, wh):
+        """ポーズのボタン（右上の、小さな丸）: (x, y, 半径)。丸そのものを押したときだけ効く（端を触って、誤って止めないように）"""
         side = round(wh * C.TOUCH["side"])
-        return pygame.Rect(ww - side, 0, side, round(wh * C.TOUCH["cuts"][0]))
+        r = round(wh * C.TOUCH["pause_r"])
+        return ww - max(side // 2, r + 6), round(wh * C.TOUCH["cuts"][0] / 2), r
 
     def _action(self, x, y, ww, wh):
-        """右半分の (x, y) が、どの帯か（ポーズの隅なら "pause"）"""
-        if self.pause_rect(ww, wh).collidepoint(x, y):
+        """右半分の (x, y) が、どの帯か（ポーズの丸なら "pause"。帯より上は、何も無い）"""
+        px, py, pr = self.pause_button(ww, wh)
+        if (x - px) ** 2 + (y - py) ** 2 <= pr * pr:
             return "pause"
         for name, (top, bottom) in self.bands(wh).items():
             if top <= y < bottom:
@@ -142,7 +145,7 @@ class Touch:
         sticks = [f for f in self.fingers.values() if isinstance(f, Stick)]
         R = round(wh * K["ring"])
         if not sticks:          # 目印: 「ここに触って、動かす」
-            self._stick(window, side // 2, round(wh * 0.62), R, set(), alpha=K["hint_alpha"])
+            self._stick(window, max(side // 2, R + 6), round(wh * 0.62), R, set(), alpha=K["hint_alpha"])    # 帯が細くても、画面の端で切れないように
         for f in sticks:
             self._stick(window, f.ox, f.oy, R, dirs, alpha=K["ring_alpha"], knob=(f.x, f.y))
         # 右の帯: 高さの帯ごとに、ボタン（親指の弧: 下ほど内側）
@@ -160,11 +163,10 @@ class Touch:
             my = (top + bottom) // 2
             pygame.draw.circle(window, lit if on else base, (bx, my), r, 0 if on else max(2, r // 10))
             self._icon(window, name, bx, my, r, (16, 16, 24) if on else mark)
-        pr = self.pause_rect(ww, wh)
-        r = min(pr.w, pr.h) // 4
+        px, py, r = self.pause_button(ww, wh)
         on = "pause" in pressed
-        pygame.draw.circle(window, lit if on else base, pr.center, r, 0 if on else max(2, r // 6))
-        self._icon(window, "pause", pr.centerx, pr.centery, r, (16, 16, 24) if on else mark)
+        pygame.draw.circle(window, lit if on else base, (px, py), r, 0 if on else max(2, r // 6))
+        self._icon(window, "pause", px, py, r, (16, 16, 24) if on else mark)
 
     @staticmethod
     def _stick(window, cx, cy, R, dirs, alpha, knob=None):
