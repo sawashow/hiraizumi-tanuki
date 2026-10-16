@@ -163,16 +163,17 @@ class Terrain:
         """x0〜x1 に、地面が少しでもあるか"""
         return any(a < x1 and x0 < b for a, b, _ in self.ground)
 
-    def support(self, px, prev_bottom, new_bottom):
+    def support(self, px, prev_bottom, new_bottom, ground_only=False):
         """下向きに動く足元が、このフレームで踏む面。(高さ, 地面か) の、一番高いもの。なければ None
-        地面も足場も、上から降りてくるときだけ乗れる（下や横からは、通り抜ける・壁になる）"""
+        地面も足場も、上から降りてくるときだけ乗れる（下や横からは、通り抜ける・壁になる）。
+        ground_only: 浮き足場を数えない（下＋ジャンプで、足場をすり抜けて降りている間）"""
         x0, x1 = px - self.FOOT, px + self.FOOT
         best = None
         for a, b, top in self.ground:
             if a < x1 and x0 < b and prev_bottom <= top + 1 and new_bottom >= top:
                 if best is None or top < best[0]:
                     best = (top, True)
-        for a, b, top in self.platforms + self.lit + self.mover_now:
+        for a, b, top in () if ground_only else self.platforms + self.lit + self.mover_now:
             if a < x1 and x0 < b and prev_bottom <= top + 1 and new_bottom >= top:
                 if best is None or top < best[0]:
                     best = (top, False)

@@ -361,7 +361,10 @@ class Game:
             p.px += carry[0]
             p.py += carry[1]
         if "jump" in pressed:
-            p.jump()
+            if "down" in held:
+                p.drop(self.terrain)    # 浮き足場の上なら、降りる（地面の上なら、ふつうに跳ぶ）
+            else:
+                p.jump()
         if "jump_release" in pressed:
             p.cut_jump()
         if "attack" in pressed:

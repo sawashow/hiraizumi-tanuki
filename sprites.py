@@ -328,6 +328,7 @@ class Player:
         self.triple = False     # 三方手裏剣（ダメージを受けると消える）
         self.super_t = 0        # スーパータヌキの残りフレーム
         self.slash = False      # このフレームに、刀の光波を出す
+        self.drop_t = 0         # 下＋ジャンプで、浮き足場をすり抜けている残りフレーム
         self.crouch = False     # しゃがんでいる（地上で、下を押している間）
         self.crouch_act = False  # いまの刀・手裏剣は、しゃがんで始めた（終わるまで、しゃがんだまま）
         self.rest_t = 0         # 何もしないで立っているフレーム数（長くなると、あくびをして眠る）
@@ -379,6 +380,18 @@ class Player:
     def _cancel(self):
         if self.recovering and not self.hurt_t:
             self.attack_t = self.throw_t = 0
+
+    def drop(self, terrain):
+        """下＋ジャンプ: 浮き足場（動く足場・消える足場も）の上なら、すり抜けて、下へ降りる（跳ばない）。地面の上なら、ふつうに跳ぶ"""
+        under = terrain.support(self.px, self.py, self.py) if terrain and self.on_ground else None
+        if under is None or under[1] or self.busy or self.hp <= 0:
+            self.jump()
+            return
+        self._cancel()
+        self.drop_t = C.PLATFORM_DROP
+        self.on_ground = False
+        self.jumped = True      # 縁から出た直後の「遅れジャンプ」を、させない
+        self.jump_q = 0
 
     def jump(self):
         """跳ぶ。いまは跳べなくても、少しのあいだ覚えておく（着地の直前、振り終わりの直前に押しても、跳べる）"""
@@ -532,7 +545,9 @@ class Player:
         if terrain is None:
             surface = (C.FLOOR_Y, True) if new_bottom >= C.FLOOR_Y else None
         else:
-            surface = terrain.support(self.px, self.py, new_bottom) if self.vy >= 0 else None
+            surface = terrain.support(self.px, self.py, new_bottom, ground_only=self.drop_t > 0) if self.vy >= 0 else None
+        if self.drop_t:
+            self.drop_t -= 1
         if surface is not None:
             height, is_ground = surface
             self.py = float(height)
