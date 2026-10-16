@@ -1923,6 +1923,9 @@ check("ジャンプの頂点は、70〜74（足場の高さを決める、もと
 for st in PROD_STAGES:
     surf = list(st.ground) + list(st.footholds)
     ng = len(st.ground)
+    # 上下に動く足場は、下の端と上の端の2枚（footholds）。乗っていれば、下から上へも、上から下へも運ばれる
+    lifts = {(m[0], m[0] + m[4], m[1]): (m[0], m[0] + m[4], m[3]) for m in st.movers if m[0] == m[2]}
+    lifts.update({v: k for k, v in list(lifts.items())})
     reach, frontier = {0}, [0]
     while frontier:
         i = frontier.pop()
@@ -1931,7 +1934,7 @@ for st in PROD_STAGES:
                 continue
             s1 = surf[i]
             walk = j < ng and i < ng and max(s2[0] - s1[1], s1[0] - s2[1], 0) == 0 and s1[2] <= s2[2]   # 隣の、同じか低い地面へは、歩ける
-            if walk or _can_jump(s1, s2):
+            if walk or _can_jump(s1, s2) or lifts.get(tuple(s1)) == tuple(s2):
                 reach.add(j)
                 frontier.append(j)
     lost = [(surf[j][0], surf[j][1], C.FLOOR_Y - surf[j][2]) for j in range(len(surf)) if j not in reach]
@@ -2232,7 +2235,7 @@ run(gg, C.GALE["warn"] + C.BOSS2["gale_frames"] + 4)
 check("大風が吹いている間に、続けて、扇を投げる", b.state in ("throw_ready", "throw") and any(isinstance(w, Gale) and w.blowing for w in gg.waves), b.state)
 st3 = [st for st in PROD_STAGES if st.name == "月見坂"][0]
 ar3 = st3.arenas[-1]
-pl3 = [pl for pl in st3.platforms if pl[1] > ar3["x0"] and pl[0] < ar3["x1"]]
+pl3 = [pl for pl in st3.platforms if pl[1] > ar3["x0"] and pl[0] < ar3["x1"]] + [(m[0], m[0] + m[4], max(m[1], m[3])) for m in st3.movers if ar3["x0"] < m[0] < ar3["x1"]]   # 動く足場は、いちばん下で測る
 floor3 = st3.terrain().height_at(ar3["boss_x"])
 check("月見坂のボスの間に、大風をやり過ごせる足場が、左右にある（風の高さより、上）",
       len(pl3) >= 2 and all(pl[2] <= floor3 - C.GALE["h"] - 8 for pl in pl3), str(pl3))
