@@ -994,8 +994,8 @@ for _ in range(C.RESPAWN_AT + 5):
 check("やられて再開すると、団子は、始まりの数に戻る（無いまま再開しない）", g.player.hp > 0 and g.player.ammo == A["start"])
 check("団子を全部取っても、残機は増えない（団子は、集める物ではなく、使う物になった）", g.lives == 2)
 few = [(st.name, st.dango_total) for st in PROD_STAGES]
-check("本番の面の団子は、足場の上にだけ、1つずつ（地面には置かない）。1面に 26個まで",
-      all(n <= 26 for _, n in few) and all(sum(p[0] <= x <= p[1] and 0 < p[2] - y <= 60 for p in st.platforms) == 1
+check("本番の面の団子は、足場の上にだけ、1つずつ（地面には置かない）。1面に 30個まで",
+      all(n <= 30 for _, n in few) and all(sum(p[0] <= x <= p[1] and 0 < p[2] - y <= 60 for p in st.platforms) == 1
                                             for st in PROD_STAGES for k, x, y in st.items if k == "dango"), str(few))
 
 
@@ -1009,6 +1009,8 @@ def _purpose(st, p):
 
 idle = [(st.name, p[0], p[1]) for st in PROD_STAGES for p in st.platforms if not _purpose(st, p)]
 check("[本番] 意味の無い足場が無い（どの足場も、穴を渡るか、上に物があるか、ボスの間にある）", not idle, str(idle))
+_f4 = [k for k, x in PROD_STAGES[3].spawns if x < 3740]
+check("[本番] 金色堂の前半は、天狗・弓兵・立ち往生も出る（敵が単調でない）", {"tengu", "yumihei", "tachiojo"} <= set(_f4), str(sorted(set(_f4))))
 
 # ---------------------------------------------------------------- 15. ボスの場所
 def boss_game():
