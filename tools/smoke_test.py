@@ -463,6 +463,21 @@ check("足場から向こう岸へ渡れる（落ちない）", g.player.hp == C
       "x=%.0f HP=%d" % (g.player.px, g.player.hp))
 snap(g, "on platform")
 
+# 下＋ジャンプ: 浮き足場の上なら、すり抜けて降りる。地面の上なら、ふつうに跳ぶ
+p0 = OLD_PLATFORMS[0]
+g = fresh(px=(p0[0] + p0[1]) / 2)
+g.player.py, g.player.vy = float(p0[2]), 0.0
+run(g, 3)
+on_plat = g.player.on_ground and g.player.py == p0[2]
+g.step({"down"}, {"jump"})
+run_until(g, lambda gg: gg.player.on_ground, {"down"})
+floor = g.terrain.height_at(g.player.px)
+check("下＋ジャンプで、浮き足場から下へ降りる（跳ばない）", on_plat and g.player.py == floor, "高さ=%.0f 床=%s" % (g.player.py, floor))
+g = fresh()
+run(g, 3)
+g.step({"down"}, {"jump"})
+check("地面の上の下＋ジャンプは、ふつうに跳ぶ", g.player.vy < 0 and not g.player.on_ground)
+
 # 一方通行: 下から突き抜けて、上に乗れる
 p0 = OLD_PLATFORMS[0]
 g = fresh(px=(p0[0] + p0[1]) / 2)
