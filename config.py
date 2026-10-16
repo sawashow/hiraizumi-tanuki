@@ -418,7 +418,7 @@ WATER_DEPTH = 8       # 穴の上端から、水面までの深さ
 WATER_TICKS = 30      # 水面が、もう1コマに切り替わるまでのフレーム数
 
 # 起動したときの、会社のロゴ画面（splash.py）。fade: 現れる・消えるのフレーム数 / hold: 止まっているフレーム数 / width: 窓の幅に対するロゴの幅
-LOGO = dict(file="ponpoco_logo.png", bg=(255, 255, 255), fade=30, hold=120, width=0.35)
+LOGO = dict(file="ponpoco_logo.png", bg=(255, 255, 255), fade=30, hold=120, after=50, width=0.35)   # after: ロゴが消えたあと、白いまま待つ（余韻）
 
 # 残機・中間地点
 LIVES = 3
