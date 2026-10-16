@@ -238,7 +238,7 @@ TALK_CELL = 24                  # せりふの絵の、1文字のますの幅（
 # 考えごとの吹き出し（返事の代わりに、食べ物を思い浮かべる面。stage.py の thought）。数は、せりふの「文字」と同じ刻み（ENDING の type フレーム）で数える
 #   grow: 丸が出て、雲がふくらみきるまで / per: 食べ物が1つ浮かぶごとの間
 #   lift: 頭のてっぺんから、雲の下端までのすき間（雲が、頭や兜に重ならないように）/ head: 姫を助ける場面での、足元から頭のてっぺんまでの高さ
-THOUGHT = dict(grow=10, per=8, lift=12, head=44)
+THOUGHT = dict(grow=10, per=8, lift=12, head=44, hold=70)
 # タヌキ侍の、頭の中の食べ物（いつも腹ペコ）。夢の吹き出し（語りの眠り・姫を助けたあと）では、これを順に浮かべる。assets/images/items/food_*.png（tools/make_foods.py）。絵が無い物は、飛ばす
 FOODS = ("onigiri", "dango", "wanko", "reimen", "jajamen", "mochi", "senbei", "kushi", "hittsumi", "anko")
 FOOD_SWAP = 40      # 夢の吹き出しで、食べ物が替わるフレーム数
@@ -360,7 +360,7 @@ THANKS_BG = "thanks_bg.png"     # 姫を助ける場面の背景（夜明けの�
 THANKS = dict(walk=1.3, stop_x=178, hime_x=298, floor=238, hop=44, type=4, gap=26, wait=70,
               lines=("THANK YOU TANUKI!", "YOUR QUEST IS OVER."), text_y=(24, 52), sub_y=82,
               dream=40, dream_swap=45,     # dream: 文が出きってから、タヌキ侍の頭の上に、食べ物の吹き出しが出るまで / dream_swap: 食べ物（FOODS）が入れ替わる間隔
-              cloud=(120, 62), cols=3, food_dx=34, food_dy=26, food_every=14,   # タヌキ侍の吹き出し: 大きさ / 食べ物を並べる列数・間隔 / 1つずつ浮かぶ間隔
+              cloud=(150, 72), cols=5, food_dx=28, food_dy=26, food_every=14,   # タヌキ侍の吹き出し: 大きさ / 食べ物を並べる列数・間隔 / 1つずつ浮かぶ間隔
               heart_after=30, heart_cloud=(36, 28))    # 姫の吹き出し（ハート）: タヌキ侍の吹き出しから、遅れて出るフレーム数 / 大きさ
 # エンドロール（姫を助ける場面のあと、エンディングの絵の前）。平和になった、いまの平泉の道を、タヌキ侍と姫が、右へ歩いていく。
 # 道は、手前と奥に歩道があって、間を車道が横に通っている。横断歩道に来ると、二人は止まる。車が通りすぎるのを待って、

@@ -720,10 +720,18 @@ class Game:
         wait（間） → boss（ボスのひとこと） → fade（光になって消える） → reply（タヌキ侍が返す） → run（右へ駆け抜ける）"""
         t = self.ending - 1
         for name in ("wait", "boss", "fade", "reply"):
-            if t < C.ENDING[name]:
+            n = self._end_len(name)
+            if t < n:
                 return name, t
-            t -= C.ENDING[name]
+            t -= n
         return "run", t
+
+    def _end_len(self, name):
+        """エンディングの各場面の長さ"""
+        n = C.ENDING[name]
+        if name == "reply" and self.stage.thought:
+            n = max(n, self._talk_cells(name) * C.ENDING["type"] + C.THOUGHT["hold"])
+        return n
 
     def _talk_cells(self, name):
         if name != "boss" and self.stage.thought:      # 返事の代わりに、食べ物を思い浮かべる: 物の数 + 吹き出しがふくらむ分
@@ -768,7 +776,7 @@ class Game:
             thinking = name == "reply" and bool(self.stage.thought)
             typed = self._talk_cells(name) * E["type"] + (0 if thinking else C.TALK_PAUSE.get(name, (0, 0))[1])
             # キーを押すと、字が出ている途中なら全部出す。出きっていれば、次へ送る
-            self.ending += (typed - t - 1) if t < typed - 1 else (E[name] - t - 1)
+            self.ending += (typed - t - 1) if t < typed - 1 else (self._end_len(name) - t - 1)
         self.ending += 1
         name, t = self._end_phase()
         more = name in talk and (t == 0 or self._talk_shown(name, t) > self._talk_shown(name, t - 1))
