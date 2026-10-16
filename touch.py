@@ -2,7 +2,7 @@
 一度でも画面に触ると、ボタンが出る（キーボード・コントローラで遊ぶ人には、出さない）。
 
 並び:  左の帯＝十字キー（↑↓←→。指を滑らせて、向きを変えられる）
-      右の帯＝ジャンプ（下）・刀（左上）・手裏剣（右上）、いちばん上に、ポーズ
+      右の帯＝上から、手裏剣・刀・ジャンプ（互い違い）、いちばん上に、ポーズ
 ゲームの絵は、窓から左右の帯を除いた所に、16:9 のまま、できるだけ大きく出す（config.TOUCH の side が、帯の幅）。
 コントローラ（gamepad.py）と同じく、「このフレームに押したもの」（handle）と「押している方向」（held）を返す。
 """
@@ -38,12 +38,13 @@ class Touch:
         u = wh                      # 大きさの物差し（窓の高さ）
         lx, rx = side // 2, ww - side // 2
         r = round(u * C.TOUCH["button"])
+        s = round(r * 0.35)         # 互い違いのずれ（縦に並べて、親指を滑らせやすく）
         return {
-            "dpad": (lx, round(u * 0.62), round(u * C.TOUCH["dpad"])),
-            "jump": (rx, round(u * 0.80), r),
-            "attack": (rx - round(r * 1.15), round(u * 0.80) - round(r * 2.1), r),
-            "throw": (rx + round(r * 1.15), round(u * 0.80) - round(r * 2.1), r),
-            "pause": (rx, round(u * 0.12), round(r * 0.6)),
+            "dpad": (lx, round(u * 0.62), min(round(u * C.TOUCH["dpad"]), side // 2 - 4)),
+            "throw": (rx + s, round(u * 0.36), r),          # 右の帯: 上から、手裏剣・刀・ジャンプ（いちばん押す物を、いちばん下に）
+            "attack": (rx - s, round(u * 0.58), r),
+            "jump": (rx + s, round(u * 0.80), r),
+            "pause": (rx, round(u * 0.10), round(r * 0.5)),
         }
 
     def _hit(self, x, y, ww, wh):
@@ -51,7 +52,7 @@ class Touch:
         bs = self.buttons(ww, wh)
         cx, cy, R = bs["dpad"]
         dx, dy = x - cx, y - cy
-        if math.hypot(dx, dy) <= R * 1.25:      # 十字キー: 中心からの角度で、向きを決める（斜めは、2つ）
+        if math.hypot(dx, dy) <= R * C.TOUCH["reach"]:      # 十字キー: 中心からの角度で、向きを決める（斜めは、2つ）
             dirs = set()
             if math.hypot(dx, dy) > R * 0.18:
                 a = math.degrees(math.atan2(-dy, dx)) % 360
@@ -68,7 +69,7 @@ class Touch:
         for name in ("jump", "attack", "throw", "pause"):
             bx, by, r = bs[name]
             d = math.hypot(x - bx, y - by)
-            if d <= r * 1.3 and (best is None or d < best[0]):     # 少し外れても、近いボタンを押したことにする
+            if d <= r * C.TOUCH["reach"] and (best is None or d < best[0]):     # 少し外れても、近いボタンを押したことにする
                 best = (d, name)
         return best and best[1]
 
