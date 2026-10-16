@@ -4,11 +4,11 @@
   web/ には main.py・config.py・sprites.py と assets/images だけを置く（元絵や試作の画像は入れない）。
   そのあと `pygbag web` で手元のサーバーが立ち、http://localhost:8000 で遊べる。
 
-公開用（docs/）の作り方（日本語を含むので Python を UTF-8 モードで動かす）:
+公開は、main へ push すると GitHub Actions（.github/workflows/pages.yml）が自動で行う。
+  Actions は、このスクリプトのあとに次を実行する（日本語を含むので Python を UTF-8 モードで動かす）:
   PYTHONUTF8=1 python -m pygbag --build --PYBUILD 3.12 --template tools/web_template.tmpl web
-  web/build/web の index.html・web.tar.gz・favicon.png を docs/ にコピーする（docs/.nojekyll も置く）
-  ※ itch.io 以外では web.tar.gz を読み込むので、これを忘れると読み込み中のまま止まる
-  ※ web.apk は itch.io に上げるときだけ使う。docs/ には入れない（作り直すたびに、リポジトリが約7.5MB太るため）
+  web/build/web の index.html・web.tar.gz・favicon.png を公開する。web.tar.gz はコミットしない
+  ※ web.apk は itch.io に上げるときだけ使う。公開物には入れない
 """
 import os
 import shutil
