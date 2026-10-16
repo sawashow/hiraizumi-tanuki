@@ -2116,7 +2116,14 @@ async def main():
             if event.type == getattr(pygame, "WINDOWFOCUSLOST", -1):     # 窓が後ろに回ったら、止める
                 pressed.add("pause_on")
             pressed |= pad.handle(event)
-            pressed |= touch.handle(event, pygame.display.get_surface().get_size())
+            got = touch.handle(event, pygame.display.get_surface().get_size())
+            if got & {"jump", "attack", "throw", "pause"} and sys.platform == "emscripten":
+                try:        # 押した手応え: 短く振動させる（Android。iPhone のブラウザは、振動できないので、何もしない）
+                    import platform
+                    platform.window.navigator.vibrate(C.TOUCH["vibrate"])
+                except Exception:
+                    pass
+            pressed |= got
         if touch.active and C.COYOTE != C.TOUCH["coyote"]:     # タッチで遊ぶ人は、ジャンプを受け付ける時間を、少し長く
             C.COYOTE, C.JUMP_BUFFER = C.TOUCH["coyote"], C.TOUCH["jump_buffer"]
         if touch.active and sys.platform == "emscripten":

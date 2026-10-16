@@ -129,39 +129,69 @@ class Touch:
             out -= {"left", "right"}
         return out
 
-    # --- 描く（左右の帯の上。帯は黒なので、透明にしなくてよい） ---
+    # --- 描く ---
     def draw(self, window):
+        """左＝移動: 指を置いていないときは、帯に薄い目印だけ。指を置くと、指の所に輪（中心）とつまみ（ゲームの絵の上でも、半透明）。
+        右＝武器: 親指の動く弧に沿って、ボタンを並べる（下ほど内側）。押している帯は、ボタンを塗って、帯もうっすら明るくする"""
         ww, wh = window.get_size()
         K = C.TOUCH
         side = round(wh * K["side"])
         base, lit, mark = K["color"], K["lit"], K["mark"]
         pressed = {v for v in self.fingers.values() if isinstance(v, str)}
         dirs = self.held()
-        # 左の帯: 移動の目印（左右の矢印と、下の矢印）。押している向きは、光る
-        cx, cy, s = side // 2, round(wh * 0.62), round(wh * 0.05)
-        for name, (vx, vy) in (("left", (-1, 0)), ("right", (1, 0)), ("down", (0, 1))):
-            px, py = cx + vx * round(s * 1.6), cy + vy * round(s * 1.6)
-            tip = (px + vx * s, py + vy * s)
-            wing = ((px - vy * s, py - vx * s), (px + vy * s, py + vx * s))
-            pygame.draw.polygon(window, lit if name in dirs else mark, (tip,) + wing)
-        pygame.draw.circle(window, base, (cx, cy), max(3, s // 2))
-        for f in self.fingers.values():         # 指を置いた所（スティックの中心）を、輪で示す（帯の中にいるときだけ）
-            if isinstance(f, Stick) and f.ox < side:
-                pygame.draw.circle(window, base, (round(f.ox), round(f.oy)), round(wh * K["stick_max"]), 2)
-        # 右の帯: 高さの帯ごとに、印。押している帯は、光る
-        rx = ww - side // 2
-        for name, (top, bottom) in self.bands(wh).items():
-            if name != ACTIONS[0]:
+        sticks = [f for f in self.fingers.values() if isinstance(f, Stick)]
+        R = round(wh * K["ring"])
+        if not sticks:          # 目印: 「ここに触って、動かす」
+            self._stick(window, side // 2, round(wh * 0.62), R, set(), alpha=K["hint_alpha"])
+        for f in sticks:
+            self._stick(window, f.ox, f.oy, R, dirs, alpha=K["ring_alpha"], knob=(f.x, f.y))
+        # 右の帯: 高さの帯ごとに、ボタン（親指の弧: 下ほど内側）
+        for k, (name, (top, bottom)) in enumerate(self.bands(wh).items()):
+            on = name in pressed
+            if on:      # 押している帯を、うっすら明るく
+                band = pygame.Surface((side, bottom - top), pygame.SRCALPHA)
+                band.fill(lit + (K["band_alpha"],))
+                window.blit(band, (ww - side, top))
+            elif k:
                 pygame.draw.line(window, base, (ww - side + 8, top), (ww - 8, top), 1)
             r = min(side // 2 - 8, (bottom - top) // 2 - 6)
+            bx = ww - side // 2 + round(side * K["arc"][k])
+            bx = min(max(bx, ww - side + r + 4), ww - r - 4)
             my = (top + bottom) // 2
-            on = name in pressed
-            pygame.draw.circle(window, lit if on else base, (rx, my), r, 0 if on else max(2, r // 10))
-            self._icon(window, name, rx, my, r, (16, 16, 24) if on else mark)
+            pygame.draw.circle(window, lit if on else base, (bx, my), r, 0 if on else max(2, r // 10))
+            self._icon(window, name, bx, my, r, (16, 16, 24) if on else mark)
         pr = self.pause_rect(ww, wh)
         r = min(pr.w, pr.h) // 4
-        pygame.draw.circle(window, lit if "pause" in pressed else base, pr.center, r, max(2, r // 6))
-        self._icon(window, "pause", pr.centerx, pr.centery, r, mark)
+        on = "pause" in pressed
+        pygame.draw.circle(window, lit if on else base, pr.center, r, 0 if on else max(2, r // 6))
+        self._icon(window, "pause", pr.centerx, pr.centery, r, (16, 16, 24) if on else mark)
+
+    @staticmethod
+    def _stick(window, cx, cy, R, dirs, alpha, knob=None):
+        """スティックの輪（中心）・左右と下の矢印・つまみ。半透明（ゲームの絵の上にも出す）"""
+        K = C.TOUCH
+        size = R * 2 + 8
+        surf = pygame.Surface((size, size), pygame.SRCALPHA)
+        c = size // 2
+        pygame.draw.circle(surf, K["mark"] + (alpha,), (c, c), R, 2)
+        s = max(4, R // 4)
+        for name, (vx, vy) in (("left", (-1, 0)), ("right", (1, 0)), ("down", (0, 1)), ("up", (0, -1))):
+            if name == "up" and name not in dirs:
+                continue        # 上は、メニューでだけ使う（押していないときは、出さない）
+            px, py = c + vx * (R - s - 2), c + vy * (R - s - 2)
+            tip = (px + vx * s, py + vy * s)
+            wing = ((px - vy * s - vx * s // 2, py - vx * s - vy * s // 2), (px + vy * s - vx * s // 2, py + vx * s - vy * s // 2))
+            on = name in dirs
+            pygame.draw.polygon(surf, (K["lit"] if on else K["mark"]) + (255 if on else alpha,), (tip,) + wing)
+        window.blit(surf, (round(cx) - c, round(cy) - c))
+        if knob:        # つまみ: 指の所（輪の中に収める）
+            dx, dy = knob[0] - cx, knob[1] - cy
+            d = max(1.0, (dx * dx + dy * dy) ** 0.5)
+            k = min(1.0, (R - s) / d)
+            kr = max(5, R // 3)
+            ks = pygame.Surface((kr * 2, kr * 2), pygame.SRCALPHA)
+            pygame.draw.circle(ks, K["lit"] + (alpha + 40,), (kr, kr), kr)
+            window.blit(ks, (round(cx + dx * k) - kr, round(cy + dy * k) - kr))
 
     @staticmethod
     def _icon(window, name, x, y, r, color):
