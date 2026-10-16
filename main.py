@@ -2138,6 +2138,8 @@ async def main():
             if splash.done:
                 splash = None
             else:
+                if splash.t == 0:
+                    audio.play_sfx(C.SFX["logo"])      # ロゴが現れるとき、音を鳴らす（起動のときも、エンドロールのあとも）
                 splash.step()
                 splash.draw(pygame.display.get_surface())
                 pygame.display.flip()
