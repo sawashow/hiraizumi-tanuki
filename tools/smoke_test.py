@@ -19,7 +19,7 @@ from main import ENEMY_SPAWNS, Game, drop_kind  # noqa: E402
 from sprites import Item, Karasu, Kitsunebi, Ochimusha, Shuriken, Wave  # noqa: E402
 import copy  # noqa: E402
 
-from stage import GROUND, ITEMS, PLATFORMS, STAGE1_LEGACY, STAGE2, STAGES, Terrain  # noqa: E402
+from stage import GROUND, ITEMS, PLATFORMS, S4, STAGE1_LEGACY, STAGE2, STAGES, Terrain  # noqa: E402
 
 # 本番の面の順は、毛越寺 → 月見坂（ボスは遊ぶ順で決まる）。ただし、以下の動きのテスト（地形・敵・ボス）は、
 # 「月見坂＝1面（泰衡）、毛越寺＝2面（基衡）」で書かれているので、写しを作って、その形にそろえて動かす。
@@ -2910,14 +2910,14 @@ gc.reset(3)
 tc = gc.terrain
 cx0, cx1, ch = tc.climb
 B = C.FLOOR_Y + ch
-ROUTE4 = [(7325, 7375, B - 50), (7380, 7540, B - 96), (7485, 7535, B - 146), (7540, 7860, B - 192),
-          (7805, 7855, B - 240), (7715, 7765, B - 288), (7805, 7855, B - 336), (7860, 8520, C.FLOOR_Y)]
+ROUTE4 = [(7325 + S4, 7375 + S4, B - 50), (7380 + S4, 7540 + S4, B - 96), (7485 + S4, 7535 + S4, B - 146), (7540 + S4, 7860 + S4, B - 192),
+          (7805 + S4, 7855 + S4, B - 240), (7715 + S4, 7765 + S4, B - 288), (7805 + S4, 7855 + S4, B - 336), (7860 + S4, 8520 + S4, C.FLOOR_Y)]
 check("金色堂の登りの道すじの足場が、面のデータにある", all(s in tc.platforms or s in tc.ground for s in ROUTE4),
       str([s for s in ROUTE4 if s not in tc.platforms and s not in tc.ground]))
-climb_at(7300, B)
+climb_at(7300 + S4, B)
 climb_safe = True
 climb_seen.clear()
-cur, lost = (7230, 7380, B), []
+cur, lost = (7230 + S4, 7380 + S4, B), []
 for nxt in ROUTE4:
     if not hop(cur, nxt):
         lost.append((nxt, round(gc.player.px), round(gc.player.py)))
@@ -2931,14 +2931,14 @@ check("金色堂: 登っている間、主役は、いつも画面の中にい�
       "%.0f〜%.0f" % (min(climb_seen), max(climb_seen)))
 run(gc, 60)
 check("金色堂: 登りきると、画面は、壇の上の高さで止まる（清衡の間は、いままでと同じ高さ）", gc.cam_y == 0 and gc.player.py == C.FLOOR_Y)
-gc._start(7740, float(B - 192))
+gc._start(7740 + S4, float(B - 192))
 gc.enemies = []
 seen_p = []
 for _ in range(400):
     gc.player.invincible = 5
     gc.step(set())
     seen_p += [round(w.px) for w in gc.waves if type(w).__name__ == "Pillar"]
-check("金色堂の登りの壁には、足場の2本の柱すじ（7740・7830）に、光の柱が落ちる", set(seen_p) == {7740, 7830}, str(sorted(set(seen_p))))
+check("金色堂の登りの壁には、足場の2本の柱すじ（7740・7830）に、光の柱が落ちる", set(seen_p) == {7740 + S4, 7830 + S4}, str(sorted(set(seen_p))))
 # 影のボスは、床が低い所でも、画面のすぐ上から降ってくる
 gz0 = Game()
 gz0.reset(3)
@@ -3005,9 +3005,9 @@ def run_hop(cur, nxt):
 # 実際に、光の橋を渡る（点いたばかりの足場へ、順に跳ぶ）
 gc = gk
 B = C.FLOOR_Y + gk.terrain.climb[2]
-BRIDGE = [(6360, 6500, B), bl[0][:3], bl[1][:3], bl[2][:3], (6900, 7000, B - 16)]
+BRIDGE = [(6360 + S4, 6500 + S4, B), bl[0][:3], bl[1][:3], bl[2][:3], (6900 + S4, 7000 + S4, B - 16)]
 check("光の橋の足場が、面のデータにある", all(s3 in gk.terrain.ground or s3 in gk.terrain.platforms or s3 in [b[:3] for b in bl] for s3 in BRIDGE))
-climb_at(6440, B)
+climb_at(6440 + S4, B)
 hp0, lost = gk.player.hp, []
 for cur, nxt in zip(BRIDGE, BRIDGE[1:]):
     blink = [b for b in bl if b[:3] == nxt]
