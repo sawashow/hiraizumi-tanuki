@@ -482,7 +482,8 @@ GAMEOVER_WAIT = 145    # このフレームまでは、Enter を押しても再�
 # 2面のボス（二代・基衡「怨庭公家」）: 歩いて、「扇の風」「扇を投げる」を交互に出す。体力が半分になると、「花びらの雨」が入る。
 # 順番の文字: W=扇の風 / T=扇を投げる / P=花びらの雨。風は、ダメージなしで、主人公を押し戻す（池や穴が近いと危ない）。
 # 扇は、ゆっくり飛んで、戻ってくる（刀で消せる）。花びらは、落ちる場所に、先に目印が出る
-BOSS2 = dict(w=36, h=76, hp=36, touch=1, speed=0.75, near=80, gravity=0.3,
+# keep_off: 基衡は、部屋の左右の端から、これだけ内側までしか歩かない（左右の、上下する足場の下に入らない。足場に、いつも乗れるように）
+BOSS2 = dict(w=36, h=76, keep_off=115, hp=36, touch=1, speed=0.75, near=80, gravity=0.3,
              walk_frames=70, rage_walk_frames=42, recover_frames=56, rage_recover_frames=34,      # 2026-10-13 に、弱すぎたので、テコ入れ（体力 28→36、歩き 90→70、隙 75→56 など）
              wind_ready=34, wind_at=12, wind_frames=34,
              throw_ready=38, throw_ready_chain=20, throw_at=8, throw_frames=26,       # throw_ready_chain: 風のすぐあとの、扇の構え（風で押し戻して、すぐ投げる）

@@ -1929,6 +1929,12 @@ class Boss2(Boss):
     def __init__(self, *args, **kw):
         super().__init__(*args, **kw)
         self.pattern = kw.get("pattern") or C.BOSS2_PATTERN
+        # 部屋の端から端（大風・花びらは、ここいっぱい）。歩くのは、左右の壁ぎわを空けた内側だけ
+        # （壁ぎわの、上下する足場に、いつも乗れる。追い詰められても、足場から跳び越えられる）
+        self.room = (self.x_min - self.w / 2, self.x_max + self.w / 2)
+        keep = self.P["keep_off"]
+        if self.x_max - self.x_min > 2 * keep:
+            self.x_min, self.x_max = self.x_min + keep, self.x_max - keep
 
     @property
     def move(self):
@@ -1975,7 +1981,7 @@ class Boss2(Boss):
         elif s == "gale_ready":     # 大風の予告: 扇を高く上げて、止まる。風の帯が、うすく現れる（低いか、高いかは、帯の場所で分かる。Gale が描く）
             if self.st == 1:
                 snd("charge")
-                self.spawned.append(Gale(self.x_min - self.w / 2, self.x_max + self.w / 2, self.floor, self.facing, self.a,
+                self.spawned.append(Gale(self.room[0], self.room[1], self.floor, self.facing, self.a,
                                          high=self.gale_high))
             if self.st >= C.GALE["warn"]:
                 self._set("gale")
@@ -2014,7 +2020,7 @@ class Boss2(Boss):
         K = C.PETAL
         for i in range(K["count"]):
             off = (i - (K["count"] - 1) / 2) * K["spread"]
-            x = max(self.x_min - self.w / 2, min(pr.centerx + off, self.x_max + self.w / 2))
+            x = max(self.room[0], min(pr.centerx + off, self.room[1]))
             snd("petal")
             self.spawned.append(Petal(x, self.floor, self.a, K["stagger"] * i))
 
