@@ -311,8 +311,9 @@ class StageDef:
     @property
     def footholds(self):
         """乗れる足場のすべて（いつもある足場と、消える光の足場）。届くかどうか・跳ぶ難しさを調べるのに使う"""
-        mid = tuple((round((m[0] + m[2]) / 2), round((m[0] + m[2]) / 2) + m[4], round((m[1] + m[3]) / 2)) for m in self.movers)   # 動く足場は、真ん中の位置にあるものとして数える
-        return tuple(self.platforms) + tuple(b[:3] for b in self.blinks) + mid
+        # 動く足場は、動く範囲ぜんぶが、1枚の足場として数える（乗れば運ばれるので、どちらの端からも、乗り降りできる）。高さは、往復の真ん中
+        span = tuple((min(m[0], m[2]), max(m[0], m[2]) + m[4], round((m[1] + m[3]) / 2)) for m in self.movers)
+        return tuple(self.platforms) + tuple(b[:3] for b in self.blinks) + span
 
 
 # 古い短い版の月見坂（長さ 4080。動作テストが、この形を前提にしている）。ゲームでは使わない
@@ -333,13 +334,15 @@ _E = [(120, 16), (120, 32), (120, 48), (120, 64), (160, 80), ("穴", 100),      
 _seg, _x = _run(_E, 3330)
 assert _x == W1 - 480, _x
 GROUND1 = tuple(g for g in GROUND if g[0] < 3330) + _seg + ((_x, W1 + 120, T),)
+# 動く足場（上下に往復する）。2つは、ずらして動く
+MOVERS1 = ((4805, T - 34, 4805, T - 66, 50, 0), (5705, T - 118, 5705, T - 154, 50, 120))
 PLATFORMS1 = tuple(pl for pl in PLATFORMS if pl[0] < 3330) + (
     (3400, 3440, T - 96), (3560, 3600, T - 112),                 # 長い登りの上の道
     (3995, 4045, T - 70),                                        # 穴（3970〜4070）の真ん中
     (4300, 4350, T - 80),
-    (4800, 4860, T - 40),                                        # 穴（4770〜4890）の真ん中
+    # 穴（4770〜4890）は、上下に動く足場（MOVERS1）で渡る
     (5120, 5170, T - 118), (5260, 5310, T - 134),                # 頂上へ登る足場
-    (5700, 5750, T - 124),                                       # 穴（5670〜5780）の真ん中
+    # 穴（5670〜5780）も、上下に動く足場（MOVERS1）で渡る
     (5900, 5950, T - 130),
     (6630, 6680, T - 30),                                        # 穴（6610〜6700）の真ん中
     (6200, 6250, T - 90), (6780, 6830, T - 70),
@@ -395,7 +398,7 @@ ZONES1 = (
 )
 STAGE1 = StageDef("月見坂", W1, GROUND1, PLATFORMS1, thin_dango(ITEMS1, PLATFORMS1), (4650, T), SPAWNS1B, C.BGM_STAGE1, C.BGM_BOSS,
                   lanterns=(("triple", 300), ("onigiri", 4750), ("onigiri", 6880)),   # 石灯籠: 入口（強化）・中間地点の先（回復）・ボスの前（回復）
-                  number=3, stele_x=140,
+                  number=3, stele_x=140, movers=MOVERS1,
                   boss_title="enemies/boss2_title.png", boss_name="enemies/boss2_name.png",
                   talk_boss="talk_boss2.png", talk_tanuki="talk_tanuki2.png",
                   boss_kind="boss2", boss_pattern=C.BOSS2_GALE_PATTERN, zones=ZONES1, thought=("jajamen", "senbei", "anko"),
@@ -554,20 +557,22 @@ assert _x3 == W3 - 480, _x3
 GROUND3 = _lowered(GROUND3, 0) + _CLIFF3 + _seg3 + ((_x3, W3 + 120, T),)    # 最後は、ボスの前の平地。面の端の先は、クリアのときに走り抜ける分
 PLATFORMS3 = (
     (460, 500, T - 80), (540, 580, T - 96),                    # 崖の道の上の足場
-    (830, 850, T - 80),                                        # 切れ目1の真ん中（越えるより、渡る道）
+    # 切れ目1（幅80）は、足場なしで、跳び越える
     (1180, 1230, T - 60),                                      # 低い谷の上
     (1330, 1370, T - 80), (1430, 1470, T - 120),               # 見晴らしの岩場への足場
     (1750, 1800, T - 60),                                      # 切れ目2の真ん中
-    (1960, 2010, T - 36), (2075, 2115, T - 52), (2180, 2230, T - 40),     # 崖渡りの足場（間は60〜65。真ん中は、狭くて高い）
+    (1975, 2015, T - 38),                                      # 崖渡り（幅390）: 最初の足場。つづきは、動く足場（MOVERS3）で、右の岸へ
     (2290, 2340, T - 50),
     (2430, 2480, T - 44),                                      # 切れ目3の真ん中
     (2680, 2730, T - 110), (2780, 2830, T - 126),              # 高台の上
     (3030, 3090, T - 58),                                      # 関の真ん中（弓兵の矢を、上でやりすごせる）
     (4430, 4480, T - 76),                                     # 切れ目（4400〜4510）の真ん中
     (4600, 4650, T - 96),
-    (5165, 5215, T - 40),                                     # 切れ目（5140〜5240）の真ん中
+    # 切れ目（5140〜5240）は、上下に動く足場（MOVERS3）で渡る
     (5300, 5350, T - 60),
 )
+# 動く足場: (A の左端, A の上面, B の左端, B の上面, 幅, ずれ)。崖渡りは、横に往復する足場。頂上の切れ目は、上下に動く足場
+MOVERS3 = ((2065, T + RISE3 - 46, 2195, T + RISE3 - 46, 40, 0), (5165, T - 34, 5165, T - 66, 50, 90))
 PLATFORMS3 = _lowered(PLATFORMS3, 0) + (
     # 崖登り。段の崖: 段の手前の足場を踏んで、段の上へ（上りは 52 → 44）
     (3645, 3695, _B3 - 84), (3805, 3855, _B3 - 180),         # 段の壁に、付ける
@@ -637,7 +642,7 @@ STAGE3 = StageDef("高館", W3, GROUND3, PLATFORMS3, thin_dango(ITEMS3, PLATFORM
                   boss_title="enemies/boss3_title.png", boss_name="enemies/boss3_name.png",
                   talk_boss="talk_boss3.png", talk_tanuki="talk_tanuki3.png", number=2, stele_x=130,
                   boss_kind="boss3", boss_pattern=C.BOSS3_PATTERN,   # ボスは遊ぶ順で決まる（代をさかのぼる: 1面:四代・泰衡 2面:三代・秀衡 3面:二代・基衡 4面:初代・清衡）
-                  zones=ZONES3, thought=("kushi", "reimen"), climb=CLIMB3,
+                  zones=ZONES3, thought=("kushi", "reimen"), climb=CLIMB3, movers=MOVERS3,
                   pit=(150, 186, 208), pit_deep=(84, 130, 170), haze=36)
 # 崖の切れ目の下は、青く霞んだ谷。昼の景色に、暗い穴は合わない。高い崖の上にいる感じを出す。
 # 前は、白（226, 240, 246）で、もやの高さ 100。穴のふちが、いちばん明るくなって、下から光が出ているように見えた。
@@ -706,9 +711,10 @@ PLATFORMS4 = _shift4((
 ), 0, 1) + (
     # 新しい3区画（写経の間・螺鈿の廊・経蔵）。穴の真ん中の足場には、団子を置く。経蔵は、段を登りながら、足場で高く跳ぶ
     (1760, 1810, T - 88),
-    (2305, 2355, T - 40), (2530, 2580, T - 40), (2755, 2805, T - 40),
+    (2305, 2355, T - 40),         # 螺鈿の廊: 1つ目の穴は静かな足場。2つ目は、上下に動く足場（MOVERS4）。3つ目（幅90）は、足場なしで跳び越える
     (3095, 3145, T - 90), (3225, 3275, T - 104), (3355, 3405, T - 90),
 )
+MOVERS4 = ((2530, _B4 - 32, 2530, _B4 - 66, 50, 0),)
 PLATFORMS4 = _lowered(PLATFORMS4, 0, RISE4, CLIMB4[0]) + _shift4((
     (7325, 7375, _B4 - 50), (7485, 7535, _B4 - 146),           # 最後の登り。段の壁に付けた足場（上りは 50 → 46）
     # 壁（7860）の手前を、左右に折り返して登る（上りは 48）。光の柱が、2本の柱すじ（7740・7830）に、順に落ちる。落ちた直後に、登る
@@ -790,7 +796,7 @@ STAGE4 = StageDef("金色堂", W4, GROUND4, PLATFORMS4, thin_dango(ITEMS4, PLATF
                   sky="stage4/bg_sky.png", mid="stage4/bg_mid.png", tiles="stage4/",
                   boss_title="enemies/boss4_title.png", boss_name="enemies/boss4_name.png",
                   talk_boss="talk_boss4.png", talk_tanuki="talk_tanuki4.png", number=4, stele_x=130,
-                  boss_kind="boss4", thought=("onigiri", "mochi", "dango", "hittsumi"), pit=(30, 20, 8), haze=20, gates=GATES4, zones=ZONES4, gilt=True, climb=CLIMB4, mid_follow=0, fill_rows=(3, 0),
+                  boss_kind="boss4", thought=("onigiri", "mochi", "dango", "hittsumi"), pit=(30, 20, 8), haze=20, gates=GATES4, zones=ZONES4, gilt=True, climb=CLIMB4, mid_follow=0, fill_rows=(3, 0), movers=MOVERS4,
                   # 光の橋: 幅400の切れ目を、消える光の足場3つと、真ん中の消えない足場1つで渡る。
                   # 光は、左から右へ、60 フレームずつ遅れて点く（波のように進む）。となりどうしが、70 フレーム、一緒に点いている
                   blinks=_shift4(((6540, 6620, _B4 - 30, 0), (6660, 6740, _B4 - 32, 140), (6780, 6860, _B4 - 30, 80)), 0, 1),
