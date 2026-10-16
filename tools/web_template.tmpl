@@ -220,7 +220,7 @@ function show_infobox() {
         /* 読み込み中は、点が増えて、下の線が流れる（止まっていないことが、分かるように） */
         #infobox:not(.ready)::after {
             content: "";
-            animation: dots 1.6s steps(1, end) infinite;
+            position: absolute;   /* 点は枠の幅に数えない（増えても、文字が中央からずれない） */ animation: dots 1.6s steps(1, end) infinite;
         }
         #infobox:not(.ready) {
             background-image: linear-gradient(90deg, transparent, #f2e8c9, transparent);
