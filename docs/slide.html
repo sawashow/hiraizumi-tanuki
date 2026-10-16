@@ -1,0 +1,54 @@
+<!doctype html>
+<!-- Day8 成果発表の1枚スライド。ブラウザで開いて、全画面（F11）で映す。PDF は Ctrl+P（横向き・余白なし・背景のグラフィックを印刷） -->
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>平泉タヌキ侍（成果発表）</title>
+<style>
+  @page { size: 1280px 720px; margin: 0; }
+  * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  html, body { margin: 0; background: #d9d9d9; }
+  body { font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", "Meiryo", sans-serif; color: #111; }
+  .deck { max-width: 1280px; margin: 0 auto; padding: 24px 0; }
+  /* 1スライド = 16:9。文字は、いちばん小さいものでも 28pt（約38px）以上 */
+  .slide {
+    position: relative; aspect-ratio: 16 / 9; width: 100%; max-width: 1280px; background: #fff; overflow: hidden;
+    padding: 48px 72px 44px; display: flex; flex-direction: column; gap: 22px;
+  }
+  .label { font-size: 38px; font-weight: 700; color: #555; margin: 0 0 4px; }
+  .who { font-size: 44px; font-weight: 700; margin: 0; }
+  .scene { font-size: 42px; line-height: 1.5; margin: 0; }
+  .app { margin-top: auto; display: flex; align-items: flex-end; justify-content: space-between; gap: 32px; }
+  .name { font-size: 96px; font-weight: 800; letter-spacing: 0.04em; margin: 0; line-height: 1.15; }
+  .catch { font-size: 42px; font-weight: 700; margin: 8px 0 0; line-height: 1.45; }
+  .by { font-size: 38px; color: #333; margin: 0 0 6px; white-space: nowrap; }
+  @media print {
+    html, body { background: #fff; }
+    .deck { padding: 0; max-width: none; }
+    .slide { width: 1280px; height: 720px; }
+  }
+</style>
+</head>
+<body>
+<div class="deck">
+  <section class="slide">
+    <div>
+      <p class="label">誰の</p>
+      <p class="who">平泉を歩いて回る、歴史が苦手な人</p>
+    </div>
+    <div>
+      <p class="label">場面</p>
+      <p class="scene">中尊寺の月見坂で、藤原四代の話を聞いたのに、<br>名前も順番も、まったく頭に入らなかった</p>
+    </div>
+    <div class="app">
+      <div>
+        <p class="name">平泉タヌキ侍</p>
+        <p class="catch">遊んでいるうちに、平泉の名所と<br>藤原四代が、順番どおりに覚えられるゲーム</p>
+      </div>
+      <p class="by">（名前）</p>
+    </div>
+  </section>
+</div>
+</body>
+</html>
