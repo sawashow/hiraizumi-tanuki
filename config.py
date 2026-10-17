@@ -220,7 +220,7 @@ ARENA_X0 = STAGE_W - BASE_W     # ボスの場所の左端（ここで画面が�
 SCORE_BOSS = 2000
 CLEAR_SCORE_AT = 40             # クリアしてから、SCORE の行が出て、数字が増え始めるまでのフレーム数
 CLEAR_COUNT = 60                # SCORE が 0 から最終値まで増える長さ（点数の大きさによらず同じ）
-ONLINE = dict(url="https://script.google.com/macros/s/AKfycbywGsCGq8k-gIqMnEdnqAeI0wDOPlsDbPTMGaTjxVz1ropGrz_K517NyXV2nE0-_W8D5Q/exec")    # 順位表のサーバー（server/gas。ブラウザ版だけ）。空にすると、順位表は使わない
+ONLINE = dict(url="https://script.google.com/macros/s/AKfycbxAC8VbYeVxLfrmjXs4b3oRTZqxO2MCC9c3nOplKem5sgOT9t2NCuQl6SqgulmMMiRGFg/exec")    # 順位表のサーバー（server/gas。ブラウザ版だけ）。空にすると、順位表は使わない
 # 順位表への送信が断られたとき、画面に出す理由（サーバーの返事の error → 文字）。知らない理由は、FAILED
 SEND_ERRORS = {"too fast": "TOO FAST", "no token": "NO TOKEN", "frames out of range": "OUT OF RANGE", "network": "NO NETWORK", "bad request": "SERVER BUSY", "bad name": "BAD NAME"}
 SUMMARY = dict(row=20, wait=170, chars="ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", send_wait=900, repeat_at=18, repeat_every=5)   # エンドロールのあとの総括: row＝次の行が出るまでのフレーム数 / wait＝操作を受け付けるまで / chars＝イニシャルに使える文字 / send_wait＝送ったあと、返事を待つ長さ / repeat_at・repeat_every＝上下を押し続けたとき、連続で進み始めるまでと、進む間隔（フレーム）
