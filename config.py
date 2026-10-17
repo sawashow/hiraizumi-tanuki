@@ -456,11 +456,11 @@ DISCO = (("bgm_story.ogg", "Evening at the Border Post"), ("bgm_map.ogg", "Steps
          ("bgm_ending.ogg", "Sunset at the Temple Gate"))
 MENU = dict(cx=150, y=196, row=18, row_option=15, head=18, gap=10, steps=5,
             pages=dict(main=("story", "option", "extra", "howto"), option=("level", "music", "sound", "stick", "back"),
-                       extra=("meisho", "jinbutsu", "disco", "back"),
+                       extra=("meisho", "jinbutsu", "disco", "records", "back"),
                        meisho=("m0", "m1", "m2", "m3", "back"),
                        jinbutsu=("p0", "p1", "p2", "p3", "back"),
                        disco=tuple("t%d" % i for i in range(len(DISCO))) + ("back",)),
-            label=dict(story="STORY", option="OPTION", extra="EXTRA", meisho="MEISHO", m0="MOTSUJI", m1="TAKADACHI", m2="TSUKIMIZAKA", m3="KONJIKIDO", jinbutsu="JINBUTSU", p0="YASUHIRA", p1="HIDEHIRA", p2="MOTOHIRA", p3="KIYOHIRA", disco="DISCOGRAPHY", howto="HOW TO PLAY", level="LEVEL", music="MUSIC", sound="SOUND", stick="STICK", back="BACK",
+            label=dict(story="STORY", option="OPTION", extra="EXTRA", meisho="MEISHO", m0="MOTSUJI", m1="TAKADACHI", m2="TSUKIMIZAKA", m3="KONJIKIDO", jinbutsu="JINBUTSU", p0="YASUHIRA", p1="HIDEHIRA", p2="MOTOHIRA", p3="KIYOHIRA", disco="DISCOGRAPHY", records="RECORDS", howto="HOW TO PLAY", level="LEVEL", music="MUSIC", sound="SOUND", stick="STICK", back="BACK",
                        **{"t%d" % i: name for i, (_, name) in enumerate(DISCO)}))
 # 隠し部屋（stage.py の caves）: hits＝崩れるまでに斬る回数 / cool＝1回の振りで、何度も数えないための間 / wall＝入口の壁の厚み（刀が当たる所）
 #   crack＝ひびの色（細く。斬るたびに濃くなる）/ shine＝ひびの下に1ドットずらして引く、明るい縁（彫ったように見せる）/ lines＝ひびの線（x は壁の左端から、y は高さに対する割合）/ room・edge＝壊したあとの部屋の色と縁
