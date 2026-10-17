@@ -11,7 +11,7 @@
  *
  * 不正への考え方（完全には防げない。遊びの順位表と割り切る）:
  *   - 「開始から、送信までの、実時間」が、送られたフレーム数（÷60）より短い記録は、弾く（偽造の記録を、直接送る手口を防ぐ）。
- *   - 人間には不可能な速さ（MIN_FRAMES 未満）も、弾く。
+ *   - 人間には不可能な速さ（難しさごとの MIN_FRAMES 未満）も、弾く。
  *   - 名前は、半角英大文字と数字の3文字だけ。
  */
 
@@ -19,7 +19,7 @@ var LEVELS = ["easy", "normal", "hard"];
 var SHEET = "scores";          // 記録を置くシートの名前（無ければ、自動で作る）
 var TOP_N = 20;                // 順位表に出す件数
 var KEEP = 200;                // 各難しさで、残す件数（これを超えたら、遅い記録から消す）
-var MIN_FRAMES = 7200;         // これより速い（= 2分未満の）通しは、あり得ないとみなす（60 フレーム = 1 秒）。実際の最短を知ったら、見直す
+var MIN_FRAMES = { easy: 9000, normal: 12600, hard: 12600 };   // 難しさごとの、これより速い通しは、あり得ないとみなす（60 フレーム = 1 秒。9000 = 2:30 / 12600 = 3:30）。NORMAL で、手間取った通しが 6:50 だった（2026-10-17）ので、その約半分。EASY は、実測がなく、仮の値。実際の最速を知ったら、見直す
 var MAX_FRAMES = 216000;       // 60分より遅い記録は、受け付けない
 var TOKEN_TTL = 21600;         // 開始の合図が有効な秒数（6時間）
 var CACHE_SEC = 60;            // 順位表を、使い回す秒数（スプレッドシートの読み込みを減らす）
@@ -88,7 +88,8 @@ function checkSubmit_(p, startedMs, nowMs) {
   if (typeof p.name !== "string" || !/^[A-Z0-9]{3}$/.test(p.name)) return "bad name";
   if (NG_NAMES.indexOf(p.name) >= 0) return "ng name";
   if (typeof p.frames !== "number" || !isFinite(p.frames) || Math.floor(p.frames) !== p.frames) return "bad frames";
-  if (p.frames < MIN_FRAMES || p.frames > MAX_FRAMES) return "frames out of range";
+  var min = MIN_FRAMES[p.level] || MIN_FRAMES.normal;
+  if (p.frames < min || p.frames > MAX_FRAMES) return "frames out of range";
   var elapsedSec = (nowMs - startedMs) / 1000;
   if (elapsedSec < (p.frames / 60) * 0.95 - 2) return "too fast";        // ゲームは、1秒に、60 フレームより速くは進まない（ゆらぎの分だけ、少し甘くする）
   return null;

@@ -14,6 +14,9 @@ t("ゆらぎの分（5%）は、許す", ctx.checkSubmit_(ok, now - 290 * 1000, 
 t("名前が3文字でない", ctx.checkSubmit_({ name: "AB", frames: 18000 }, now - 400 * 1000, now), "bad name");
 t("小文字は、使えない", ctx.checkSubmit_({ name: "abc", frames: 18000 }, now - 400 * 1000, now), "bad name");
 t("使えない名前", ctx.checkSubmit_({ name: "ASS", frames: 18000 }, now - 400 * 1000, now), "ng name");
+t("難しさごとの下限: EASY は 2:30 まで許す（10000 フレーム）", ctx.checkSubmit_({ name: "ABC", level: "easy", frames: 10000 }, now - 400 * 1000, now), null);
+t("難しさごとの下限: NORMAL では、同じ 10000 フレームは、速すぎる", ctx.checkSubmit_({ name: "ABC", level: "normal", frames: 10000 }, now - 400 * 1000, now), "frames out of range");
+t("難しさごとの下限: HARD は 3:30 から（12000 は弾く・13000 は通す）", ctx.checkSubmit_({ name: "ABC", level: "hard", frames: 12000 }, now - 400 * 1000, now) === "frames out of range" ? ctx.checkSubmit_({ name: "ABC", level: "hard", frames: 13000 }, now - 400 * 1000, now) : "NG", null);
 t("速すぎる記録（2分未満）は、弾く", ctx.checkSubmit_({ name: "ABC", frames: 3000 }, now - 400 * 1000, now), "frames out of range");
 t("遅すぎる記録（60分超）は、弾く", ctx.checkSubmit_({ name: "ABC", frames: 300000 }, now - 9999 * 1000, now), "frames out of range");
 t("小数は、弾く", ctx.checkSubmit_({ name: "ABC", frames: 18000.5 }, now - 400 * 1000, now), "bad frames");
