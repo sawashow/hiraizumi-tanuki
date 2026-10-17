@@ -312,12 +312,12 @@ BGM_FADE_MS = 1200      # やられたとき、曲が消えていくまでの時
 
 # スタート画面: 絵（assets/images/title.png、480×270）の上に、題名を重ねる。Enter（Z・Space でも）で始まる。
 # クリアのあとは、ここへ戻る。題名は、絵の左の空（右は主人公と月）に置く。
-# 題名の絵は tools/make_title_logo.py（昔のゲームのロゴ風）、「PUSH ENTER KEY」は tools/make_text_image.py で作る
+# 題名の絵は tools/make_title_logo.py（昔のゲームのロゴ風）、「PRESS START」は tools/make_text_image.py で作る
 # 絵が無いときは、1面の始まりの景色を暗くして、代わりにする
 TITLE_BG = "title.png"
 TITLE_DIM = 70          # 絵が無いとき、景色を暗くする度合い（0〜255）
 TITLE_LOGO = (150, 14)    # 題名の、左右の中心と上端
-TITLE_PROMPT = (150, 214)  # 「PUSH ENTER KEY」の、左右の中心と上端（これより上は、中央の人物の足に重なる。前は 232）
+TITLE_PROMPT = (150, 214)  # 「PRESS START」の、左右の中心と上端（これより上は、中央の人物の足に重なる。前は 232）
 # 題名は、画面の上の外から、ゆっくり下りてきて止まる（最後に減速）。着いてから、案内が出る
 TITLE_DROP_WAIT = 30    # 開いてから、下り始めるまでのフレーム数
 TITLE_DROP = 120        # 下りるフレーム数
@@ -406,7 +406,7 @@ STORY_SLEEP_SEQ = (4, 5, 4, 5, 4, 6)   # 眠っている間のコマの順番（
 # ゲーム中も、何も押さずに立っていると、あくびをして、座って眠る（「Z」が出る）。絵は、語りの画面と同じもの。
 # キーを押すか、ダメージを受けると、すぐ起きる。眠っていても、当たり判定は立っているときと同じ
 REST = dict(start=480, yawn=70, drowsy=70, sit=30, breath=60)   # start = 眠りに入るまでの、何もしない時間（8秒）
-STORY_PROMPT = (350, 216)   # 「PUSH ENTER KEY」の、左右の中心と上端
+STORY_PROMPT = (350, 216)   # 「PRESS START」の、左右の中心と上端
 
 # 面の名前の表示（面の始まりに、縦書きで出す）: 少し待って → 現れる → 見せる → 消える（フレーム数）
 STAGE_TITLE = dict(wait=20, fade_in=25, hold=120, fade_out=35)
