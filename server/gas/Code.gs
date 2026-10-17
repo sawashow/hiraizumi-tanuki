@@ -25,6 +25,11 @@ var TOKEN_TTL = 21600;         // 開始の合図が有効な秒数（6時間）
 var CACHE_SEC = 60;            // 順位表を、使い回す秒数（スプレッドシートの読み込みを減らす）
 var NG_NAMES = ["ASS", "SEX", "FUK", "FCK", "SHT", "KKK", "NZI", "DIE"];   // 使えない3文字（必要なら足す）
 
+/** 最初に1回だけ、エディタから実行する: 権限の許可を求め、記録のシート（scores）を作る（末尾が「_」の関数は、エディタの一覧に出ない） */
+function setup() {
+  sheet_();
+}
+
 function json_(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
 }
