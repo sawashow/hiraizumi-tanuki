@@ -890,7 +890,8 @@ for st in STAGES:
     sp = Terrain(st.ground, st.platforms)
     check("[%s] 落ち武者の配置が、すべて地面の上" % st.name, all(sp.height_at(x) is not None for k, x in st.spawns if k == "ochimusha"))
     check("[%s] アイテムが、地面の中に埋まっていない" % st.name,
-          all((sp.height_at(x) is None) or (y + C.ITEM_SIZE / 2 <= sp.height_at(x) + 1) for _, x, y in st.items))
+          all((sp.height_at(x) is None) or (y + C.ITEM_SIZE / 2 <= sp.height_at(x) + 1)
+              or any(c[0] <= x <= c[1] and c[2] <= y <= c[3] for c in st.caves) for _, x, y in st.items))     # 隠し部屋の中は、地面の中でよい
     check("[%s] 団子がある・敵がいる・中間地点が地面の上" % st.name,
           st.dango_total > 0 and len(st.spawns) > 0 and sp.height_at(st.checkpoint[0]) == st.checkpoint[1])
 check("アイテムが、地面の中に埋まっていない", all((R.height_at(x) is None) or (y + C.ITEM_SIZE / 2 <= R.height_at(x) + 1) for _, x, y in ITEMS))
@@ -2190,7 +2191,7 @@ _top = min((run(_hg, 1, {"jump"}) or _hg.player.py) for _ in range(30))
 check("隠し部屋: 跳んでも、天井に頭がつかえる", _top - C.PLAYER_H >= _cv[2] - 0.01, str(_top))
 run(_hg, 80, {"left"})
 check("隠し部屋: 入口から出られる", _hg.player.px < _cv[0])
-for _st in (_stg.STAGE1, _stg.STAGE4):     # ほかの面の隠し部屋も、斬って崩して、中の物を全部取れる
+for _st in (_stg.STAGE2, _stg.STAGE1, _stg.STAGE4):     # ほかの面の隠し部屋も、斬って崩して、中の物を全部取れる
     _hg = Game()
     _hg.reset(STAGES.index(_st))
     _cv = _hg.terrain.caves[0]
