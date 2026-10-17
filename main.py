@@ -93,6 +93,8 @@ class Game:
         self.howto = False       # 操作説明を出している
         self.records_on = False  # ベストタイムの一覧（EXTRA の RECORDS）を出している
         self.rec_view = self.level   # その一覧で、見ている難しさ
+        self.rec_tab = 0         # その一覧で、見ているもの（0 = 自分の記録 / 1 = みんなの順位。順位は、ブラウザ版だけ）
+        self.rank_t = 0          # みんなの順位を頼んでから、数えたフレーム数（返事が来ないとき、諦めるため）
         self.meisho = None       # 出している、名所・人物の説明の絵（出していなければ None）
         self._fade_cache = {}    # 崖の縁の、中景の入れ替えに使う、濃さの帯（幅ごとに作る）
         self._roll_fade = None   # エンドロールの、左の枠の右の端を暗くぼかす帯
@@ -514,10 +516,20 @@ class Game:
         step_lr, step_ud = (lr if lr != self._lr else 0), (ud if ud != self._ud else 0)   # 押した瞬間だけ
         self._lr, self._ud = lr, ud
         if self.records_on:     # ベストタイムの一覧: 左右で、難しさを替える。決定で、メニューに戻る
+            online_ok = online.enabled(C.ONLINE["url"])
+            if step_ud and online_ok:       # 上下で、自分の記録 ⇔ みんなの順位
+                self.rec_tab = 1 - self.rec_tab
+                self.sfx.append(C.SFX["cursor"])
+                if self.rec_tab:
+                    self._ask_ranking()
             if step_lr:
                 order = C.LEVEL_ORDER
                 self.rec_view = order[max(0, min(order.index(self.rec_view) + step_lr, len(order) - 1))]
                 self.sfx.append(C.SFX["cursor"])
+                if self.rec_tab:
+                    self._ask_ranking()
+            if self.rec_tab:
+                self.rank_t += 1
             if decide:
                 self.records_on = False
                 self.sfx.append(C.SFX["decide"])
@@ -580,7 +592,7 @@ class Game:
                 self.menu_page, self.menu_i, self.disco_song = page, C.MENU["pages"][page].index(came), None
                 self.sfx.append(C.SFX["decide"])
             elif decide and row == "records":
-                self.records_on, self.rec_view = True, self.level
+                self.records_on, self.rec_view, self.rec_tab = True, self.level, 0
                 self.sfx.append(C.SFX["decide"])
                 return
             elif decide and row == "howto" and self.a.howto:
@@ -2058,19 +2070,42 @@ class Game:
             img = self.a.title_prompt
             screen.blit(img, (C.TITLE_PROMPT[0] - img.get_width() // 2, C.TITLE_PROMPT[1]))
 
+    def _ask_ranking(self):
+        """見ている難しさの、みんなの順位を、サーバーに頼む（返事は、あとで読む）"""
+        online.fetch_ranking(C.ONLINE["url"], self.rec_view)
+        self.rank_t = 0
+
     def _draw_records(self, screen, font):
-        """EXTRA の RECORDS: 難しさごとの、面ごとのベストタイムと、通しのベスト。左右で、難しさを替える"""
+        """EXTRA の RECORDS: 難しさごとの、面ごとのベストタイムと、通しのベスト（自分の記録）。ブラウザ版は、上下で、みんなの順位（上位）に替わる。左右で、難しさを替える"""
         gold, grey = (255, 236, 150), (176, 176, 190)
         cx, left, right = C.BASE_W // 2, C.BASE_W // 2 - 120, C.BASE_W // 2 + 120
         screen.fill((11, 13, 31))
         def put(text, x, y, color=C.TEXT, right_=False):
             img = font.render(text, False, color)
             screen.blit(img, (x - img.get_width() if right_ else x, y))
-        put("RECORDS", cx - font.size("RECORDS")[0] // 2, 28, gold)
+        title = "RECORDS" if not online.enabled(C.ONLINE["url"]) else ("RECORDS - ONLINE" if self.rec_tab else "RECORDS - MINE")
+        put(title, cx - font.size(title)[0] // 2, 28, gold)
         order = C.LEVEL_ORDER
         i = order.index(self.rec_view)
         lv = ("< " if i > 0 else "  ") + C.LEVELS[self.rec_view]["label"] + (" >" if i < len(order) - 1 else "  ")
         put(lv, cx - font.size(lv)[0] // 2, 46, grey)
+        if self.rec_tab:        # みんなの順位（上位）
+            state, rows = online.ranking_state(self.rec_view)
+            if state == "pending" and self.rank_t > C.SUMMARY["send_wait"]:
+                state = "fail"
+            if state == "ok":
+                for k, row in enumerate(rows[:10]):
+                    ry = 72 + k * 16
+                    put("%2d" % (k + 1), left, ry, gold if k == 0 else C.TEXT)
+                    put(str(row.get("name", "---")), left + 36, ry, gold if k == 0 else C.TEXT)
+                    put(records.fmt(int(row.get("frames", 0))), right, ry, gold if k == 0 else C.TEXT, right_=True)
+                if not rows:
+                    put("NO RECORDS YET", cx - font.size("NO RECORDS YET")[0] // 2, 110, grey)
+            else:
+                msg = "LOADING..." if state == "pending" else "CAN'T CONNECT"
+                put(msg, cx - font.size(msg)[0] // 2, 110, grey)
+            put("UP DOWN: MINE / ONLINE   ENTER: BACK", cx - font.size("UP DOWN: MINE / ONLINE   ENTER: BACK")[0] // 2, 244, grey)
+            return
         for k, st in enumerate(STAGES):
             put(C.MENU["label"]["m%d" % k], left, 72 + k * 18)
             put(records.fmt(records.best(self.rec_view, st.name)), right, 72 + k * 18, right_=True)
@@ -2079,6 +2114,8 @@ class Game:
         put("TOTAL", left, y, gold)
         put(records.fmt(records.best(self.rec_view, records.TOTAL)), right, y, gold, right_=True)
         put("PRESS ENTER", cx - font.size("PRESS ENTER")[0] // 2, y + 40, grey)
+        if online.enabled(C.ONLINE["url"]):
+            put("UP DOWN: MINE / ONLINE", cx - font.size("UP DOWN: MINE / ONLINE")[0] // 2, y + 58, grey)
 
     def _draw_menu(self, screen, font):
         """スタート画面のメニュー。main = STORY / OPTION / HOW TO PLAY。option = LEVEL（難しさ）/ MUSIC・SOUND（音量）/ BACK。

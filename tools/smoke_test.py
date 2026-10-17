@@ -621,6 +621,46 @@ g = Game(title=True)
 g.start_demo_summary()
 check("確認用の近道: 通しの総括から始まる（記録は残さない）", g.summary and not g.title and sum(g.run_times) == 7200 and g.total_rec == (7200, True))
 
+# RECORDS: みんなの順位（ブラウザ版だけ。通信は、偽物に差し替える）
+_asked, _state = [], [("pending", None)]
+_real2 = (online.enabled, online.fetch_ranking, online.ranking_state)
+online.enabled = lambda url: False
+g = Game(title=True)
+g.records_on = True
+run(g, 1, {"down"})
+check("RECORDS: PC 版（通信しない）では、上下を押しても、自分の記録のまま", g.rec_tab == 0)
+online.enabled = lambda url: True
+online.fetch_ranking = lambda url, level: _asked.append(level)
+online.ranking_state = lambda level: _state[0]
+g = Game(title=True)
+g.records_on, g.rec_view = True, "normal"
+run(g, 1, {"down"})
+check("RECORDS: 上下で、みんなの順位に替わる（その難しさの順位を、サーバーに頼む）", g.rec_tab == 1 and _asked == ["normal"], str(_asked))
+snap(g, "records online loading")
+run(g, 1, ())
+run(g, 1, {"right"})
+check("RECORDS: 順位を見ている間も、左右で難しさを替えると、その順位を頼み直す", g.rec_view == "hard" and _asked == ["normal", "hard"], str(_asked))
+_state[0] = ("ok", [{"name": "TNK", "frames": 27064}, {"name": "ABC", "frames": 30000}])
+snap(g, "records online")
+_state[0] = ("ok", [])
+g.draw(screen, font)
+_state[0] = ("fail", None)
+g.draw(screen, font)
+_state[0] = ("pending", None)
+g.rank_t = C.SUMMARY["send_wait"] + 1
+g.draw(screen, font)
+check("RECORDS: 順位の表示は、待ち・取れない・空・一覧のどれでも、描ける", True)
+run(g, 1, ())
+run(g, 1, {"up"})
+check("RECORDS: もう一度上下で、自分の記録に戻る", g.rec_tab == 0)
+run(g, 1, (), {"restart"})
+g2 = Game(title=True)
+g2.records_on, g2.rec_tab = True, 1
+run(g2, 1, (), {"restart"})
+check("RECORDS: 決定で閉じる（順位を見ている途中でも）", not g.records_on and not g2.records_on)
+online.enabled, online.fetch_ranking, online.ranking_state = _real2
+check("通信: PC 版の順位の状態は、いつも「まだ」", online.ranking_state("easy") == ("pending", None) and online.ranking("easy") is None)
+
 # 通し: 面をクリアするたびにタイムを集め、最後の面で、通しの記録を残す。エンドロールのあとに、総括を出す
 g = Game(title=True)
 g.title = False
