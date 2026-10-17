@@ -784,6 +784,49 @@ g.draw(screen, font)
 check("重さ: 難しさを替えたときだけ、読み直す", _calls[0] == _one * 2, "読んだ回数 %d" % _calls[0])
 records.best, records.best_score = _real_best, _real_bs
 
+# ブラウザの保存領域（localStorage）へ渡す文字は、英数字と - _ = だけ。偽の保存領域で、PC 以外の経路を確かめる
+import platform as _plat  # noqa: E402
+import re as _re  # noqa: E402
+class _FakeLS:
+    def __init__(self): self.d, self.bad = {}, []
+    def setItem(self, k, v):
+        if not _re.fullmatch(r"[A-Za-z0-9_=\-]+", v):
+            self.bad.append(v)
+            raise ValueError("引用符などを含む値は、渡せない（想定）")
+        self.d[k] = v
+    def getItem(self, k): return self.d.get(k)
+class _FakeWin:
+    def __init__(self): self.localStorage = _FakeLS()
+_fw = _FakeWin()
+_plat.window = _fw
+_old_plat, _old_path, _old_status = sys.platform, records.PATH, records.status
+sys.platform = "emscripten"
+records.status = "ok"
+records.submit("easy", "毛越寺", 4321)
+records.submit("easy", records.TOTAL, 17000)
+records.submit_score("easy", 12345)
+records.set_name("TNK")
+check("ブラウザの保存: 渡す文字は、英数字と - _ = だけ（日本語の面の名前でも）", _fw.localStorage.bad == [] and list(_fw.localStorage.d) == [records.KEY], str(_fw.localStorage.bad)[:80])
+check("ブラウザの保存: 保存した記録を、読み戻せる（日本語の名前・通し・スコア・イニシャル）",
+      records.best("easy", "毛越寺") == 4321 and records.best("easy", records.TOTAL) == 17000 and records.best_score("easy") == 12345 and records.last_name() == "TNK" and records.status == "ok", records.status)
+_fw.localStorage.d[records.KEY] = "###こわれた###"
+check("ブラウザの保存: こわれたデータでも、止まらず、記録なしにして、理由を残す", records.best("easy", "毛越寺") is None and records.status == "READ ERROR", records.status)
+_fw.localStorage.d.clear()
+records.status = "ok"
+check("ブラウザの保存: 何も無い（はじめて）ときは、エラーにしない", records.best("easy", "毛越寺") is None and records.status == "ok", records.status)
+class _BrokenLS(_FakeLS):
+    def setItem(self, k, v): raise RuntimeError("保存できない")
+_fw.localStorage = _BrokenLS()
+records.submit("easy", "毛越寺", 100)
+check("ブラウザの保存: 書き込めないときは、止まらず、理由（WRITE ERROR）を残す", records.status == "WRITE ERROR", records.status)
+class _LostLS(_FakeLS):
+    def setItem(self, k, v): pass
+_fw.localStorage = _LostLS()
+records.submit("easy", "毛越寺", 100)
+check("ブラウザの保存: 書いたのに、読み戻せないときは、理由（WRITE MISMATCH）を残す", records.status == "WRITE MISMATCH", records.status)
+sys.platform, records.PATH, records.status = _old_plat, _old_path, _old_status
+del _plat.window
+
 # 通し: 面をクリアするたびにタイムを集め、最後の面で、通しの記録を残す。エンドロールのあとに、総括を出す
 g = Game(title=True)
 g.title = False
