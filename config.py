@@ -87,7 +87,7 @@ HIT_TICKS = 4        # 命中の破片1コマの長さ
 
 # 攻撃のダメージ。刀は強く、手裏剣は弱い（そのかわり離れて撃てる）
 SWORD_DAMAGE = 2
-CUT_DROP = 0.25    # ボス戦の間、敵の弾を刀で斬ったとき、団子が落ちる確率（道中は落とさない: 弓兵の矢で、いくらでも稼げてしまう）
+CUT_DROP = 0.4      # ボス戦の間、敵の弾を刀で斬ったとき、団子が落ちる確率（道中は落とさない: 弓兵の矢で、いくらでも稼げてしまう）
 SHURIKEN_DAMAGE = 1
 
 # 敵（ザコ）3種類。大きさ・体力・速さ・動きを変えて、見た目も攻略も区別する
@@ -527,7 +527,7 @@ GALE = dict(h=40, high_bottom=46, high_h=54, push=2.4, warn=70, blow=150, alpha=
 # 3面のボス（三代・秀衡「鬼角薙将」）。縦に高く、角のある兜に、大鎧、長い薙刀。動きは、1面の泰衡と同じ形
 # （歩く → 構える → 薙刀を振って光波、3回に1回、跳びかかり）だが、間合いが長く、光波が速くて遠くまで届く。
 # 光波の高さの順は、「低・高」を、交互に薙ぎ分ける
-BOSS3 = dict(BOSS, w=34, h=88, hp=30, speed=0.55, near=90, wave_speed=2.3, wave_range=520, high_bottom=34,
+BOSS3 = dict(BOSS, w=34, h=88, hurt_w=60, hp=30, speed=0.55, near=90, wave_speed=2.3, wave_range=520, high_bottom=34,
              rage_walk_frames=46, rage_recover_frames=40,
              combo=2, rage_combo=3, combo_ready=26,   # 光波を、続けて撃つ（ふだん2発、体力が半分で3発）。2発目からは、構えが短い
              thrust_near=150, thrust_ready=34, thrust_speed=4.4, thrust_range=130,   # 踏み込み突き: 主人公が、この距離より近いと、光波の代わりに突く。構え 34 フレーム（足元に赤い矢印）
