@@ -78,7 +78,7 @@ class Game:
         self.start_t = 0         # 決定してから、始まるまでの残りフレーム
         self.menu_on = False     # スタート画面で、メニューを開いている
         self.menu_i = 0          # 選んでいる項目
-        self.menu_page = "main"  # メニューの画面（main = STORY・OPTION・MEISHO・DISCOGRAPHY・HOW TO PLAY / option = 難しさ・音量 / meisho = 名所 / disco = 曲の一覧）
+        self.menu_page = "main"  # メニューの画面（main = STORY・OPTION・EXTRA・HOW TO PLAY / option = 難しさ・音量 / extra = 名所・曲 / meisho = 名所 / disco = 曲の一覧）
         self.disco_song = None   # ディスコグラフィで、いま鳴らしている曲のファイル名
         self.howto = False       # 操作説明を出している
         self.meisho = None       # 名所の説明を出している面の番号（0〜。出していなければ None）
@@ -508,7 +508,7 @@ class Game:
             if decide and row == "option":
                 self.menu_page, self.menu_i = "option", 0
                 self.sfx.append(C.SFX["decide"])
-            elif decide and row in ("disco", "meisho"):
+            elif decide and row in ("extra", "disco", "meisho"):
                 self.menu_page, self.menu_i = row, 0
                 self.sfx.append(C.SFX["decide"])
             elif decide and self.menu_page == "meisho" and row != "back" and int(row[1:]) < len(self.a.meisho):    # 名所を選んで決定: 説明を出す
@@ -519,8 +519,9 @@ class Game:
                 song = C.DISCO[int(row[1:])][0]
                 self.disco_song = None if self.disco_song == song else song
             elif decide and row == "back":
-                came = self.menu_page if self.menu_page in ("disco", "meisho") else "option"
-                self.menu_page, self.menu_i, self.disco_song = "main", C.MENU["pages"]["main"].index(came), None
+                # 戻る先: 名所・曲の一覧は EXTRA へ、それ以外は最初のメニューへ（来た項目を選んだまま）
+                came, page = self.menu_page, "extra" if self.menu_page in ("disco", "meisho") else "main"
+                self.menu_page, self.menu_i, self.disco_song = page, C.MENU["pages"][page].index(came), None
                 self.sfx.append(C.SFX["decide"])
             elif decide and row == "howto" and self.a.howto:
                 self.howto = True
@@ -1819,7 +1820,7 @@ class Game:
         rows = M["pages"][self.menu_page]
         gap = M["row"] if self.menu_page == "main" else M["row_option"]
         top = M["y"] - max(0, len(rows) - 4) * gap       # 行が多いページは、上へ伸ばす（画面の下に出ないように）
-        if self.menu_page in ("disco", "meisho"):
+        if self.menu_page in ("extra", "disco", "meisho"):
             head = "- %s -" % M["label"][self.menu_page]
             text(head, M["cx"] - font.size(head)[0] // 2, top - M["head"], (214, 168, 72))
         for n, row in enumerate(rows):
