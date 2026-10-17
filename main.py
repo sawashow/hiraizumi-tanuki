@@ -1706,7 +1706,7 @@ class Game:
             full.blit(fade, (0, 0))
 
     def _draw_ending_screen(self, screen):
-        """エンディング: 暗い所から、ゆっくり明るくなる。しばらくして、「PUSH ENTER KEY」が点滅する"""
+        """エンディング: 暗い所から、ゆっくり明るくなる。しばらくして、「PRESS START」が点滅する"""
         E = C.ENDING_SCREEN
         screen.blit(self.a.ending_image, (0, 0))
         if self.ending_t < E["fade"]:
