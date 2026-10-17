@@ -1587,6 +1587,11 @@ class Boss3(Boss):
         self.thrust = False     # いまの構えは、突き
 
     @property
+    def hurt_rect(self):
+        """斬られる範囲: 体（w）より横に広い（hurt_w）。薙いだあと・突いたあとは、絵の体が、当たりの体より横へずれるため（触れて痛い範囲は、体のまま）"""
+        return self.rect.inflate(self.P["hurt_w"] - self.w, 0)
+
+    @property
     def high(self):
         return not self.thrust and super().high      # 突きの構えは、低い構え（腰を落として、得物を後ろへ引く）
 
