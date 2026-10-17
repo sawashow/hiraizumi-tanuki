@@ -510,6 +510,8 @@ class Game:
                 self.story_x += T["run_speed"]
             if self.story_x > C.BASE_W + T["head_x"]:
                 self.story = False
+                if online.start_state() not in ("ok", "pending", "off"):      # 遊び始めの合図が、取れていなければ、もう一度頼む（一時的な不調のとき）
+                    online.start(C.ONLINE["url"], self.level)
                 if self.use_map:
                     self._open_map()
         elif self.story_t > C.STORY_SKIP_WAIT and {"restart", "attack", "jump"} & set(pressed):
@@ -1815,8 +1817,10 @@ class Game:
         self.sum_msg = ""
         if online.submit(C.ONLINE["url"], self.level, name, sum(self.run_times)):
             self.sum_mode, self.send_t = "send", 0
-        else:
-            self.sum_msg, self.sum_mode = "OFFLINE", "done"
+        else:       # 送れない（開始の合図が無い）: 入力のまま、理由を出す。もう一度 OK を押すか、SKIP でやめられる
+            st = online.start_state()
+            why = {"nobridge": "RELOAD THE PAGE", "pending": "TRY AGAIN"}.get(st) or C.SEND_ERRORS.get(st.partition(":")[2], "NO START SIGNAL")
+            self.sum_msg = "OFFLINE  " + why
 
     def _draw_summary(self, screen, font):
         """エンドロールのあとの総括: 面ごとのタイム → 通しのタイムとベスト。1行ずつ、順に出る"""

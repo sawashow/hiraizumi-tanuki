@@ -537,6 +537,7 @@ records.set_name("a!b")
 check("イニシャル: おかしい文字が入っていたら、AAA に戻す", records.last_name() == "AAA")
 _sent, _reply = [], [None]
 _real = (online.enabled, online.submit, online.submit_result)
+_real_start = (online.start, online.start_state)
 online.enabled = lambda url: True
 online.submit = lambda url, level, name, frames: (_sent.append((level, name, frames)) or True)
 online.submit_result = lambda: _reply[0]
@@ -614,7 +615,34 @@ g._begin_summary()
 run(g, C.SUMMARY["wait"])
 for _ in range(4):
     run(g, 1, (), {"restart"})
-check("送信: 送れない（合図が無いなど）ときは、OFFLINE を出して、続けられる", g.sum_mode == "done" and g.sum_msg == "OFFLINE", g.sum_msg)
+online.start_state = lambda: "fail:network"
+for _ in range(4):
+    run(g, 1, (), {"restart"})
+check("送信: 送れない（合図が無い）ときは、入力のまま、理由を出す（もう一度 OK か SKIP）", g.sum_mode == "name" and g.sum_msg == "OFFLINE  NO NETWORK", g.sum_msg)
+online.start_state = lambda: "nobridge"
+g.name_i = 3
+run(g, 1, (), {"restart"})
+check("送信: 古いページ（通信の窓口なし）のときは、再読み込みを促す", g.sum_msg == "OFFLINE  RELOAD THE PAGE", g.sum_msg)
+online.start_state = lambda: "pending"
+run(g, 1, (), {"restart"})
+check("送信: 合図がまだなら、少し待って、もう一度", g.sum_msg == "OFFLINE  TRY AGAIN", g.sum_msg)
+run(g, 1, {"right"})
+run(g, 1, ())
+run(g, 1, (), {"restart"})
+check("送信: 送れなくても、SKIP で、先へ進める", g.sum_mode == "done")
+_started = []
+online.start = lambda url, level: _started.append(level)
+online.start_state = lambda: "fail:network"
+g = Game(title=True)
+g.title = False
+g.story, g.story_run, g.story_x, g.story_wake = True, 2, C.BASE_W + 999.0, 0
+g._step_story(set())
+check("開始の合図: 語りの終わりに、取れていなければ、もう一度頼む", _started == [g.level], str(_started))
+_started.clear()
+online.start_state = lambda: "ok"
+g.story, g.story_run, g.story_x = True, 2, C.BASE_W + 999.0
+g._step_story(set())
+check("開始の合図: 取れていれば、頼み直さない", _started == [])
 # スマホ: イニシャルを、キーボード（入力欄）で入れる。PC・コントローラ: 上下の長押しで、文字が連続で進む
 _typed = ["tnk"]
 _real_ask = online.ask_name
@@ -650,6 +678,7 @@ check("イニシャル: 押した瞬間は、1文字だけ進む", g.name_chars[
 run(g, C.SUMMARY["repeat_at"] + C.SUMMARY["repeat_every"] * 3, {"up"})
 check("イニシャル: 上を押し続けると、文字が連続で進む", g.name_chars[0] != "B" and g.name_chars[0] != "C", g.name_chars[0])
 online.enabled, online.submit, online.submit_result = _real
+online.start, online.start_state = _real_start
 records.set_name("AAA")
 g = Game(title=True)
 g.start_demo_summary()

@@ -39,6 +39,22 @@ def start(url, level):
         _call("hzStart", url, level)
 
 
+def start_state():
+    """開始の合図の状態: "ok" / "pending"（まだ返事が無い）/ "fail:理由" / "nobridge"（通信の窓口が無い = 古いページ）。PC 版は "off" """
+    if sys.platform != "emscripten":
+        return "off"
+    try:
+        w = _win()
+        if not hasattr(w, "hzStart"):
+            return "nobridge"
+        d = _read(w.HZ.start)
+    except Exception:
+        return "nobridge"
+    if d is None:
+        return "pending"
+    return "ok" if d.get("ok") and d.get("token") else "fail:" + str(d.get("error"))
+
+
 def token():
     """いまの遊びの合図（まだ・失敗なら None）"""
     try:
