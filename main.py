@@ -87,6 +87,8 @@ class Game:
         self.menu_page = "main"  # メニューの画面（main = STORY・OPTION・EXTRA・HOW TO PLAY / option = 難しさ・音量 / extra = 名所・人物・曲 / meisho = 名所 / jinbutsu = 人物 / disco = 曲の一覧）
         self.disco_song = None   # ディスコグラフィで、いま鳴らしている曲のファイル名
         self.howto = False       # 操作説明を出している
+        self.records_on = False  # ベストタイムの一覧（EXTRA の RECORDS）を出している
+        self.rec_view = self.level   # その一覧で、見ている難しさ
         self.meisho = None       # 出している、名所・人物の説明の絵（出していなければ None）
         self._fade_cache = {}    # 崖の縁の、中景の入れ替えに使う、濃さの帯（幅ごとに作る）
         self._roll_fade = None   # エンドロールの、左の枠の右の端を暗くぼかす帯
@@ -507,6 +509,15 @@ class Game:
         ud = ("down" in held) - ("up" in held)
         step_lr, step_ud = (lr if lr != self._lr else 0), (ud if ud != self._ud else 0)   # 押した瞬間だけ
         self._lr, self._ud = lr, ud
+        if self.records_on:     # ベストタイムの一覧: 左右で、難しさを替える。決定で、メニューに戻る
+            if step_lr:
+                order = C.LEVEL_ORDER
+                self.rec_view = order[max(0, min(order.index(self.rec_view) + step_lr, len(order) - 1))]
+                self.sfx.append(C.SFX["cursor"])
+            if decide:
+                self.records_on = False
+                self.sfx.append(C.SFX["decide"])
+            return
         if self.howto or self.meisho is not None:      # 操作説明・名所や人物の説明: 決定で、メニューに戻る
             if decide:
                 self.howto, self.meisho = False, None
@@ -563,6 +574,10 @@ class Game:
                 came, page = self.menu_page, "extra" if self.menu_page in ("disco", "meisho", "jinbutsu") else "main"
                 self.menu_page, self.menu_i, self.disco_song = page, C.MENU["pages"][page].index(came), None
                 self.sfx.append(C.SFX["decide"])
+            elif decide and row == "records":
+                self.records_on, self.rec_view = True, self.level
+                self.sfx.append(C.SFX["decide"])
+                return
             elif decide and row == "howto" and self.a.howto:
                 self.howto = True
                 self.sfx.append(C.SFX["decide"])
@@ -1946,11 +1961,35 @@ class Game:
         elif self.meisho is not None:
             img = self.meisho
             screen.blit(img, ((C.BASE_W - img.get_width()) // 2, (C.BASE_H - img.get_height()) // 2))
+        elif self.records_on and font:
+            self._draw_records(screen, font)
         elif self.menu_on and font:
             self._draw_menu(screen, font)
         elif landed >= 0 and (landed // 30) % 2 == 0:   # 着いてから点滅
             img = self.a.title_prompt
             screen.blit(img, (C.TITLE_PROMPT[0] - img.get_width() // 2, C.TITLE_PROMPT[1]))
+
+    def _draw_records(self, screen, font):
+        """EXTRA の RECORDS: 難しさごとの、面ごとのベストタイムと、通しのベスト。左右で、難しさを替える"""
+        gold, grey = (255, 236, 150), (176, 176, 190)
+        cx, left, right = C.BASE_W // 2, C.BASE_W // 2 - 120, C.BASE_W // 2 + 120
+        screen.fill((11, 13, 31))
+        def put(text, x, y, color=C.TEXT, right_=False):
+            img = font.render(text, False, color)
+            screen.blit(img, (x - img.get_width() if right_ else x, y))
+        put("RECORDS", cx - font.size("RECORDS")[0] // 2, 28, gold)
+        order = C.LEVEL_ORDER
+        i = order.index(self.rec_view)
+        lv = ("< " if i > 0 else "  ") + C.LEVELS[self.rec_view]["label"] + (" >" if i < len(order) - 1 else "  ")
+        put(lv, cx - font.size(lv)[0] // 2, 46, grey)
+        for k, st in enumerate(STAGES):
+            put(C.MENU["label"]["m%d" % k], left, 72 + k * 18)
+            put(records.fmt(records.best(self.rec_view, st.name)), right, 72 + k * 18, right_=True)
+        y = 72 + len(STAGES) * 18 + 6
+        pygame.draw.line(screen, (110, 110, 130), (left, y - 3), (right, y - 3))
+        put("TOTAL", left, y, gold)
+        put(records.fmt(records.best(self.rec_view, records.TOTAL)), right, y, gold, right_=True)
+        put("PRESS ENTER", cx - font.size("PRESS ENTER")[0] // 2, y + 40, grey)
 
     def _draw_menu(self, screen, font):
         """スタート画面のメニュー。main = STORY / OPTION / HOW TO PLAY。option = LEVEL（難しさ）/ MUSIC・SOUND（音量）/ BACK。
