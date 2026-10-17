@@ -531,6 +531,96 @@ check("通信: JavaScript の返事（JSON の文字列）を、辞書にする"
 check("通信: 空・undefined・壊れた文字は、None（まだ・失敗）", online._read("") is None and online._read("undefined") is None and online._read("not json") is None)
 check("通信: 順位表の URL が、config にある", C.ONLINE["url"].startswith("https://script.google.com/macros/s/"))
 
+# 総括: イニシャルを入れて、順位表に送る（通信は、偽物に差し替えて、流れだけを確かめる）
+check("イニシャル: はじめは AAA。覚えたものを、次に使う", records.last_name() == "AAA" and (records.set_name("TNK"), records.last_name())[1] == "TNK")
+records.set_name("a!b")
+check("イニシャル: おかしい文字が入っていたら、AAA に戻す", records.last_name() == "AAA")
+_sent, _reply = [], [None]
+_real = (online.enabled, online.submit, online.submit_result)
+online.enabled = lambda url: True
+online.submit = lambda url, level, name, frames: (_sent.append((level, name, frames)) or True)
+online.submit_result = lambda: _reply[0]
+g = Game(title=True)
+g.title = False
+g.level = "normal"
+g.run_times, g.total_rec = [3000, 3100, 3200, 3300], (12600, True)
+g._begin_summary()
+check("総括: 新しい記録で、順位表に送れるなら、イニシャルを入れる", g.sum_mode == "name" and g.name_chars == list("AAA") and g.name_i == 0)
+run(g, C.SUMMARY["wait"])
+run(g, 1, {"up"})
+run(g, 1, ())
+check("イニシャル: 上で、次の文字（A → B）", g.name_chars == list("BAA"), "".join(g.name_chars))
+run(g, 1, {"down"})
+run(g, 1, ())
+run(g, 1, {"down"})
+run(g, 1, ())
+check("イニシャル: 下で、前の文字（B → A → 9。端で回る）", g.name_chars[0] == "9", "".join(g.name_chars))
+run(g, 1, (), {"restart"})
+run(g, 1, {"up"})
+run(g, 1, ())
+check("イニシャル: 決定で、次の桁へ進む", g.name_i == 1 and g.name_chars == list("9BA"), "%d %s" % (g.name_i, "".join(g.name_chars)))
+run(g, 1, (), {"restart"})
+run(g, 1, (), {"restart"})
+check("イニシャル: 3文字のあとの決定で、OK の位置へ", g.name_i == 3)
+run(g, 1, (), {"restart"})
+check("イニシャル: OK で、順位表に送る（難しさ・名前・通しのフレーム数）", g.sum_mode == "send" and _sent == [("normal", "9BA", 12600)], str(_sent))
+check("イニシャル: 送った名前を、覚える", records.last_name() == "9BA")
+run(g, 5)
+check("送信: 返事が来るまで、待つ（ロゴ画面へは行かない）", g.sum_mode == "send" and g.summary)
+_reply[0] = {"ok": True, "rank": 3}
+run(g, 1)
+check("送信: 成功すると、順位が出る", g.sum_mode == "done" and g.sum_msg == "RANK 3", g.sum_msg)
+snap(g, "summary rank")
+run(g, 1, (), {"restart"})
+check("送信のあと、Enter でロゴ画面へ", not g.summary and g.logo_again)
+g = Game(title=True)
+g.title = False
+g.run_times, g.total_rec = [3000, 3100, 3200, 3300], (12600, True)
+g._begin_summary()
+run(g, C.SUMMARY["wait"])
+for _ in range(3):
+    run(g, 1, (), {"restart"})
+_reply[0] = {"ok": False, "error": "ng name"}
+run(g, 1, (), {"restart"})
+run(g, 1)
+check("送信: 使えない名前だと、入れ直しになる（先頭へ戻る）", g.sum_mode == "name" and g.sum_msg == "NG NAME" and g.name_i == 0, g.sum_mode)
+_reply[0] = None
+for _ in range(3):
+    run(g, 1, (), {"restart"})
+run(g, 1, (), {"restart"})
+_reply[0] = {"ok": False, "error": "too fast"}
+run(g, 1)
+check("送信: サーバーに断られたら、FAILED を出して、続けられる", g.sum_mode == "done" and g.sum_msg == "FAILED")
+g = Game(title=True)
+g.title = False
+g.run_times, g.total_rec = [3000, 3100, 3200, 3300], (12600, True)
+g._begin_summary()
+run(g, C.SUMMARY["wait"])
+run(g, 1, {"right"}); run(g, 1, ()); run(g, 1, {"right"}); run(g, 1, ()); run(g, 1, {"right"}); run(g, 1, ()); run(g, 1, {"right"}); run(g, 1, ())
+check("イニシャル: 左右で、SKIP の位置まで動ける", g.name_i == 4)
+n_sent = len(_sent)
+run(g, 1, (), {"restart"})
+check("イニシャル: SKIP で、送らずに終わる", g.sum_mode == "done" and len(_sent) == n_sent)
+g = Game(title=True)
+g.title = False
+g.run_times, g.total_rec = [3000, 3100, 3200, 3300], (12600, False)
+g._begin_summary()
+check("総括: 新しい記録でなければ、イニシャルは入れない", g.sum_mode == "done")
+online.submit = lambda url, level, name, frames: False
+g = Game(title=True)
+g.title = False
+g.run_times, g.total_rec = [3000, 3100, 3200, 3300], (12600, True)
+g._begin_summary()
+run(g, C.SUMMARY["wait"])
+for _ in range(4):
+    run(g, 1, (), {"restart"})
+check("送信: 送れない（合図が無いなど）ときは、OFFLINE を出して、続けられる", g.sum_mode == "done" and g.sum_msg == "OFFLINE", g.sum_msg)
+online.enabled, online.submit, online.submit_result = _real
+records.set_name("AAA")
+g = Game(title=True)
+g.start_demo_summary()
+check("確認用の近道: 通しの総括から始まる（記録は残さない）", g.summary and not g.title and sum(g.run_times) == 7200 and g.total_rec == (7200, True))
+
 # 通し: 面をクリアするたびにタイムを集め、最後の面で、通しの記録を残す。エンドロールのあとに、総括を出す
 g = Game(title=True)
 g.title = False

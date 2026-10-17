@@ -8,6 +8,7 @@ import os
 import sys
 
 KEY = "hiraizumi_records_v1"
+NAME_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"     # イニシャルに使える文字
 TOTAL = "通し"       # 4面を続けて遊んだ、合計タイムの記録の名前（面の名前と同じように、level の下に残す）
 PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "records.json")     # PC 版の保存先（.gitignore）
 
@@ -35,6 +36,18 @@ def _save(data):
                 f.write(text)
     except Exception:
         pass
+
+
+def last_name():
+    """前に入れたイニシャル（3文字。無い・おかしいときは AAA）"""
+    n = _load().get("name")
+    return n if isinstance(n, str) and len(n) == 3 and all(c in NAME_CHARS for c in n) else "AAA"
+
+
+def set_name(name):
+    data = _load()
+    data["name"] = name
+    _save(data)
 
 
 def best(level, stage):

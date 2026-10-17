@@ -54,6 +54,9 @@ class Game:
         self.roll = False            # いま、エンドロール（平泉の道を歩く場面）を出している
         self.summary = False         # いま、エンドロールのあとの総括（面ごとのタイムと、通しのタイム）を出している
         self.summary_t = 0
+        self.sum_mode = "done"      # 総括の状態: name（イニシャルを入れている）/ send（送って、返事を待っている）/ done（終わり。Enter でロゴ画面へ）
+        self.sum_msg = ""           # 送った結果の文字（RANK 3 など）
+        self.name_chars, self.name_i, self.send_t = list("AAA"), 0, 0     # 入れているイニシャルと、選んでいる位置（0〜2 = 文字 / 3 = OK / 4 = SKIP）
         self.ending_screen = False   # いま、エンディング画面を出している（いまは使っていない。エンドロールのあとは、ロゴ画面へ戻る）
         self.logo_again = False      # 真なら、メインループが、ロゴ画面を出し直す（エンドロールのあと）
         self.ending_t = 0
@@ -375,7 +378,7 @@ class Game:
                 self._enter_title(self.use_title)
             return
         if self.summary:    # エンドロールのあとの総括
-            self._step_summary(set(pressed))
+            self._step_summary(held, set(pressed))
             return
         if self.roll:       # エンドロール
             self._step_roll(set(pressed))
@@ -1658,9 +1661,27 @@ class Game:
         # エンドロールが終わったら: 4面を通して遊んだ回は、総括（タイム）を出す。そのあと（通して遊んでいないときは、すぐ）ロゴ画面へ
         self.roll = False
         if self.total_rec:
-            self.summary, self.summary_t = True, 0
+            self._begin_summary()
         else:
             self._back_to_logo()
+
+    def _begin_summary(self):
+        """総括を始める。新しい記録で、順位表に送れるなら、イニシャルを入れてもらう（ブラウザ版だけ）"""
+        self.summary, self.summary_t, self.sum_msg = True, 0, ""
+        if self.total_rec[1] and online.enabled(C.ONLINE["url"]):
+            self.sum_mode, self.name_i, self.name_chars = "name", 0, list(records.last_name())
+        else:
+            self.sum_mode = "done"
+
+    def start_demo_summary(self):
+        """確認用（ブラウザ版: アドレスの末尾に ?demo=1）: 通しの総括から始める。合計は 2:00（サーバーが受け付ける、いちばん速い値）。
+        記録は端末に残さない。イニシャルを入れて、送るところまでを試す（サーバーは、開始から 2 分たつまで、受け付けない）"""
+        self.level = "easy"
+        self._enter_title(False)
+        self.run_times = [1800] * 4
+        self.total_rec = (7200, True)
+        online.start(C.ONLINE["url"], self.level)
+        self._begin_summary()
 
     def _back_to_logo(self):
         """リセットして、起動したときと同じ、ロゴ画面からやり直す（絵は出さない）"""
@@ -1675,11 +1696,57 @@ class Game:
         if self.stage_i == len(STAGES) - 1 and len(self.run_times) == len(STAGES):      # 最初の面から通して遊んだ回だけ
             self.total_rec = records.submit(self.level, records.TOTAL, sum(self.run_times))
 
-    def _step_summary(self, pressed):
+    def _step_summary(self, held, pressed):
+        S = C.SUMMARY
         self.summary_t += 1
-        if {"restart", "attack", "jump"} & pressed and self.summary_t >= C.SUMMARY["wait"]:
+        lr = ("right" in held) - ("left" in held)
+        ud = ("down" in held) - ("up" in held)
+        step_lr, step_ud = (lr if lr != self._lr else 0), (ud if ud != self._ud else 0)     # 押した瞬間だけ
+        self._lr, self._ud = lr, ud
+        decide = bool({"restart", "attack"} & pressed) or ("jump" in pressed and "up" not in held)
+        if self.summary_t < S["wait"]:
+            return
+        if self.sum_mode == "name":     # イニシャル: 上下で文字、左右で位置。決定で、次へ（OK で送る・SKIP でやめる）
+            if step_ud and self.name_i < 3:
+                chars = S["chars"]
+                c = self.name_chars[self.name_i]
+                self.name_chars[self.name_i] = chars[(chars.find(c) - step_ud) % len(chars)]       # 上 = 次の文字
+                self.sfx.append(C.SFX["cursor"])
+            if step_lr:
+                self.name_i = max(0, min(4, self.name_i + step_lr))
+                self.sfx.append(C.SFX["cursor"])
+            if decide:
+                if self.name_i < 3:
+                    self.name_i += 1
+                    self.sfx.append(C.SFX["cursor"])
+                elif self.name_i == 3:
+                    self._send_name()
+                else:
+                    self.sum_mode = "done"
+                    self.sfx.append(C.SFX["decide"])
+        elif self.sum_mode == "send":       # 返事を待つ
+            self.send_t += 1
+            r = online.submit_result()
+            if r and r.get("ok"):
+                self.sum_msg, self.sum_mode = "RANK %d" % int(r.get("rank", 0)), "done"
+            elif r and r.get("error") == "ng name":       # 使えないイニシャル: 入れ直す
+                self.sum_msg, self.sum_mode, self.name_i = "NG NAME", "name", 0
+            elif r or self.send_t > S["send_wait"]:
+                self.sum_msg, self.sum_mode = "FAILED", "done"
+        elif {"restart", "attack", "jump"} & pressed:
             self.summary = False
             self._back_to_logo()
+
+    def _send_name(self):
+        """入れたイニシャルを覚えて、通しの記録を、順位表に送る"""
+        name = "".join(self.name_chars)
+        records.set_name(name)
+        self.sfx.append(C.SFX["decide"])
+        self.sum_msg = ""
+        if online.submit(C.ONLINE["url"], self.level, name, sum(self.run_times)):
+            self.sum_mode, self.send_t = "send", 0
+        else:
+            self.sum_msg, self.sum_mode = "OFFLINE", "done"
 
     def _draw_summary(self, screen, font):
         """エンドロールのあとの総括: 面ごとのタイム → 通しのタイムとベスト。1行ずつ、順に出る"""
@@ -1708,8 +1775,28 @@ class Game:
             put(records.fmt(best), right, y + 18, right=True)
             if new and (t // 20) % 2 == 0:
                 put("NEW RECORD!", cx - font.size("NEW RECORD!")[0] // 2, y + 40, gold)
-        if t >= S["wait"] and (t // 30) % 2 == 0:
-            put("PRESS ENTER", cx - font.size("PRESS ENTER")[0] // 2, y + 66)
+        if t >= S["wait"]:
+            ty = y + 62
+            if self.sum_mode == "name":
+                put("NAME", left, ty, gold)
+                for i, ch in enumerate(self.name_chars):
+                    x = left + 56 + i * 18
+                    on = self.name_i == i
+                    put(ch, x, ty, gold if on else C.TEXT)
+                    if on:
+                        pygame.draw.line(screen, gold, (x, ty + 15), (x + font.size(ch)[0], ty + 15))
+                for k, label in ((3, "OK"), (4, "SKIP")):
+                    put(label, left + 56 + 3 * 18 + 12 + (k - 3) * 36, ty, gold if self.name_i == k else (176, 176, 190))
+                if self.sum_msg:
+                    put(self.sum_msg, right, ty + 18, (255, 150, 150), right=True)
+                put("UP DOWN: LETTER   ENTER: NEXT", cx - font.size("UP DOWN: LETTER   ENTER: NEXT")[0] // 2, ty + 36, (176, 176, 190))
+            elif self.sum_mode == "send":
+                put("SENDING...", cx - font.size("SENDING...")[0] // 2, ty, gold)
+            else:
+                if self.sum_msg:
+                    put(self.sum_msg, cx - font.size(self.sum_msg)[0] // 2, ty, gold)
+                if (t // 30) % 2 == 0:
+                    put("PRESS ENTER", cx - font.size("PRESS ENTER")[0] // 2, ty + 24)
 
     def _step_roll(self, pressed):
         R = C.ROLL
@@ -2282,6 +2369,8 @@ async def main():
     if sys.platform == "emscripten":
         import platform
         perf = "perf=1" in str(platform.window.location.search)
+        if "demo=1" in str(platform.window.location.search):      # 確認用: 通しの総括から始める（順位表への送信を、試す）
+            game.start_demo_summary()
     perf_ms, perf_t, perf_parts, perf_step, perf_blit = [], 0, {}, 0, 0
     if perf:        # 描く処理を、部品ごとに測る（_draw・_blit で始まるもの）
         def _timed(f, name):
