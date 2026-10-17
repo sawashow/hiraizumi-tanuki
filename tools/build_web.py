@@ -18,7 +18,7 @@ OUT = os.path.join(ROOT, "web")
 
 shutil.rmtree(OUT, ignore_errors=True)
 os.makedirs(os.path.join(OUT, "assets", "images"))
-for name in ("main.py", "config.py", "sprites.py", "stage.py", "audio.py", "gamepad.py", "splash.py", "touch.py"):
+for name in ("main.py", "config.py", "sprites.py", "stage.py", "audio.py", "gamepad.py", "splash.py", "touch.py", "records.py"):
     shutil.copy(os.path.join(ROOT, name), OUT)
 src_images = os.path.join(ROOT, "assets", "images")
 for dirpath, _, files in os.walk(src_images):

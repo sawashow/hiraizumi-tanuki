@@ -19,3 +19,6 @@ AI_CONTEXT.md
 
 # 仮想環境（作り方は README）
 .venv/
+
+# 遊んだ記録（面ごとのベストタイム。PC 版の保存先）
+records.json

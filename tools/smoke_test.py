@@ -15,6 +15,9 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import pygame  # noqa: E402
 
 import config as C  # noqa: E402
+import records  # noqa: E402
+import tempfile  # noqa: E402
+records.PATH = os.path.join(tempfile.mkdtemp(), "records.json")     # テストの記録は、本物の records.json に書かない
 from main import ENEMY_SPAWNS, Game, drop_kind  # noqa: E402
 from sprites import Item, Karasu, Kitsunebi, Ochimusha, Shuriken, Wave  # noqa: E402
 import copy  # noqa: E402
@@ -504,6 +507,19 @@ check("タッチ（固定）: 中心の下で、しゃがむ", _tc.held() == {"d
 _finger(pygame.FINGERMOTION, _cx, _cy, 7)
 check("タッチ（固定）: 中心に戻すと、止まる", _tc.held() == set(), str(_tc.held()))
 _finger(pygame.FINGERUP, _cx, _cy, 7)
+
+# 記録: 難しさごと・面ごとに、ベストだけ残す
+_r = lambda: records.PATH
+check("記録: 何も無いときは、ベストなし", records.best("easy", "テスト面") is None)
+check("記録: はじめのタイムは、そのままベストになる", records.submit("easy", "テスト面", 3000) == (3000, True) and records.best("easy", "テスト面") == 3000)
+check("記録: 遅いタイムでは、ベストは変わらない", records.submit("easy", "テスト面", 3500) == (3000, False) and records.best("easy", "テスト面") == 3000)
+check("記録: 速いタイムで、ベストが更新される", records.submit("easy", "テスト面", 2900) == (2900, True) and records.best("easy", "テスト面") == 2900)
+check("記録: 難しさが違えば、別の記録（EASY の速さが、HARD に混ざらない）", records.best("hard", "テスト面") is None)
+check("記録: 時間の出し方（分:秒.百分の1秒）", records.fmt(3600 + 60 * 5 + 30) == "1:05.50" and records.fmt(None) == "-:--.--")
+_pth = records.PATH
+records.PATH = os.path.join(os.path.dirname(_pth), "no_dir", "x.json")      # 書けない場所
+check("記録: 保存できなくても、止まらない", records.submit("easy", "別の面", 100) == (100, True))
+records.PATH = _pth
 
 # 下＋ジャンプ: 浮き足場の上なら、すり抜けて降りる。地面の上なら、ふつうに跳ぶ
 p0 = OLD_PLATFORMS[0]
@@ -1366,6 +1382,7 @@ check("画面の右へ駆け抜けると、クリア（落ちない）", ok and 
 t0 = g.frames
 run(g, 10, {"right"}, {"restart"})
 check("クリアのあとは、動かない（時間も止まる。すぐには、Enterを受け付けない）", g.cleared and g.frames == t0)
+check("クリアすると、タイムが残る（はじめは、今回がベスト）", g.rec == (g.frames, True) and records.best(g.level, g.stage.name) == g.frames, str(g.rec))
 run(g, C.CLEAR_WAIT)
 snap(g, "clear")
 _lives0 = g.lives
