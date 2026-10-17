@@ -40,7 +40,8 @@ jobs:
       - name: 公開用のファイルを集める
         run: |
           mkdir _site
-          cp web/build/web/index.html web/build/web/web.tar.gz web/build/web/favicon.png _site/
+          cp web/build/web/index.html web/build/web/web.tar.gz _site/
+          cp assets/images/favicon.png _site/      # タヌキ侍の顔（tools/make_favicon.py で作る）
           cp docs/CNAME _site/
           touch _site/.nojekyll
           ls -l _site
