@@ -559,7 +559,8 @@ BOSS4_RAGE_CYCLE = ("beads", "pillar", "ring", "warp", "pillar", "beads", "warp"
 # 2026-10-13: 発生が早すぎて、よけづらかったので、予告を長くした（warn 54→78、rage_warn 42→60）。清衡の pillar_frames も、合わせて 78→102
 PILLAR = dict(w=20, warn=78, rage_warn=60, flash=14, beam=16, damage=1, count=3, rage_count=5, spread=64, stagger=8)
 # 数珠の輪: 清衡のまわり radius の所に count 個の玉が出て、八方へ飛ぶ。横へ飛ぶ玉は、しゃがめば当たらない高さ
-RING = dict(count=8, radius=40, speed=1.9, rage_speed=2.3, range=200)
+# 数珠の輪: shots＝続けて撃つ回数（怒る前・怒ったあと）。1回ごとに、玉と玉のすき間の半分だけ回す。gap＝2回目からの、予告の輪が出てから撃つまで
+RING = dict(count=8, radius=40, speed=1.9, rage_speed=2.3, range=200, shots=2, rage_shots=3, gap=36)
 # 後光: 半径 r（怒ると rage_r）、光の筋 rays 本（長い・短いを交互）、spin=回る速さ、dy=体の中心から上へずらす量
 HALO = dict(r=44, rage_r=54, rays=16, ray_long=16, ray_short=8, spin=0.012, dy=8, roar_grow=10,
             color=(255, 214, 90), rage_color=(255, 132, 56))
