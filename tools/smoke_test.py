@@ -739,6 +739,22 @@ check("ボーナス: 速いほど、増える（1秒 50 点）。団子を全部
       dict(g.bonus).get("TIME BONUS") == (_par - 10) * C.SCORE_BONUS["per_sec"] and dict(g.bonus).get("ALL FOOD") == C.SCORE_BONUS["allfood"] and dict(g.bonus).get("NO DAMAGE") == C.SCORE_BONUS["nodamage"], str(g.bonus))
 check("スコア: 最高点を記録する（低い点では、更新しない）", records.submit_score("easy", 5000) == (5000, True) and records.submit_score("easy", 3000) == (5000, False) and records.best_score("easy") == 5000)
 
+# 重さ: RECORDS は、記録を、毎コマ読み直さない（ブラウザでは、保存領域の読み込みが、重いため）
+_calls = [0]
+_real_best, _real_bs = records.best, records.best_score
+records.best = lambda *a: (_calls.__setitem__(0, _calls[0] + 1), _real_best(*a))[1]
+records.best_score = lambda *a: (_calls.__setitem__(0, _calls[0] + 1), _real_bs(*a))[1]
+g = Game(title=True)
+g.records_on, g.rec_view = True, "normal"
+for _ in range(30):
+    g.draw(screen, font)
+_one = _calls[0]
+check("重さ: RECORDS は、30コマ描いても、記録を読むのは、1回分だけ", _one == len(STAGES) + 2, "読んだ回数 %d" % _one)
+g.rec_view = "hard"
+g.draw(screen, font)
+check("重さ: 難しさを替えたときだけ、読み直す", _calls[0] == _one * 2, "読んだ回数 %d" % _calls[0])
+records.best, records.best_score = _real_best, _real_bs
+
 # 通し: 面をクリアするたびにタイムを集め、最後の面で、通しの記録を残す。エンドロールのあとに、総括を出す
 g = Game(title=True)
 g.title = False
