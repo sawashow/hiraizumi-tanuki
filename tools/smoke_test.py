@@ -521,6 +521,16 @@ records.PATH = os.path.join(os.path.dirname(_pth), "no_dir", "x.json")      # �
 check("記録: 保存できなくても、止まらない", records.submit("easy", "別の面", 100) == (100, True))
 records.PATH = _pth
 
+# 順位表の通信（ブラウザ版だけ。PC では、何もしない）
+import online  # noqa: E402
+check("通信: PC 版では、通信しない（URL があっても）", not online.enabled("http://x") and not online.enabled(""))
+online.start("http://x", "easy")
+check("通信: PC 版で呼んでも、例外を出さず、何も返さない", online.token() is None and online.submit("http://x", "easy", "ABC", 9000) is False
+      and online.submit_result() is None and online.ranking("easy") is None)
+check("通信: JavaScript の返事（JSON の文字列）を、辞書にする", online._read('{"ok":true,"token":"a"}') == {"ok": True, "token": "a"})
+check("通信: 空・undefined・壊れた文字は、None（まだ・失敗）", online._read("") is None and online._read("undefined") is None and online._read("not json") is None)
+check("通信: 順位表の URL が、config にある", C.ONLINE["url"].startswith("https://script.google.com/macros/s/"))
+
 # 通し: 面をクリアするたびにタイムを集め、最後の面で、通しの記録を残す。エンドロールのあとに、総括を出す
 g = Game(title=True)
 g.title = False

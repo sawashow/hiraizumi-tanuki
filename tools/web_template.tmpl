@@ -184,6 +184,48 @@ function goFullscreen() {
 window.addEventListener("touchend", goFullscreen, { passive: true });
 window.addEventListener("click", goFullscreen);
 
+// 順位表のサーバー（GAS）との通信。Python は、ここへ頼んで、結果（JSON の文字列）を window.HZ から読む。
+// 本文は、ヘッダーなしの POST（プリフライトを避ける）。サーバーは 302 で結果の場所を返し、fetch が自動で追う。
+// HZ-BRIDGE-BEGIN
+window.HZ = { start: "", submit: "", rank: {} };
+async function hzFetch(url, options) {
+    try {
+        const r = await fetch(url, options);
+        return await r.text();
+    } catch (e) {
+        return JSON.stringify({ ok: false, error: "network" });
+    }
+}
+// POST: しばらく使っていないあとの最初の1回だけ、サーバーが「bad request」を返すことがある（GAS の起動直後）。
+// 通信の失敗や、その返事のときだけ、少し待って、もう1回送る（最大3回。記録が書かれる前の失敗なので、くり返しても安全）
+async function hzPost(url, obj) {
+    let t = "";
+    for (let i = 0; i < 3; i++) {
+        t = await hzFetch(url, { method: "POST", body: JSON.stringify(obj) });
+        let retry = true;
+        try {
+            const d = JSON.parse(t);
+            retry = d.ok !== true && (d.error === "bad request" || d.error === "network");
+        } catch (e) {}
+        if (!retry) return t;
+        await new Promise((res) => setTimeout(res, 1500));
+    }
+    return t;
+}
+window.hzStart = async function (url, level) {
+    HZ.start = "";
+    HZ.start = await hzPost(url, { action: "start", level: level });
+};
+window.hzSubmit = async function (url, token, level, name, frames) {
+    HZ.submit = "";
+    HZ.submit = await hzPost(url, { action: "submit", token: token, level: level, name: name, frames: frames });
+};
+window.hzRanking = async function (url, level) {
+    HZ.rank[level] = "";
+    HZ.rank[level] = await hzFetch(url + "?action=ranking&level=" + encodeURIComponent(level));
+};
+// HZ-BRIDGE-END
+
 function show_infobox() {
     infobox.style.display = "block";    // 位置は、CSS（#infobox）で中央に固定している
 }

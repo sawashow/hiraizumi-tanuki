@@ -14,6 +14,7 @@ import config as C
 from stage import STAGE1_LEGACY, STAGES
 from audio import DIR as AUDIO_DIR, Audio
 from gamepad import Pad
+import online
 import records
 from splash import Splash
 from touch import Touch
@@ -551,6 +552,7 @@ class Game:
                 self.stick_fixed = not self.stick_fixed
                 self.sfx.append(C.SFX["cursor"])
             if decide and row == "story":           # 始める
+                online.start(C.ONLINE["url"], self.level)       # 順位表のサーバーに、遊び始めを知らせる（通信できなくても、続ける）
                 self.start_t = C.TITLE_START
                 self.flash_t = 0
                 self.sfx.append(C.SFX_SWORD)
