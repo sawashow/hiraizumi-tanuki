@@ -1743,8 +1743,9 @@ class Game:
                 self.sum_msg, self.sum_mode = "RANK %d" % int(r.get("rank", 0)), "done"
             elif r and r.get("error") == "ng name":       # 使えないイニシャル: 入れ直す
                 self.sum_msg, self.sum_mode, self.name_i = "NG NAME", "name", 0
-            elif r or self.send_t > S["send_wait"]:
-                self.sum_msg, self.sum_mode = "FAILED", "done"
+            elif r or self.send_t > S["send_wait"]:      # 断られた・返事が来ない: 理由を出す（TOO FAST = 開始から、まだ時間がたっていない）
+                why = C.SEND_ERRORS.get(r.get("error"), "") if r else "TIMEOUT"
+                self.sum_msg, self.sum_mode = "FAILED  " + why if why else "FAILED", "done"
         elif {"restart", "attack", "jump"} & pressed:
             self.summary = False
             self._back_to_logo()

@@ -221,6 +221,8 @@ SCORE_BOSS = 2000
 CLEAR_SCORE_AT = 40             # クリアしてから、SCORE の行が出て、数字が増え始めるまでのフレーム数
 CLEAR_COUNT = 60                # SCORE が 0 から最終値まで増える長さ（点数の大きさによらず同じ）
 ONLINE = dict(url="https://script.google.com/macros/s/AKfycbywGsCGq8k-gIqMnEdnqAeI0wDOPlsDbPTMGaTjxVz1ropGrz_K517NyXV2nE0-_W8D5Q/exec")    # 順位表のサーバー（server/gas。ブラウザ版だけ）。空にすると、順位表は使わない
+# 順位表への送信が断られたとき、画面に出す理由（サーバーの返事の error → 文字）。知らない理由は、FAILED
+SEND_ERRORS = {"too fast": "TOO FAST", "no token": "NO TOKEN", "frames out of range": "OUT OF RANGE", "network": "NO NETWORK", "bad request": "SERVER BUSY", "bad name": "BAD NAME"}
 SUMMARY = dict(row=20, wait=170, chars="ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", send_wait=900)   # エンドロールのあとの総括: row＝次の行が出るまでのフレーム数 / wait＝操作を受け付けるまで / chars＝イニシャルに使える文字 / send_wait＝送ったあと、返事を待つ長さ
 CLEAR_WAIT = CLEAR_SCORE_AT + CLEAR_COUNT + 80   # クリアしてから、Enter を受け付けるまでのフレーム数（FOOD・TIME・BEST が出たあと）
 # ボスを倒したあとの寸劇: ボスが決まった場所へ吹っ飛ぶ → タヌキ侍が決まった場所へ歩く → 間 → 倒れたボスがひとこと → 光になって消える → タヌキ侍が返す → 右へ駆け抜ける → 結果
