@@ -283,7 +283,7 @@ BGM_SUPER = "bgm_super.ogg"    # スーパータヌキの間（勢いのある�
 # 場面ごとの曲（ファイルを assets/audio に置けば、鳴る。無ければ、右に書いた、いまの曲で代わりにする）
 BGM_MAP = "bgm_map.ogg"            # ステージ選択の地図。曲名は「Steps Into the Morning Sun」（前後の無音を切ってある。無ければ、語りの曲）
 BGM_TITLE = "bgm_title.ogg"        # スタート画面（無ければ、無音。雷の音だけ）
-BGM_ENDING = "bgm_ending.ogg"      # エンディング（無ければ、語りの曲）
+BGM_ENDING = "bgm_ending.ogg"      # エンディング・エンドロール。曲名は「Sunset at the Temple Gate」（終わりの無音を切ってある。無ければ、語りの曲）
 BGM_STAGE_N = "bgm_stage%d.ogg"    # 面ごとの曲（%d は、遊ぶ順の番号 1〜4。無ければ、その面に決めてある曲 = 1面の曲）
 BGM_BOSS_N = "bgm_boss%d.ogg"      # 面ごとの、ボスの曲（無ければ、ボスの曲）
 BGM_MIDBOSS = "bgm_midboss.ogg"    # 面の途中の相手（弁慶・影のボス。無ければ、ボスの曲）
@@ -451,7 +451,8 @@ LEVEL_LABEL = (150, 252)    # （前の、難しさの表示の場所。いま�
 #   y = 1行目の上端 / row・row_option = 行の間隔 / head = 見出しを、1行目より、どれだけ上に出すか / gap = 項目名と値の間 / steps = 音量の段の数
 # ディスコグラフィ（スタート画面のメニュー）: 曲のファイルと、曲名。ファイルが無い曲は、並べない
 DISCO = (("bgm_story.ogg", "Evening at the Border Post"), ("bgm_map.ogg", "Steps Into the Morning Sun"),
-         ("bgm_stage1.ogg", "Clash of the Iron Fan"), ("bgm_boss.ogg", "Crimson Temple Breach"), ("bgm_super.ogg", "Seven Blades High"))
+         ("bgm_stage1.ogg", "Clash of the Iron Fan"), ("bgm_boss.ogg", "Crimson Temple Breach"), ("bgm_super.ogg", "Seven Blades High"),
+         ("bgm_ending.ogg", "Sunset at the Temple Gate"))
 MENU = dict(cx=150, y=196, row=18, row_option=15, head=18, gap=10, steps=5,
             pages=dict(main=("story", "option", "extra", "howto"), option=("level", "music", "sound", "back"),
                        extra=("meisho", "disco", "back"),
