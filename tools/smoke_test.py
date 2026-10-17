@@ -683,6 +683,20 @@ records.set_name("AAA")
 g = Game(title=True)
 g.start_demo_summary()
 check("確認用の近道: 通しの総括から始まる（記録は残さない）", g.summary and not g.title and sum(g.run_times) == 7200 and g.total_rec == (7200, True))
+_sent2 = []
+_real3 = (online.enabled, online.submit, online.start)
+online.enabled = lambda url: True
+online.submit = lambda *a: (_sent2.append(a) or True)
+online.start = lambda *a: _sent2.append(("start",) + a)
+g = Game(title=True)
+g.start_demo_summary()
+run(g, C.SUMMARY["wait"])
+for _ in range(4):
+    run(g, 1, (), {"restart"})
+check("確認用の近道: 順位表には、送らない（開始の合図も、頼まない）", _sent2 == [] and g.sum_mode == "done" and g.sum_msg == "DEMO (NOT SENT)", str(_sent2) + " " + g.sum_msg)
+online.enabled, online.submit, online.start = _real3
+g._back_to_logo()
+check("確認用の近道: ロゴ画面に戻ると、ふつうの遊びに戻る", not g.demo)
 
 # RECORDS: みんなの順位（ブラウザ版だけ。通信は、偽物に差し替える）
 _asked, _state = [], [("pending", None)]

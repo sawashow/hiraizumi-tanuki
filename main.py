@@ -133,6 +133,7 @@ class Game:
         self.lives = self.L["lives"]
         self.score = 0
         self.run_times = []         # 今回の遊びで、クリアした面のタイム（フレーム数。面の順）
+        self.demo = False           # 確認用の近道（?demo=1）で、総括を出しているか（順位表に送らない）
         self.total_rec = None       # 4面を通して遊んだとき: 通しの記録 (いまのベスト, 今回で更新したか)
         self.summary = False
         self._begin_stage()
@@ -1712,13 +1713,13 @@ class Game:
             self.sum_mode = "done"
 
     def start_demo_summary(self):
-        """確認用（ブラウザ版: アドレスの末尾に ?demo=1）: 通しの総括から始める。合計は 2:00（サーバーが受け付ける、いちばん速い値）。
-        記録は端末に残さない。イニシャルを入れて、送るところまでを試す（サーバーは、開始から 2 分たつまで、受け付けない）"""
+        """確認用（ブラウザ版: アドレスの末尾に ?demo=1）: 通しの総括から始める（画面とイニシャル入力の確認用）。
+        記録は端末に残さず、順位表にも送らない（誰でも使える近道なので、本物の順位表に、記録を載せる道具にしない）"""
         self.level = "easy"
         self._enter_title(False)
         self.run_times = [1800] * 4
         self.total_rec = (7200, True)
-        online.start(C.ONLINE["url"], self.level)
+        self.demo = True
         self._begin_summary()
 
     def _back_to_logo(self):
@@ -1812,8 +1813,11 @@ class Game:
     def _send_name(self):
         """入れたイニシャルを覚えて、通しの記録を、順位表に送る"""
         name = "".join(self.name_chars)
-        records.set_name(name)
         self.sfx.append(C.SFX["decide"])
+        if self.demo:       # 確認用の近道: 送らない
+            self.sum_msg, self.sum_mode = "DEMO (NOT SENT)", "done"
+            return
+        records.set_name(name)
         self.sum_msg = ""
         if online.submit(C.ONLINE["url"], self.level, name, sum(self.run_times)):
             self.sum_mode, self.send_t = "send", 0
