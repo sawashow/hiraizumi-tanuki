@@ -168,6 +168,22 @@ window.addEventListener("touchend", function () {
     if (window.MM && typeof MM.is_safari === "function") MM.is_safari();
 }, { passive: true });
 
+// スマホ: 最初に触ったとき、全画面にする（アドレスバーを隠す。全画面は、利用者の操作の中でしか始められない）。
+// 全画面から出てしまったら、次に触ったときに、もう一度入る。横向きにも固定する（ゲームは横長）。
+// Android の Chrome などで効く。iPhone の Safari は、全画面に対応していないので、何も起きない（「ホーム画面に追加」で開くと、バーは出ない）
+function goFullscreen() {
+    if (!matchMedia("(pointer: coarse)").matches || document.fullscreenElement || document.webkitFullscreenElement) return;
+    const el = document.documentElement;
+    const req = el.requestFullscreen || el.webkitRequestFullscreen;
+    if (!req) return;
+    try {
+        const p = req.call(el);
+        if (p && p.then) p.then(() => { try { screen.orientation.lock("landscape").catch(() => {}); } catch (e) {} }).catch(() => {});
+    } catch (e) {}
+}
+window.addEventListener("touchend", goFullscreen, { passive: true });
+window.addEventListener("click", goFullscreen);
+
 function show_infobox() {
     infobox.style.display = "block";    // 位置は、CSS（#infobox）で中央に固定している
 }
