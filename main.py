@@ -78,9 +78,10 @@ class Game:
         self.start_t = 0         # 決定してから、始まるまでの残りフレーム
         self.menu_on = False     # スタート画面で、メニューを開いている
         self.menu_i = 0          # 選んでいる項目
-        self.menu_page = "main"  # メニューの画面（main = STORY・OPTION・DISCOGRAPHY・HOW TO PLAY / option = 難しさ・音量 / disco = 曲の一覧）
+        self.menu_page = "main"  # メニューの画面（main = STORY・OPTION・MEISHO・DISCOGRAPHY・HOW TO PLAY / option = 難しさ・音量 / meisho = 名所 / disco = 曲の一覧）
         self.disco_song = None   # ディスコグラフィで、いま鳴らしている曲のファイル名
         self.howto = False       # 操作説明を出している
+        self.meisho = None       # 名所の説明を出している面の番号（0〜。出していなければ None）
         self._fade_cache = {}    # 崖の縁の、中景の入れ替えに使う、濃さの帯（幅ごとに作る）
         self._roll_fade = None   # エンドロールの、左の枠の右の端を暗くぼかす帯
         self.story = False       # いま、始まりの語りを流している
@@ -470,9 +471,9 @@ class Game:
         ud = ("down" in held) - ("up" in held)
         step_lr, step_ud = (lr if lr != self._lr else 0), (ud if ud != self._ud else 0)   # 押した瞬間だけ
         self._lr, self._ud = lr, ud
-        if self.howto:      # 操作説明: 決定で、メニューに戻る
+        if self.howto or self.meisho is not None:      # 操作説明・名所の説明: 決定で、メニューに戻る
             if decide:
-                self.howto = False
+                self.howto, self.meisho = False, None
                 self.sfx.append(C.SFX["decide"])
             return
         if not self.menu_on:
@@ -507,14 +508,18 @@ class Game:
             if decide and row == "option":
                 self.menu_page, self.menu_i = "option", 0
                 self.sfx.append(C.SFX["decide"])
-            elif decide and row == "disco":
-                self.menu_page, self.menu_i = "disco", 0
+            elif decide and row in ("disco", "meisho"):
+                self.menu_page, self.menu_i = row, 0
                 self.sfx.append(C.SFX["decide"])
+            elif decide and self.menu_page == "meisho" and row != "back" and int(row[1:]) < len(self.a.meisho):    # 名所を選んで決定: 説明を出す
+                self.meisho = int(row[1:])
+                self.sfx.append(C.SFX["decide"])
+                return
             elif decide and self.menu_page == "disco" and row != "back":     # 曲を選んで決定: その曲を鳴らす（もう一度で、止める）
                 song = C.DISCO[int(row[1:])][0]
                 self.disco_song = None if self.disco_song == song else song
             elif decide and row == "back":
-                came = "disco" if self.menu_page == "disco" else "option"
+                came = self.menu_page if self.menu_page in ("disco", "meisho") else "option"
                 self.menu_page, self.menu_i, self.disco_song = "main", C.MENU["pages"]["main"].index(came), None
                 self.sfx.append(C.SFX["decide"])
             elif decide and row == "howto" and self.a.howto:
@@ -1786,6 +1791,9 @@ class Game:
         if self.howto and self.a.howto:
             img = self.a.howto
             screen.blit(img, ((C.BASE_W - img.get_width()) // 2, (C.BASE_H - img.get_height()) // 2))
+        elif self.meisho is not None:
+            img = self.a.meisho[self.meisho]
+            screen.blit(img, ((C.BASE_W - img.get_width()) // 2, (C.BASE_H - img.get_height()) // 2))
         elif self.menu_on and font:
             self._draw_menu(screen, font)
         elif landed >= 0 and (landed // 30) % 2 == 0:   # 着いてから点滅
@@ -1811,8 +1819,8 @@ class Game:
         rows = M["pages"][self.menu_page]
         gap = M["row"] if self.menu_page == "main" else M["row_option"]
         top = M["y"] - max(0, len(rows) - 4) * gap       # 行が多いページは、上へ伸ばす（画面の下に出ないように）
-        if self.menu_page == "disco":
-            head = "- DISCOGRAPHY -"
+        if self.menu_page in ("disco", "meisho"):
+            head = "- %s -" % M["label"][self.menu_page]
             text(head, M["cx"] - font.size(head)[0] // 2, top - M["head"], (214, 168, 72))
         for n, row in enumerate(rows):
             y = top + n * gap

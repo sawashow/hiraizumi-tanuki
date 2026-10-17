@@ -176,6 +176,8 @@ class Assets:
         self.oneup = _load("oneup.png")
         self.torii = {False: _load("items/torii_off.png"), True: _load("items/torii_on.png")}   # 中間地点（通る前・通った後）
         self.howto = _load("howto.png") if os.path.exists(os.path.join(IMG, "howto.png")) else None     # 操作説明（メニューから開く）
+        # 名所の説明（メニューの MEISHO から開く。面の順。tools/make_meisho.py で作る）
+        self.meisho = [_load(f"meisho_{n}.png") for n in range(1, 5) if os.path.exists(os.path.join(IMG, f"meisho_{n}.png"))]
         self.title_logo = _load("title_logo.png")       # 題名「平泉 タヌキ侍」（昔のゲームのロゴ風）
         self.title_prompt = _load("title_prompt.png")   # 「PUSH ENTER KEY」
         # スタート画面の絵（無ければ、1面の景色で代わりにする）
