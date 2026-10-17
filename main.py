@@ -66,7 +66,7 @@ class Game:
         self._lr = 0                 # スタート画面で、前のフレームに押していた左右（押した瞬間だけ、切り替える）
         self._ud = 0                 # 同じく、上下
         self.vol_bgm = self.vol_sfx = C.MENU["steps"]    # 曲と効果音の音量（0〜steps。スタート画面のメニューで変える）
-        self.stick_fixed = False     # スマホの左のスティックを、決まった位置に固定するか（OPTION の STICK。False = 触った所が中心）
+        self.stick_fixed = True      # スマホの左のスティックを、決まった位置に固定するか（OPTION の STICK。True = 固定 / False = 触った所が中心）
         self.story_bgm = os.path.exists(os.path.join(AUDIO_DIR, C.BGM_STORY))   # 語りの曲があるか
         self.super_bgm = os.path.exists(os.path.join(AUDIO_DIR, C.BGM_SUPER))   # スーパータヌキの曲があるか
         self._enter_title(title)
