@@ -14,6 +14,7 @@ import config as C
 from stage import STAGE1_LEGACY, STAGES
 from audio import DIR as AUDIO_DIR, Audio
 from gamepad import Pad
+import records
 from splash import Splash
 from touch import Touch
 import sprites
@@ -194,6 +195,7 @@ class Game:
         self.frames = 0             # 遊んだ時間（フレーム数。クリア画面に出す）
         self.cleared = False
         self.clear_t = 0            # クリアしてからの経過フレーム
+        self.rec = None             # クリアしたときの記録: (いまのベスト, 今回で更新したか)
         self._start(60, self._floor_at(60))
 
     def respawn(self):
@@ -880,6 +882,7 @@ class Game:
             p.update({"right"}, self.stage.width + 120, self.terrain)
             if p.px - self.cam_x >= C.BASE_W + E["exit"]:
                 self.cleared = True
+                self.rec = records.submit(self.level, self.stage.name, self.frames)     # ベストと比べて、速ければ残す（難しさごと・面ごと）
                 self.sfx.append(C.SFX["clear"])
         else:
             p.update(set(), self.stage.width, self.terrain)
@@ -2066,12 +2069,13 @@ class Game:
         veil = pygame.Surface((C.BASE_W, C.BASE_H))
         veil.set_alpha(min(C.GAMEOVER_DIM, self.clear_t * 4))
         screen.blit(veil, (0, 0))
-        sec = self.frames // C.FPS
         t, cx = self.clear_t, C.BASE_W // 2
+        best, new = self.rec or (None, False)
         shown = int(self.score * min(1, max(0, t - C.CLEAR_SCORE_AT) / C.CLEAR_COUNT))   # 0 から最終値まで増える
         rows = [("SCORE", "%06d" % shown, C.CLEAR_SCORE_AT),
                 ("FOOD", "%d/%d" % (self.dango, self.stage.dango_total), C.CLEAR_SCORE_AT + C.CLEAR_COUNT + 20),
-                ("TIME", "%d:%02d" % (sec // 60, sec % 60), C.CLEAR_SCORE_AT + C.CLEAR_COUNT + 40)]
+                ("TIME", records.fmt(self.frames), C.CLEAR_SCORE_AT + C.CLEAR_COUNT + 40),
+                ("BEST", records.fmt(best), C.CLEAR_SCORE_AT + C.CLEAR_COUNT + 60)]
         def draw(text, x, y, right=False):
             img = font.render(text, False, C.TEXT)
             screen.blit(img, (x - img.get_width() if right else x, y))
@@ -2082,6 +2086,9 @@ class Game:
             if t >= at:
                 draw(label, cx - width // 2, 106 + i * 18)
                 draw(value, cx + width // 2, 106 + i * 18, right=True)
+        if new and t >= C.CLEAR_SCORE_AT + C.CLEAR_COUNT + 60 and (t // 20) % 2 == 0:     # ベストを更新した: 点滅
+            img = font.render("NEW RECORD!", False, (255, 236, 150))
+            screen.blit(img, (cx - img.get_width() // 2, 88))
         if t >= C.CLEAR_WAIT and (t // 30) % 2 == 0:
             img = font.render("PRESS ENTER", False, C.TEXT)
             screen.blit(img, (cx - img.get_width() // 2, 106 + 4 * 18))
