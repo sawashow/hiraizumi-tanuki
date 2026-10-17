@@ -443,7 +443,7 @@ LEVEL_ORDER = ("easy", "normal", "hard")
 LEVEL = "normal"        # 最初に選ばれている難しさ
 LEVEL_LABEL = (150, 252)    # （前の、難しさの表示の場所。いまは、メニューの中に出す）
 # スタート画面のメニュー: 決定のキーで開く。上下で項目を選び、決定で進む。
-#   main:   STORY（始める）/ OPTION（設定の画面へ）/ HOW TO PLAY（操作説明。assets/images/howto.png。tools/make_howto.py で作る）
+#   main:   STORY（始める）/ OPTION（設定の画面へ）/ MEISHO（名所の説明。assets/images/meisho_*.png。tools/make_meisho.py で作る）/ HOW TO PLAY（操作説明。assets/images/howto.png。tools/make_howto.py で作る）
 #   option: LEVEL（難しさ。左右で変える）/ MUSIC・SOUND（音量。左右で変える）/ BACK（戻る）
 #   cx = 行の中心（題名と同じ。どの行も、中央ぞろえ。右の大きなタヌキ侍は、x=265 あたりから。行の幅は、200 まで）
 #   y = 1行目の上端 / row・row_option = 行の間隔 / head = 見出しを、1行目より、どれだけ上に出すか / gap = 項目名と値の間 / steps = 音量の段の数
@@ -451,9 +451,10 @@ LEVEL_LABEL = (150, 252)    # （前の、難しさの表示の場所。いま�
 DISCO = (("bgm_story.ogg", "Evening at the Border Post"), ("bgm_map.ogg", "Steps Into the Morning Sun"),
          ("bgm_stage1.ogg", "Clash of the Iron Fan"), ("bgm_boss.ogg", "Crimson Temple Breach"), ("bgm_super.ogg", "Seven Blades High"))
 MENU = dict(cx=150, y=196, row=18, row_option=15, head=18, gap=10, steps=5,
-            pages=dict(main=("story", "option", "disco", "howto"), option=("level", "music", "sound", "back"),
+            pages=dict(main=("story", "option", "meisho", "disco", "howto"), option=("level", "music", "sound", "back"),
+                       meisho=("m0", "m1", "m2", "m3", "back"),
                        disco=tuple("t%d" % i for i in range(len(DISCO))) + ("back",)),
-            label=dict(story="STORY", option="OPTION", disco="DISCOGRAPHY", howto="HOW TO PLAY", level="LEVEL", music="MUSIC", sound="SOUND", back="BACK",
+            label=dict(story="STORY", option="OPTION", meisho="MEISHO", m0="MOTSUJI", m1="TAKADACHI", m2="TSUKIMIZAKA", m3="KONJIKIDO", disco="DISCOGRAPHY", howto="HOW TO PLAY", level="LEVEL", music="MUSIC", sound="SOUND", back="BACK",
                        **{"t%d" % i: name for i, (_, name) in enumerate(DISCO)}))
 RESPAWN_AT = 215        # 倒れてから、中間地点で再開するまでのフレーム数（残機が残っているとき）
 RESPAWN_CLEAR = 160     # 再開した場所から、この距離までの敵は置かない（再開してすぐ、ぶつからないように）
