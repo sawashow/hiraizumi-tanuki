@@ -2140,6 +2140,19 @@ g.reset(0)
 check("最初からやり直すと、石灯籠は、元に戻る", all(x.active for x in g.lanterns))
 STAGES[:] = _swap
 
+# タッチで遊び始めたら、最初の難しさを、タッチ向けにする（まだ自分で変えていなければ）
+_tg = Game(title=True)
+_tg.touch_level()
+check("タッチで遊び始めると、難しさがタッチ向け（EASY）になり、残機もその数になる",
+      _tg.level == C.TOUCH["level"] == "easy" and _tg.lives == C.LEVELS["easy"]["lives"])
+_tg = Game(title=True)
+_tg.level = "hard"
+_tg.touch_level()
+check("自分で難しさを変えていたら、タッチでも、そのまま", _tg.level == "hard")
+_tg = Game(title=False)
+_tg.touch_level()
+check("遊んでいる途中（スタート画面の外）では、変えない", _tg.level == C.LEVEL)
+
 # ---------------------------------------------------------------- 18. コントローラ
 import pygame as _pg  # noqa: E402
 import gamepad  # noqa: E402
