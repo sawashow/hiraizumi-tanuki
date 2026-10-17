@@ -1,20 +1,18 @@
 """成果発表スライド（docs/slide.html）の、キャラクターの行列の絵を作る。
 ゲームの絵を、2倍（ドットがにじまない、整数倍）にして、右へ向かって行進するように並べる。
-敵とボスの絵は左向きなので、左右を反転する（清衡は正面なので、そのまま）。先頭のタヌキ侍の足元に、横断歩道を描く。
+敵とボスの絵は左向きなので、左右を反転する（清衡は正面なので、そのまま）。地面（道路と横断歩道）は、スライドの側で描く。
 
 使い方: python tools/make_slide_parade.py   → docs/slide_parade.png
 """
 import os
 
-from PIL import Image, ImageDraw
+from PIL import Image
 
 ROOT = os.path.join(os.path.dirname(__file__), "..")
 IMG = os.path.join(ROOT, "assets", "images")
 OUT = os.path.join(ROOT, "docs", "slide_parade.png")
 K = 2               # 拡大の倍率（整数）
-W, H = 1152, 252    # 絵の大きさ（スライドの、左右の余白を除いた幅）
-BASE = H - 24       # 地面の高さ（足の位置）
-GAP = 8             # キャラクターの間（2倍にしたあと）
+W, H = 1152, 232    # 絵の大きさ（スライドの、左右の余白を除いた幅）。足は、絵のいちばん下
 
 # 左から右へ（行進の後ろから先頭へ）: (絵, 反転するか, 地面からの浮き)
 PARADE = [
@@ -31,7 +29,6 @@ PARADE = [
     ("hime_walk_0", False, 0),
     ("roll_tanuki_raise_2", False, 0),      # 先頭: 手を挙げて、横断歩道を渡るタヌキ侍
 ]
-ZEBRA_FROM = "hime_walk_0"      # この絵から先頭までの足元に、横断歩道
 
 
 def load(name, flip):
@@ -43,29 +40,16 @@ def load(name, flip):
 
 
 def main():
-    parts = [(name, load(name, flip), lift) for name, flip, lift in PARADE]
-    total = sum(im.width for _, im, _ in parts) + GAP * (len(parts) - 1)
+    parts = [(load(name, flip), lift) for name, flip, lift in PARADE]
+    total = sum(im.width for im, _ in parts)
+    gap = (W - total) // (len(parts) - 1)      # 幅いっぱいに、等しい間で並べる
     out = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    d = ImageDraw.Draw(out)
-    x = W - total       # 右へ寄せる（先頭が、右の端）
-    zebra_x = None
-    for name, im, lift in parts:
-        if name == ZEBRA_FROM:
-            zebra_x = x - 8
-        out.alpha_composite(im, (x, BASE - im.height - lift))
-        x += im.width + GAP
-    # 地面の線と、先頭の足元の横断歩道（足の下に、敷く）
-    ground = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    g = ImageDraw.Draw(ground)
-    g.rectangle((0, BASE, W, BASE + 3), fill=(48, 44, 40, 255))
-    if zebra_x is not None:     # 道路（灰色）に、白い縞。足は、道路の上に乗る
-        g.rectangle((zebra_x, BASE - 14, W, H - 2), fill=(92, 92, 98, 255))
-        for sx in range(zebra_x + 6, W - 6, 20):
-            g.rectangle((sx, BASE - 12, sx + 10, H - 4), fill=(246, 244, 236, 255))
-    ground.alpha_composite(out)
-    del d
-    ground.save(OUT)
-    print("書き出し:", os.path.normpath(OUT), ground.size, "行列の幅", total)
+    x = 0
+    for im, lift in parts:
+        out.alpha_composite(im, (x, H - im.height - lift))     # 足は、絵のいちばん下（スライドの道路の上に、立つ）
+        x += im.width + gap
+    out.save(OUT)
+    print("書き出し:", os.path.normpath(OUT), out.size, "行列の幅", total, "間", gap)
 
 
 if __name__ == "__main__":
