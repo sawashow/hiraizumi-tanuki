@@ -27,7 +27,7 @@ def _load():
 
 def _save(data):
     try:
-        text = json.dumps(data, ensure_ascii=False)
+        text = json.dumps(data)       # 英数字だけにする（日本語は \uXXXX の記号になる）。日本語のまま、ブラウザの保存領域へ渡すと、文字が化けて、読めなくなる
         if sys.platform == "emscripten":
             import platform
             platform.window.localStorage.setItem(KEY, text)
@@ -36,6 +36,19 @@ def _save(data):
                 f.write(text)
     except Exception:
         pass
+
+
+def can_save():
+    """記録を保存して、読み戻せるか（保存領域が使えない環境 = シークレットモードなどでは False。RECORDS に注意を出す）"""
+    try:
+        if sys.platform == "emscripten":
+            import platform
+            ls = platform.window.localStorage
+            ls.setItem(KEY + "_check", "ok")
+            return str(ls.getItem(KEY + "_check")) == "ok"
+        return True
+    except Exception:
+        return False
 
 
 def last_name():
