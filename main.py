@@ -180,6 +180,9 @@ class Game:
         self.intro_t = 0        # 面の名前を出してからのフレーム数（遊び始めてから数える）
         self.taken = set()          # 取ったアイテム（配置表の番号）
         self.toro_broken = set()    # 壊した石灯籠（配置表の番号）。やられて再開しても、壊れたまま
+        self.terrain.caves_open.clear()     # 隠し部屋の壁（面の始めは、ふさがっている。やられて再開しても、壊れたまま）
+        self.cave_hits = [0] * len(self.terrain.caves)     # 隠し部屋の壁を、斬った回数
+        self.cave_cool = [0] * len(self.terrain.caves)     # 1回の振りで、何度も数えないための間
         self.one_up_given = False
         self.checkpoint = Checkpoint(*self.stage.checkpoint, self.a)
         self.cp_state = None        # 中間地点を通ったときの (スコア, 団子の数, 取ったもの)
@@ -431,6 +434,7 @@ class Game:
         sword = p.sword_rect()
         self._hit_foes(p, foes, sword)
         self._hit_lanterns(sword)
+        self._hit_caves(sword)
         self._drop_items()
         self._pick_items(p)
         # 中間地点（鳥居）を通る
@@ -640,6 +644,49 @@ class Game:
                 self.toro_broken.add(lt.idx)
                 self.effects.append(HitEffect(*lt.rect.center, self.a))
                 self.items.append(Item(lt.kind, lt.rect.centerx, lt.rect.centery, self.a, drop=True))
+
+    def _cave_wall(self, i):
+        """隠し部屋 i の入口の壁（斬ると崩れる所）"""
+        x0, x1, ceil, floor = self.terrain.caves[i]
+        return pygame.Rect(x0 - 2, ceil, C.SECRET["wall"], floor - ceil)
+
+    def _hit_caves(self, sword):
+        """刀で、隠し部屋の壁を斬る（step から呼ぶ）。決まった回数で崩れて、入れるようになる"""
+        for i in range(len(self.terrain.caves)):
+            if self.cave_cool[i]:
+                self.cave_cool[i] -= 1
+            if i in self.terrain.caves_open or self.cave_cool[i] or not (sword and sword.colliderect(self._cave_wall(i))):
+                continue
+            self.cave_hits[i] += 1
+            self.cave_cool[i] = C.SECRET["cool"]
+            self.effects.append(HitEffect(*self._cave_wall(i).center, self.a))
+            if self.cave_hits[i] >= C.SECRET["hits"]:
+                self.terrain.open_cave(i)
+                self.sfx.append(C.SFX["break"])
+            else:
+                self.sfx.append(C.SFX["hit"])
+
+    def _in_closed_cave(self, x, y):
+        """(x, y) が、まだ壊していない隠し部屋の中か（中のアイテムは、壊すまで見せない）"""
+        return any(x0 <= x <= x1 and ceil <= y <= floor for i, (x0, x1, ceil, floor) in enumerate(self.terrain.caves)
+                   if i not in self.terrain.caves_open)
+
+    def _draw_caves(self, screen, cam):
+        """隠し部屋: 壊す前は、入口の岩に、細いひび（見る人が見れば分かるくらい。斬るたびに、増える）。壊したあとは、暗い部屋"""
+        K = C.SECRET
+        for i, (x0, x1, ceil, floor) in enumerate(self.terrain.caves):
+            if i in self.terrain.caves_open:
+                pygame.draw.rect(screen, K["room"], (x0 - cam, ceil, x1 - x0, floor - ceil))
+                pygame.draw.line(screen, K["edge"], (x0 - cam, ceil), (x1 - cam - 1, ceil), 2)        # 天井の縁
+                pygame.draw.line(screen, K["edge"], (x1 - cam - 1, ceil), (x1 - cam - 1, floor), 2)   # 奥の壁
+                continue
+            crack = pygame.Surface((K["wall"] + 4, floor - ceil), pygame.SRCALPHA)
+            col = K["crack"][:3] + (min(255, K["crack"][3] + 60 * self.cave_hits[i]),)
+            for line in K["lines"][:2 + self.cave_hits[i]]:
+                pts = [(x, y * (floor - ceil)) for x, y in line]
+                pygame.draw.lines(crack, K["shine"], False, [(x + 1, y + 1) for x, y in pts], 1)
+                pygame.draw.lines(crack, col, False, pts, 1)
+            screen.blit(crack, (x0 - cam, ceil))
 
     def _drop_items(self):
         """倒した敵が、物を落とす（step から呼ぶ）。"""
@@ -1030,6 +1077,7 @@ class Game:
         else:
             world.blit(self.a.mid, (-mid_x, cy))
         self._draw_ground(world, cam)
+        self._draw_caves(world, cam)
         self._draw_stele(world, cam)
         self._draw_traps(world, cam)
         for lt in self.lanterns:
@@ -1048,7 +1096,8 @@ class Game:
         for s in self.slashes:
             s.draw(world, cam)
         for it in self.items:
-            it.draw(world, cam)
+            if not self._in_closed_cave(it.cx, it.cy):
+                it.draw(world, cam)
         self.checkpoint.draw(world, cam)
         self.player.draw(world, cam)
         for fx in self.effects:

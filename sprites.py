@@ -562,6 +562,10 @@ class Player:
             if terrain and is_ground and terrain.safe_spot(self.px, height):
                 self.safe_x, self.safe_y = self.px, float(height)
         else:
+            h = C.CROUCH_H if self.crouch else C.PLAYER_H
+            roof = terrain.ceiling(self.px, self.py - h, new_bottom - h) if terrain and self.vy < 0 else None
+            if roof is not None:        # 隠し部屋の天井に、頭がつかえる
+                new_bottom, self.vy = roof + h, 0.0
             self.py = new_bottom
             self.on_ground = False
             self.air_t += 1
