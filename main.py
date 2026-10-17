@@ -2154,7 +2154,8 @@ async def main():
         game.player.px, game.player.py = float(game.stage.checkpoint[0] - 70), float(game.stage.checkpoint[1])
         game.enemies = [e for e in game.enemies if abs(e.cx - game.stage.checkpoint[0]) > 200]
     if "boss" in sys.argv[1:]:   # 確認用: python main.py boss で、ボスの場所の手前から始める（スタート画面は出さない）
-        game.player.px = float(game.stage.arena_x0 + 100)
+        bx = game.stage.arena_x0 + 100      # その高さの地面に立たせて、画面もそこへ（崖登りのある面では、手前の地面が低いため）
+        game._start(bx, float(game.terrain.height_at(bx)))
         game.enemies = []
     audio = Audio()
     audio.preload(sorted(f for f in os.listdir(AUDIO_DIR) if f.startswith("sfx_")))    # 効果音は先に読んでおく
