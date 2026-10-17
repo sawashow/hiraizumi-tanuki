@@ -855,6 +855,12 @@ class Game:
         """いまの難しさの数字（config.LEVELS）"""
         return C.LEVELS[self.level]
 
+    def touch_level(self):
+        """タッチで遊び始めたとき: スタート画面で、まだ難しさを変えていなければ、タッチ向けの難しさにする（キーより操作が難しいため）"""
+        if self.title and not self.start_t and self.level == C.LEVEL:
+            self.level = C.TOUCH["level"]
+            self.lives = self.L["lives"]
+
     def _arena(self):
         """いま、戦っている（次に戦う）ボスの間"""
         arenas = self.stage.arenas
@@ -2137,6 +2143,7 @@ async def main():
             pressed |= got
         if touch.active and C.COYOTE != C.TOUCH["coyote"]:     # タッチで遊ぶ人は、ジャンプを受け付ける時間を、少し長く
             C.COYOTE, C.JUMP_BUFFER = C.TOUCH["coyote"], C.TOUCH["jump_buffer"]
+            game.touch_level()
         if touch.active and sys.platform == "emscripten":
             fit_to_page()       # タッチ: 窓の横幅を、スマホの画面の縦横比に合わせる（左右の帯にボタンを置くため）
         if game.logo_again:     # エンドロールのあと: 曲を消して、ロゴ画面から、やり直す
