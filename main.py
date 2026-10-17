@@ -194,6 +194,10 @@ class Game:
 
     def _begin_stage(self):
         self.dango = 0
+        self.hurt_count = 0         # この面で、傷を受けた回数（ノーダメージのボーナス用。やられて再開しても、数え続ける）
+        self._hp_prev = C.PLAYER_HP
+        self.combo, self.combo_t = 0, 0     # 続けて敵を倒した数と、次を倒すまでの残りフレーム（コンボ）
+        self.bonus = []             # クリアしたときのボーナスの内訳: [(ラベル, 点)]
         self.intro_t = 0        # 面の名前を出してからのフレーム数（遊び始めてから数える）
         self.taken = set()          # 取ったアイテム（配置表の番号）
         self.toro_broken = set()    # 壊した石灯籠（配置表の番号）。やられて再開しても、壊れたまま
@@ -212,6 +216,7 @@ class Game:
         self.cleared = False
         self.clear_t = 0            # クリアしてからの経過フレーム
         self.rec = None             # クリアしたときの記録: (いまのベスト, 今回で更新したか)
+        self.score_rec = None       # 通しをクリアしたときの、スコアの記録: (いまの最高点, 今回で更新したか)
         self._start(60, self._floor_at(60))
 
     def respawn(self):
@@ -240,6 +245,8 @@ class Game:
     def _start(self, x, y, clear=0):
         """clear を渡すと（再開のとき）、その距離までの敵は置かず、少しのあいだ無敵にする"""
         self.player = Player(x, self.a)
+        self._hp_prev = self.player.hp      # 再開・面の始めは、満タンから数える（傷の数）
+        self.combo, self.combo_t = 0, 0
         self.player.py = y
         self.player.safe_x, self.player.safe_y = float(x), y
         if clear:
@@ -454,6 +461,7 @@ class Game:
 
         sword = p.sword_rect()
         self._hit_foes(p, foes, sword)
+        self._score_kills()
         self._hit_lanterns(sword)
         self._hit_caves(sword)
         self._drop_items()
@@ -467,6 +475,13 @@ class Game:
             self.msg_t -= 1
         self._hit_by_waves(p, sword)
         self._touch_foes(p, foes)
+        if p.hp < self._hp_prev:        # 傷を受けた（ノーダメージのボーナスを、なくす）
+            self.hurt_count += 1
+        self._hp_prev = p.hp
+        if self.combo_t:
+            self.combo_t -= 1
+            if not self.combo_t:
+                self.combo = 0
 
         self._boss_shake(p)
         self.bar_t = max(0, min(C.BOSS_INTRO["bar_frames"], self.bar_t + (1 if self.boss_intro else -1)))
@@ -1410,6 +1425,9 @@ class Game:
             pygame.draw.rect(screen, (252, 208, 40), (x + 1, 11, 40 * p.super_t // C.SUPER_FRAMES, 4))
         text = font.render("%06d" % self.score, False, C.TEXT)
         screen.blit(text, (C.BASE_W - text.get_width() - 8, 8))
+        if self.combo >= 2 and self.combo_t:        # コンボ: 続けて倒しているとき
+            text = font.render("COMBO x%d" % min(self.combo, C.COMBO["max"]), False, (255, 236, 150))
+            screen.blit(text, (C.BASE_W - text.get_width() - 8, 32))
         # 腹ペコゲージ（手裏剣を投げられる数）。左端は、団子。体力の赤い四角とは、形と色を変える（串に刺さった、丸い団子）
         icon = self.a.dango_straight
         w, h = icon.get_size()
@@ -1705,12 +1723,36 @@ class Game:
         self._enter_title(self.use_title)
         self.logo_again = True
 
+    def _score_kills(self):
+        """倒れた敵に、点を入れる（種類ごと。2秒以内に続けて倒すと、倍率が上がる）"""
+        for e in self.enemies:
+            if e.dying and not e.scored:
+                e.scored = True
+                self.combo = self.combo + 1 if self.combo_t > 0 else 1
+                self.combo_t = C.COMBO["frames"]
+                self.score += C.SCORE_ENEMY.get(e.KIND, 100) * min(self.combo, C.COMBO["max"])
+
     def _record_clear(self):
         """面をクリアしたとき: タイムをベストと比べて、速ければ残す（難しさごと・面ごと）。最後の面なら、通しのタイムも"""
         self.rec = records.submit(self.level, self.stage.name, self.frames)
         self.run_times.append(self.frames)
-        if self.stage_i == len(STAGES) - 1 and len(self.run_times) == len(STAGES):      # 最初の面から通して遊んだ回だけ
+        B = C.SCORE_BONUS
+        final = self.stage_i == len(STAGES) - 1
+        self.bonus = []
+        par = B["par"].get(self.stage.name, B["par_default"])
+        fast = int(par - self.frames / C.FPS)
+        if fast > 0:
+            self.bonus.append(("TIME BONUS", fast * B["per_sec"]))
+        if self.hurt_count == 0:
+            self.bonus.append(("NO DAMAGE", B["nodamage"]))
+        if self.stage.dango_total and self.dango >= self.stage.dango_total:
+            self.bonus.append(("ALL FOOD", B["allfood"]))
+        if final and self.lives > 0:
+            self.bonus.append(("LIVES x%d" % self.lives, self.lives * B["life"]))
+        self.score += sum(p for _, p in self.bonus)
+        if final and len(self.run_times) == len(STAGES):      # 最初の面から通して遊んだ回だけ
             self.total_rec = records.submit(self.level, records.TOTAL, sum(self.run_times))
+            self.score_rec = records.submit_score(self.level, self.score)
 
     def _step_summary(self, held, pressed):
         S = C.SUMMARY
@@ -1784,7 +1826,11 @@ class Game:
             img = font.render(text, False, color)
             screen.blit(img, (x - img.get_width() if right else x, y))
         put("RESULT", cx - font.size("RESULT")[0] // 2, 28, gold)
-        put("LEVEL  " + self.L["label"], cx - font.size("LEVEL  " + self.L["label"])[0] // 2, 46, (176, 176, 190))
+        if self.score_rec and t >= S["row"] * (len(self.run_times) + 2):     # 通しの合計スコアと、自己ベスト（端末の中だけ）。LEVEL の行に、並べて出す
+            line = "%s   SCORE %06d   BEST %06d" % (self.L["label"], self.score, self.score_rec[0])
+            put(line, cx - font.size(line)[0] // 2, 46, gold if self.score_rec[1] else (176, 176, 190))
+        else:
+            put("LEVEL  " + self.L["label"], cx - font.size("LEVEL  " + self.L["label"])[0] // 2, 46, (176, 176, 190))
         left, right = cx - 120, cx + 120
         for i, frames in enumerate(self.run_times):      # 面ごと
             if t >= S["row"] * (i + 1):
@@ -2128,11 +2174,14 @@ class Game:
         pygame.draw.line(screen, (110, 110, 130), (left, y - 3), (right, y - 3))
         put("TOTAL", left, y, gold)
         put(records.fmt(records.best(self.rec_view, records.TOTAL)), right, y, gold, right_=True)
-        put("PRESS ENTER", cx - font.size("PRESS ENTER")[0] // 2, y + 40, grey)
+        sc = records.best_score(self.rec_view)
+        put("SCORE", left, y + 18)
+        put("%06d" % sc if sc else "------", right, y + 18, right_=True)
+        put("PRESS ENTER", cx - font.size("PRESS ENTER")[0] // 2, y + 58, grey)
         if not self.rec_can_save:
             put("CAN'T SAVE HERE (PRIVATE MODE?)", cx - font.size("CAN'T SAVE HERE (PRIVATE MODE?)")[0] // 2, 244, (255, 150, 150))
         if online.enabled(C.ONLINE["url"]):
-            put("UP DOWN: MINE / ONLINE", cx - font.size("UP DOWN: MINE / ONLINE")[0] // 2, y + 58, grey)
+            put("UP DOWN: MINE / ONLINE", cx - font.size("UP DOWN: MINE / ONLINE")[0] // 2, y + 76, grey)
 
     def _draw_menu(self, screen, font):
         """スタート画面のメニュー。main = STORY / OPTION / HOW TO PLAY。option = LEVEL（難しさ）/ MUSIC・SOUND（音量）/ BACK。
@@ -2329,12 +2378,18 @@ class Game:
             if t >= at:
                 draw(label, cx - width // 2, 106 + i * 18)
                 draw(value, cx + width // 2, 106 + i * 18, right=True)
+        for i, (label, points) in enumerate(self.bonus):        # ボーナスの内訳（表の下に、1行ずつ）
+            if t >= C.CLEAR_SCORE_AT + 15 * i:
+                bw = font.size("TIME BONUS    +0000")[0] + 16       # ボーナスの行は、表より少し広く（ラベルと点が、重ならないように）
+                by = 184 + i * 14
+                draw(label, cx - bw // 2, by)
+                draw("+%d" % points, cx + bw // 2, by, right=True)
         if new and t >= C.CLEAR_SCORE_AT + C.CLEAR_COUNT + 60 and (t // 20) % 2 == 0:     # ベストを更新した: 点滅
             img = font.render("NEW RECORD!", False, (255, 236, 150))
             screen.blit(img, (cx - img.get_width() // 2, 88))
         if t >= C.CLEAR_WAIT and (t // 30) % 2 == 0:
             img = font.render("PRESS ENTER", False, C.TEXT)
-            screen.blit(img, (cx - img.get_width() // 2, 106 + 4 * 18))
+            screen.blit(img, (cx - img.get_width() // 2, 246))
 
     def _draw_dim(self, screen):
         """画面を、少しずつ暗くする"""

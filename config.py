@@ -254,6 +254,11 @@ TALK_BOSS_Y = 40                # ボスの吹き出しの、しっぽの先（�
 # アイテム。団子=スコア / おにぎり=回復 / 金の葉=強化（刀を振ると光波が出る。ダメージを受けると消える）
 ITEM_SIZE = 16
 SCORE_DANGO = 100
+# 敵を倒した点（種類ごと。KIND）。2秒以内に続けて倒すと、倍率が上がる（COMBO: frames = 続けて倒す猶予 / max = 倍率の上限）
+SCORE_ENEMY = dict(ochimusha=200, miira=300, tengu=400, yumihei=250, tachiojo=300, kitsunebi=100, karasu=150)
+COMBO = dict(frames=120, max=5)
+# 面をクリアしたときのボーナス: per_sec = 基準（par。面の名前ごと、秒）より速い分、1秒につき / nodamage = 1度も傷を受けなかった / allfood = 団子を全部取った / life = 最後の面で、残機1つにつき
+SCORE_BONUS = dict(per_sec=50, nodamage=1000, allfood=500, life=300, par={"毛越寺": 60, "高館": 100, "月見坂": 170, "金色堂": 180}, par_default=120)
 SCORE_FULL_HP = 50      # 体力が満タンでおにぎりを取ったときのスコア
 HEAL_ONIGIRI = 2
 # 強化は3種類。金の葉・三方手裏剣は、ダメージを受けると消える（両方、同時に持てる）。スーパータヌキは、時間で切れる

@@ -702,6 +702,43 @@ check("記録: 保存データは、英数字だけ（日本語の面の名前�
 check("記録: 英数字にしても、日本語の名前で、読み戻せる", records.best("easy", "毛越寺") == 5000 and records.best("easy", records.TOTAL) == 20000)
 check("記録: PC 版では、保存できる", records.can_save())
 
+# スコア: 敵を倒す点・コンボ・クリアのボーナス・最高点の記録
+from sprites import make_enemy as _mk  # noqa: E402
+g = fresh()
+_e1, _e2 = _mk("ochimusha", 800, g.a, g.terrain), _mk("karasu", 900, g.a, g.terrain)
+g.enemies = [_e1, _e2]
+g.score = 0
+_e1.dying = True
+g._score_kills()
+check("スコア: 敵を倒すと、種類ごとの点が入る（落ち武者 200）", g.score == C.SCORE_ENEMY["ochimusha"] and g.combo == 1, str(g.score))
+g._score_kills()
+check("スコア: 同じ敵に、2度は入らない", g.score == C.SCORE_ENEMY["ochimusha"])
+_e2.dying = True
+g._score_kills()
+check("スコア: 続けて倒すと、倍率（2体目は、×2）", g.score == C.SCORE_ENEMY["ochimusha"] + C.SCORE_ENEMY["karasu"] * 2 and g.combo == 2, str(g.score))
+run(g, C.COMBO["frames"] + 5)
+check("スコア: 間があくと、コンボは、1に戻る", g.combo == 0)
+_big = [_mk("karasu", 1000 + i * 10, g.a, g.terrain) for i in range(8)]
+g.enemies, g.score = _big, 0
+for _b in _big:
+    _b.dying = True
+    g._score_kills()
+check("スコア: 倍率は、上限（×5）まで", g.score == C.SCORE_ENEMY["karasu"] * (1 + 2 + 3 + 4 + 5 + 5 + 5 + 5), str(g.score))
+g = fresh()
+g._set_stage(0)
+g._begin_stage()
+g.frames, g.hurt_count, g.dango = 60 * 200, 1, 0
+g.score = 0
+g._record_clear()
+check("ボーナス: 基準より遅く、傷を受けたときは、付かない", g.bonus == [] and g.score == 0, str(g.bonus))
+g._begin_stage()
+g.frames, g.dango = 60 * 10, g.stage.dango_total
+g._record_clear()
+_par = C.SCORE_BONUS["par"].get(g.stage.name, C.SCORE_BONUS["par_default"])
+check("ボーナス: 速いほど、増える（1秒 50 点）。団子を全部取ると、ALL FOOD。傷なしは、NO DAMAGE",
+      dict(g.bonus).get("TIME BONUS") == (_par - 10) * C.SCORE_BONUS["per_sec"] and dict(g.bonus).get("ALL FOOD") == C.SCORE_BONUS["allfood"] and dict(g.bonus).get("NO DAMAGE") == C.SCORE_BONUS["nodamage"], str(g.bonus))
+check("スコア: 最高点を記録する（低い点では、更新しない）", records.submit_score("easy", 5000) == (5000, True) and records.submit_score("easy", 3000) == (5000, False) and records.best_score("easy") == 5000)
+
 # 通し: 面をクリアするたびにタイムを集め、最後の面で、通しの記録を残す。エンドロールのあとに、総括を出す
 g = Game(title=True)
 g.title = False
@@ -1593,7 +1630,7 @@ run(g, 20)
 snap(g, "ending run")
 ok = boss_until(g, lambda gg: gg.cleared, 400)
 check("画面の右へ駆け抜けると、クリア（落ちない）", ok and g.player.px > C.STAGE_W and g.player.on_ground and g.player.hp > 0
-      and g.score == 1500 + C.SCORE_BOSS and g.bgm is None, "x=%.0f" % g.player.px)
+      and g.score == 1500 + C.SCORE_BOSS + sum(_p for _, _p in g.bonus) and g.bgm is None, "x=%.0f" % g.player.px)
 t0 = g.frames
 run(g, 10, {"right"}, {"restart"})
 check("クリアのあとは、動かない（時間も止まる。すぐには、Enterを受け付けない）", g.cleared and g.frames == t0)
@@ -1601,10 +1638,12 @@ check("クリアすると、タイムが残る（はじめは、今回がベス�
 run(g, C.CLEAR_WAIT)
 snap(g, "clear")
 _lives0 = g.lives
+_bonus0 = sum(_p for _, _p in g.bonus)
+check("クリアのボーナス: 速く、傷を受けずにクリアすると、TIME BONUS と NO DAMAGE が付く", dict(g.bonus).get("NO DAMAGE") == C.SCORE_BONUS["nodamage"] and "TIME BONUS" in dict(g.bonus), str(g.bonus))
 run(g, 1, (), {"restart"})
 check("クリアのあと、Enterで、次の面へ進む（スコアは引き継ぎ、体力は満タン、団子・時間は数え直す）",
       not g.cleared and g.stage_i == 1 and g.stage.name == "毛越寺" and g.player.px == 60 and g.player.hp == C.PLAYER_HP
-      and g.score == 1500 + C.SCORE_BOSS and g.dango == 0 and g.frames <= 1 and g.boss_state is None and g.cp_state is None
+      and g.score == 1500 + C.SCORE_BOSS + _bonus0 and g.dango == 0 and g.frames <= 1 and g.boss_state is None and g.cp_state is None
       and g.lives == _lives0 and not g.boss_on and len(g.enemies) > 0,
       "stage %d px %.0f hp %d score %d dango %d frames %d lives %d enemies %d" % (g.stage_i, g.player.px, g.player.hp, g.score, g.dango, g.frames, g.lives, len(g.enemies)))
 check("次の面の地形に切り替わっている", g.terrain.ground == [tuple(x) for x in g.stage.ground] and g.stage.width != C.STAGE_W)

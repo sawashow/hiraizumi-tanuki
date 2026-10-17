@@ -63,6 +63,25 @@ def set_name(name):
     _save(data)
 
 
+SCORE = "score"       # スコアの記録の名前（level の下に、最高点を残す。タイムと違って、大きいほどよい）
+
+
+def best_score(level):
+    v = _load().get(level, {}).get(SCORE)
+    return v if isinstance(v, int) and v > 0 else None
+
+
+def submit_score(level, points):
+    """今回のスコアを、最高点と比べて、高ければ保存する。(いまの最高点, 更新したか) を返す"""
+    data = _load()
+    now = data.get(level, {}).get(SCORE)
+    if not (isinstance(now, int) and now > 0) or points > now:
+        data.setdefault(level, {})[SCORE] = int(points)
+        _save(data)
+        return int(points), True
+    return now, False
+
+
 def best(level, stage):
     """level（easy など）・stage（面の名前）の、ベストのフレーム数。まだ無ければ None"""
     v = _load().get(level, {}).get(stage)
