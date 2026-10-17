@@ -459,6 +459,7 @@ MENU = dict(cx=150, y=196, row=18, row_option=15, head=18, gap=10, steps=5,
                        disco=tuple("t%d" % i for i in range(len(DISCO))) + ("back",)),
             label=dict(story="STORY", option="OPTION", extra="EXTRA", meisho="MEISHO", m0="MOTSUJI", m1="TAKADACHI", m2="TSUKIMIZAKA", m3="KONJIKIDO", disco="DISCOGRAPHY", howto="HOW TO PLAY", level="LEVEL", music="MUSIC", sound="SOUND", back="BACK",
                        **{"t%d" % i: name for i, (_, name) in enumerate(DISCO)}))
+ONEUP_MSG = 90          # 1UP を取ったとき、頭の上に「1UP!」を出すフレーム数（上へ、ゆっくり昇る）
 # ポーズ画面の項目: CONTINUE（再開）/ TITLE（スタート画面へ戻る。その面の進み具合は、残らない）
 PAUSE_ROWS = ("continue", "title")
 PAUSE_LABEL = {"continue": "CONTINUE", "title": "TITLE"}

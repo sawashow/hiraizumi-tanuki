@@ -453,6 +453,9 @@ ZONES1 = (
     (6860, 7020, "ボス前", "休む", 1, "石灯籠で回復して、ボスに備える"),
     (7020, 7500, "基衡の間", "見せ場", 5, "上下する足場で扇の狙いを外し、基衡を跳び越えて斬る"),
 )
+# 1UP（面に1つ）: 杉の大木の塔のてっぺん（強化の葉）から、右の空中へ跳ぶ寄り道。下の地面からは、高すぎて届かない
+PLATFORMS1 += ((1610, 1650, 62, "杉の大木: 塔のてっぺんから、右へ跳んで乗る台。1UP の寄り道（下からは届かない。烏が来る中で跳ぶ）"),)
+ITEMS1 += (("oneup", 1630, 44),)
 STAGE1 = StageDef("月見坂", W1, GROUND1, PLATFORMS1, thin_dango(ITEMS1, PLATFORMS1), (4650, T), SPAWNS1B, C.BGM_STAGE1, C.BGM_BOSS,
                   lanterns=(("triple", 300), ("onigiri", 4750), ("onigiri", 6880)),   # 石灯籠: 入口（強化）・中間地点の先（回復）・ボスの前（回復）
                   number=3, stele_x=140, movers=MOVERS1,
@@ -560,6 +563,9 @@ ZONES2 = (
     (3880, 4330, "最後の池", "渡る", 3, "足場の道で強化を取り、飛び石で渡る"),
     (4330, 4520, "ボス前", "休む", 1, "石灯籠で回復して、ボスに備える"),
 )
+# 1UP（面に1つ）: 築山の塔のてっぺん（強化の葉）から、右の空中へ跳ぶ寄り道。下の地面からは、高すぎて届かない
+PLATFORMS2 += ((2640, 2680, 70, "築山: 塔のてっぺんから、右へ跳んで乗る台。1UP の寄り道（下からは届かない）"),)
+ITEMS2 += (("oneup", 2660, 52),)
 STAGE2 = StageDef("毛越寺", 5000, GROUND2, PLATFORMS2, thin_dango(ITEMS2, PLATFORMS2), (2170, T - 32), SPAWNS2, C.BGM_STAGE1, C.BGM_BOSS,
                   lanterns=(("triple", 300), ("onigiri", 2310), ("onigiri", 4370)),   # 石灯籠: 入口（強化）・中間地点の先（回復）・ボスの前（回復）
                   sky="stage2/bg_sky.png", mid="stage2/bg_mid.png", tiles="stage2/",
@@ -898,6 +904,9 @@ ZONES4 = (
     (8080, 8520, "清衡の前", "休む", 1, "台の上と石灯籠で回復して、最後のボスに備える"),
     (8520, 9000, "清衡の間", "見せ場", 5, "最後のボス。浮かぶ清衡を、部屋の台に乗って斬る。数珠の玉は、台の上下でかわす"),
 ), 0, 1)
+# 1UP（面に1つ）: 経蔵の塔のてっぺん（おにぎり）から、右の空中へ跳ぶ寄り道。下の床からは、高すぎて届かない
+PLATFORMS4 += ((3345, 3395, 450, "経蔵: 塔のてっぺんから、右へ跳んで乗る台。1UP の寄り道（下からは届かない）"),)
+ITEMS4 += (("oneup", 3370, 432),)
 STAGE4 = StageDef("金色堂", W4, GROUND4, PLATFORMS4, thin_dango(ITEMS4, PLATFORMS4), (6950 + S4, _B4 - 16), SPAWNS4, C.BGM_STAGE1, C.BGM_BOSS,
                   lanterns=_shift4((("triple", 280), ("onigiri", 7090), ("onigiri", 8370)), 1),   # 石灯籠: 入口（強化）・中間地点の先（回復）・ボスの前（回復）
                   sky="stage4/bg_sky.png", mid="stage4/bg_mid.png", tiles="stage4/",

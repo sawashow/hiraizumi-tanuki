@@ -151,7 +151,7 @@ class Assets:
                 f.set_alpha(C.GUST["alpha"])    # 薄くして、風のうしろの敵や地形が見えるように
         slash = [_load(f"slash_{i}.png") for i in range(C.SLASH_FRAMES)]
         self.slash = {True: slash, False: [pygame.transform.flip(f, True, False) for f in slash]}
-        self.item = {k: _load(f"items/{k}.png") for k in ("dango", "onigiri", "leaf")}
+        self.item = {k: _load(f"items/{k}.png") for k in ("dango", "onigiri", "leaf", "oneup")}     # oneup: 残機が1つ増える（tools/make_oneup_item.py）
         for k in C.FOODS[2:]:       # 頭の中の食べ物（あれば）
             if os.path.exists(os.path.join(IMG, "items", f"food_{k}.png")):
                 self.item[k] = _load(f"items/food_{k}.png")
@@ -2592,7 +2592,7 @@ class SlashWave:
 
 
 class Item:
-    """拾えるもの。dango=スコア / onigiri=回復 / leaf・triple・super=強化。絵ができるまでは、色付きの図形で描く。
+    """拾えるもの。dango=スコア / onigiri=回復 / leaf・triple・super=強化 / oneup=残機が1つ増える。絵ができるまでは、色付きの図形で描く。
     drop=True は、敵が落とした物: 少し跳ねて地面に落ち、しばらくすると消える"""
 
     def __init__(self, kind, x, y, assets=None, idx=-1, drop=False):

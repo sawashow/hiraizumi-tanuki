@@ -325,6 +325,10 @@ class Game:
                 elif it.kind == "triple":
                     p.triple = True
                     self.sfx.append(C.SFX["power"])
+                elif it.kind == "oneup":        # 1UP: 残機が1つ増える（頭の上に「1UP!」）
+                    self.lives += 1
+                    self.msg_t = C.ONEUP_MSG
+                    self.sfx.append(C.SFX["power"])
                 else:
                     p.super_t = C.SUPER_FRAMES
 
@@ -1328,7 +1332,7 @@ class Game:
             for img, y, start in ((self.a.boss_title, C.BOSS_TITLE_Y, 0), (self.a.boss_name, C.BOSS_NAME_Y, delay)):
                 img.set_alpha(max(0, min(255, (t - start) * 255 // fade, (total - t) * 255 // fade)))
                 screen.blit(img, (C.BASE_W // 2 - img.get_width() // 2, y))
-        if self.msg_t:   # 団子を全部取った
+        if self.msg_t:   # 1UP を取った
             screen.blit(self.a.oneup, (self.player.rect.centerx - self.cam_x - self.a.oneup.get_width() // 2,
                                        self.player.rect.top - (round(self.cam_y) if self._world else 0) - 28 - (90 - self.msg_t) // 4))
 
