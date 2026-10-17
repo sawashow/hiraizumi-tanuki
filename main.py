@@ -66,6 +66,7 @@ class Game:
         self._lr = 0                 # スタート画面で、前のフレームに押していた左右（押した瞬間だけ、切り替える）
         self._ud = 0                 # 同じく、上下
         self.vol_bgm = self.vol_sfx = C.MENU["steps"]    # 曲と効果音の音量（0〜steps。スタート画面のメニューで変える）
+        self.stick_fixed = False     # スマホの左のスティックを、決まった位置に固定するか（OPTION の STICK。False = 触った所が中心）
         self.story_bgm = os.path.exists(os.path.join(AUDIO_DIR, C.BGM_STORY))   # 語りの曲があるか
         self.super_bgm = os.path.exists(os.path.join(AUDIO_DIR, C.BGM_SUPER))   # スーパータヌキの曲があるか
         self._enter_title(title)
@@ -525,6 +526,9 @@ class Game:
             elif step_lr and row == "sound":
                 self.vol_sfx = max(0, min(S, self.vol_sfx + step_lr))
                 self.sfx.append(C.SFX["cursor"])       # 変えた音量で、鳴る（大きさを、耳で確かめられる）
+            elif row == "stick" and (step_lr or decide):      # 左右でも、決定でも、切り替える（FLOAT ⇔ FIXED）
+                self.stick_fixed = not self.stick_fixed
+                self.sfx.append(C.SFX["cursor"])
             if decide and row == "story":           # 始める
                 self.start_t = C.TITLE_START
                 self.flash_t = 0
@@ -1889,7 +1893,6 @@ class Game:
         どの行も、題名と同じ中心（cx）に、中央ぞろえで出す（右の大きなタヌキ侍に、掛からない幅）。選んでいる行は、金色で、左右に印"""
         M = C.MENU
         gold, grey = (255, 236, 150), (176, 176, 190)
-        option = self.menu_page == "option"
 
         def text(s, x, y, color):
             edge = font.render(s, False, C.BLACK)
@@ -1897,13 +1900,10 @@ class Game:
                 screen.blit(edge, (x + dx, y + dy))
             screen.blit(font.render(s, False, color), (x, y))
 
-        if option:      # 画面の見出し
-            head = "- OPTION -"
-            text(head, M["cx"] - font.size(head)[0] // 2, M["y"] - M["head"], (214, 168, 72))
         rows = M["pages"][self.menu_page]
         gap = M["row"] if self.menu_page == "main" else M["row_option"]
         top = M["y"] - max(0, len(rows) - 4) * gap       # 行が多いページは、上へ伸ばす（画面の下に出ないように）
-        if self.menu_page in ("extra", "disco", "meisho", "jinbutsu"):
+        if self.menu_page in ("option", "extra", "disco", "meisho", "jinbutsu"):      # 画面の見出し（行の上端を基準にする。行が増えて上へ伸びても、重ならない）
             head = "- %s -" % M["label"][self.menu_page]
             text(head, M["cx"] - font.size(head)[0] // 2, top - M["head"], (214, 168, 72))
         for n, row in enumerate(rows):
@@ -1918,6 +1918,8 @@ class Game:
             if row == "level":
                 i = C.LEVEL_ORDER.index(self.level)
                 value = ("< " if i > 0 else "  ") + self.L["label"] + (" >" if i < len(C.LEVEL_ORDER) - 1 else "  ")
+            elif row == "stick":
+                value = "< FIXED  " if self.stick_fixed else "  FLOAT >"
             elif row in ("music", "sound"):
                 boxes = self.vol_bgm if row == "music" else self.vol_sfx
             lw = font.size(label)[0]
@@ -2241,6 +2243,7 @@ async def main():
                 await asyncio.sleep(0)
                 continue
         t_step = pygame.time.get_ticks()
+        touch.fixed = game.stick_fixed
         game.step(keys_to_input(pygame.key.get_pressed()) | pad.held() | touch.held(), pressed)
         perf_step += pygame.time.get_ticks() - t_step
         audio.set_gain(game.vol_bgm / C.MENU["steps"], game.vol_sfx / C.MENU["steps"])    # 音を鳴らす前に（変えた音量で、鳴るように）

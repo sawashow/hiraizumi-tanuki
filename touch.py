@@ -22,13 +22,17 @@ ACTIONS = ("throw", "attack", "jump")       # 右半分の帯（上から）
 class Stick:
     """移動のスティック（左半分の指1本）。触った所が中心。中心は、指が離れすぎると、ついてくる"""
 
-    def __init__(self, x, y, wh):
-        self.ox, self.oy = x, y
+    def __init__(self, x, y, wh, center=None):
+        self.fixed = center is not None      # 固定: 中心は、決まった位置のまま動かない（指が、その左右・下にあるかで、向きが決まる）
+        self.ox, self.oy = center if self.fixed else (x, y)
         self.x, self.y = x, y
         self.wh = wh
 
     def move(self, x, y):
         K, u = C.TOUCH, self.wh
+        if self.fixed:
+            self.x, self.y = x, y
+            return
         lim, vlim = u * K["stick_max"], u * K["stick_down"] * 1.5     # 縦は、しゃがむのに要る分は、残す
         self.x, self.y = x, y
         self.ox = min(max(self.ox, x - lim), x + lim)     # 離れすぎたら、中心が、指についてくる
@@ -52,6 +56,7 @@ class Stick:
 class Touch:
     def __init__(self):
         self.active = False     # 一度でも触ったら、目印を出す
+        self.fixed = False      # 真なら、左のスティックの中心を、決まった位置に固定する（OPTION の STICK）
         self.fingers = {}       # 指の番号 → Stick（移動）か、"jump" などの名前
 
     # --- 並び（窓の大きさから、毎回計算する） ---
@@ -62,6 +67,11 @@ class Touch:
         k = min((ww - 2 * side) / C.BASE_W, wh / C.BASE_H)
         w, h = round(C.BASE_W * k), round(C.BASE_H * k)
         return pygame.Rect((ww - w) // 2, (wh - h) // 2, w, h)
+
+    @staticmethod
+    def center(ww, wh):
+        """固定のスティックの中心（指を置いていないときの目印も、ここに出す）"""
+        return round(ww * C.TOUCH["hint_x"]), round(wh * C.TOUCH["fix_y"])
 
     @staticmethod
     def bands(wh):
@@ -99,7 +109,7 @@ class Touch:
         before = self.fingers.get(fid)
         if t == pygame.FINGERDOWN:
             if x < ww / 2:
-                self.fingers[fid] = Stick(x, y, wh)
+                self.fingers[fid] = Stick(x, y, wh, self.center(ww, wh) if self.fixed else None)
                 return set()
             now = self._action(x, y, ww, wh)
         elif t == pygame.FINGERMOTION:
@@ -146,7 +156,8 @@ class Touch:
         R = round(wh * K["ring"])
         if not sticks:          # 目印: 「ここに触って、動かす」
             # 画面の端ではなく、内側に出す（そこへ指を置くよう、誘う。端で操作すると、指が画面の外へ出て、移動が止まりやすい）
-            self._stick(window, round(ww * K["hint_x"]), round(wh * 0.62), R, set(), alpha=K["hint_alpha"])
+            hx, hy = self.center(ww, wh) if self.fixed else (round(ww * K["hint_x"]), round(wh * 0.62))
+            self._stick(window, hx, hy, R, set(), alpha=K["hint_alpha"])
         for f in sticks:
             self._stick(window, f.ox, f.oy, R, dirs, alpha=K["ring_alpha"], knob=(f.x, f.y))
         # 右の帯: 高さの帯ごとに、ボタン（親指の弧: 下ほど内側）

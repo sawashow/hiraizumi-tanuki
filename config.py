@@ -424,8 +424,9 @@ WATER_TICKS = 30      # 水面が、もう1コマに切り替わるまでのフ�
 #   coyote・jump_buffer＝タッチのときだけ、ジャンプを受け付ける時間を、長くする（COYOTE・JUMP_BUFFER の代わり）
 #   ring＝指の所に出す輪の半径／hint_x＝指を置いていないときの、左の目印の位置（窓の幅に対する割合。端ではなく内側へ、指を誘う）／ring_alpha・hint_alpha＝輪の濃さ（指を置いたとき・置いていないときの目印）／band_alpha＝押している帯の明るさ
 #   level＝タッチで遊ぶ人に、最初に選んでおく難しさ（スタート画面で、まだ難しさを変えていなければ。あとで自分で変えられる）
+#   fix_y＝「固定」のスティックの、中心の高さ（窓の高さに対する割合。横は hint_x。指がこの中心の左右・下にあるかで、向きを決める）
 #   arc＝右のボタンの、帯の真ん中からの横のずれ（帯の幅に掛ける。上から手裏剣・刀・ジャンプ。親指の弧に沿って、下ほど内側）／vibrate＝押したときの振動（ミリ秒。Android のみ）
-TOUCH = dict(side=0.17, cuts=(0.18, 0.42, 0.64), pause_r=0.045, stick_dead=0.03, stick_down=0.07, stick_max=0.04, ring=0.10, ring_alpha=150, hint_alpha=140, hint_x=0.20, band_alpha=40, arc=(0.12, 0.0, -0.12), vibrate=12, coyote=8, jump_buffer=12, level="easy",
+TOUCH = dict(side=0.17, cuts=(0.30, 0.52, 0.72), pause_r=0.045, stick_dead=0.03, stick_down=0.07, stick_max=0.04, ring=0.10, ring_alpha=150, hint_alpha=140, hint_x=0.20, band_alpha=40, arc=(0.0, 0.0, -0.12), fix_y=0.66, vibrate=12, coyote=8, jump_buffer=12, level="easy",
              color=(110, 110, 130), lit=(255, 236, 150), mark=(200, 200, 215))
 LOGO = dict(file="ponpoco_logo.png", bg=(255, 255, 255), fade=30, hold=120, after=50, width=0.35)   # after: ロゴが消えたあと、白いまま待つ（余韻）
 
@@ -453,12 +454,12 @@ DISCO = (("bgm_story.ogg", "Evening at the Border Post"), ("bgm_map.ogg", "Steps
          ("bgm_stage1.ogg", "Clash of the Iron Fan"), ("bgm_boss.ogg", "Crimson Temple Breach"), ("bgm_super.ogg", "Seven Blades High"),
          ("bgm_ending.ogg", "Sunset at the Temple Gate"))
 MENU = dict(cx=150, y=196, row=18, row_option=15, head=18, gap=10, steps=5,
-            pages=dict(main=("story", "option", "extra", "howto"), option=("level", "music", "sound", "back"),
+            pages=dict(main=("story", "option", "extra", "howto"), option=("level", "music", "sound", "stick", "back"),
                        extra=("meisho", "jinbutsu", "disco", "back"),
                        meisho=("m0", "m1", "m2", "m3", "back"),
                        jinbutsu=("p0", "p1", "p2", "p3", "back"),
                        disco=tuple("t%d" % i for i in range(len(DISCO))) + ("back",)),
-            label=dict(story="STORY", option="OPTION", extra="EXTRA", meisho="MEISHO", m0="MOTSUJI", m1="TAKADACHI", m2="TSUKIMIZAKA", m3="KONJIKIDO", jinbutsu="JINBUTSU", p0="YASUHIRA", p1="HIDEHIRA", p2="MOTOHIRA", p3="KIYOHIRA", disco="DISCOGRAPHY", howto="HOW TO PLAY", level="LEVEL", music="MUSIC", sound="SOUND", back="BACK",
+            label=dict(story="STORY", option="OPTION", extra="EXTRA", meisho="MEISHO", m0="MOTSUJI", m1="TAKADACHI", m2="TSUKIMIZAKA", m3="KONJIKIDO", jinbutsu="JINBUTSU", p0="YASUHIRA", p1="HIDEHIRA", p2="MOTOHIRA", p3="KIYOHIRA", disco="DISCOGRAPHY", howto="HOW TO PLAY", level="LEVEL", music="MUSIC", sound="SOUND", stick="STICK", back="BACK",
                        **{"t%d" % i: name for i, (_, name) in enumerate(DISCO)}))
 # 隠し部屋（stage.py の caves）: hits＝崩れるまでに斬る回数 / cool＝1回の振りで、何度も数えないための間 / wall＝入口の壁の厚み（刀が当たる所）
 #   crack＝ひびの色（細く。斬るたびに濃くなる）/ shine＝ひびの下に1ドットずらして引く、明るい縁（彫ったように見せる）/ lines＝ひびの線（x は壁の左端から、y は高さに対する割合）/ room・edge＝壊したあとの部屋の色と縁

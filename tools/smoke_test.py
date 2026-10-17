@@ -491,6 +491,20 @@ check("タッチ: 歩いている指を、下へ滑らせると、しゃがむ",
 _finger(pygame.FINGERUP, 270, 290, 2)
 check("タッチ: 指を離すと、方向も離す", _tc.held() == set())
 
+# 固定のスティック: 中心は決まった位置。指が、その左右・下にあるかで、向きが決まる（触った所は、関係ない）
+_tc = Touch()
+_tc.fixed = True
+_cx, _cy = Touch.center(*_sz)
+_finger(pygame.FINGERDOWN, _cx - 60, _cy, 7)
+check("タッチ（固定）: 中心の左に触ると、すぐ左へ歩く", _tc.held() == {"left"}, str(_tc.held()))
+_finger(pygame.FINGERMOTION, _cx + 60, _cy, 7)
+check("タッチ（固定）: 指を中心の右へ動かすと、右へ歩く。中心は、指についてこない", _tc.held() == {"right"} and _tc.fingers[7].ox == _cx, str(_tc.held()))
+_finger(pygame.FINGERMOTION, _cx, _cy + 80, 7)
+check("タッチ（固定）: 中心の下で、しゃがむ", _tc.held() == {"down"}, str(_tc.held()))
+_finger(pygame.FINGERMOTION, _cx, _cy, 7)
+check("タッチ（固定）: 中心に戻すと、止まる", _tc.held() == set(), str(_tc.held()))
+_finger(pygame.FINGERUP, _cx, _cy, 7)
+
 # 下＋ジャンプ: 浮き足場の上なら、すり抜けて降りる。地面の上なら、ふつうに跳ぶ
 p0 = OLD_PLATFORMS[0]
 g = fresh(px=(p0[0] + p0[1]) / 2)
@@ -1440,8 +1454,8 @@ check("もう一度決定すると、メニューに戻る（始まらない）"
 tap({"up"})
 tap({"up"})
 tap((), {"restart"})
-check("OPTION で決定すると、設定の画面へ移る（LEVEL / MUSIC / SOUND / BACK）",
-      g.menu_page == "option" and cur() == "level" and C.MENU["pages"]["option"] == ("level", "music", "sound", "back"))
+check("OPTION で決定すると、設定の画面へ移る（LEVEL / MUSIC / SOUND / STICK / BACK）",
+      g.menu_page == "option" and cur() == "level" and C.MENU["pages"]["option"] == ("level", "music", "sound", "stick", "back"))
 snap(g, "title option")
 tap({"right"})
 check("LEVEL で右を押すと、難しさが上がる（残機も、その難しさの数になる）", g.level == "hard" and g.lives == C.LEVELS["hard"]["lives"])
@@ -1466,6 +1480,13 @@ for _ in range(C.MENU["steps"] + 2):
 check("SOUND で左を押し続けると、効果音が消える（0 より下がらない）", g.vol_sfx == 0 and g.vol_bgm == C.MENU["steps"])
 snap(g, "title menu sound")
 g.vol_sfx = C.MENU["steps"]
+tap({"down"})
+check("STICK は、はじめ、触った所が中心（FLOAT）", cur() == "stick" and not g.stick_fixed)
+tap({"right"})
+check("STICK で右を押すと、固定（FIXED）になる", g.stick_fixed)
+tap((), {"restart"})
+check("STICK は、決定でも切り替わる（FLOAT へ戻る）", not g.stick_fixed and g.menu_page == "option")
+snap(g, "title menu stick")
 tap({"down"})
 tap((), {"restart"})
 check("BACK で決定すると、最初のメニューへ戻る（OPTION を選んだまま。始まらない）", g.menu_page == "main" and cur() == "option" and not g.start_t)
