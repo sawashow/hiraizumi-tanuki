@@ -95,7 +95,7 @@ Google Drive（s.sawada@ponpoco-works.com）に置いてあります。元絵を
 - エンディングの曲: 「Sunset at the Temple Gate」（`assets/audio/bgm_ending.ogg`）
 
 効果音は、`tools/make_sfx.py` で、計算して作っています。
-ただし、ロゴ画面の音（`assets/audio/sfx_logo.ogg`）は、「Springin’ Sound Stock」の素材「チェレスタグリッサンド1」を、切り出して使っています。
+ただし、ロゴ画面の音（`assets/audio/sfx_logo.ogg`）は、「Springin’ Sound Stock」の素材「短い音-プイッッッ」を、加工して使っています。
 効果音：Springin’ Sound Stock（https://www.springin.org/sound-stock/）
 
 「無念…」などの文字の絵は、ドット風フォント DotGothic16（SIL Open Font License 1.1）で書き出したものです。
