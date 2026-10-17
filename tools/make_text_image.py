@@ -12,11 +12,13 @@ from PIL import Image, ImageDraw, ImageFont
 
 def main(font_path, text, out, size=16, scale=3):
     font = ImageFont.truetype(font_path, size)
-    l, t, r, b = font.getbbox(text)
-    img = Image.new("L", (r - l + 4, b - t + 4), 0)
+    # 大きさは、実際に書いた字から測る（getbbox は、アンチエイリアスなしで書いたときより狭いことがあり、最後の字が切れる）
+    img = Image.new("L", (size * (len(text) + 2), size * 3), 0)
     d = ImageDraw.Draw(img)
     d.fontmode = "1"   # アンチエイリアスなし（ドットをそのまま出す）
-    d.text((2 - l, 2 - t), text, font=font, fill=255)
+    d.text((size, size), text, font=font, fill=255)
+    l, t, r, b = img.getbbox()
+    img = img.crop((l - 2, t - 2, r + 2, b + 2))
     mask = img.point(lambda v: 255 if v >= 128 else 0)
     w, h = mask.size
     big = mask.resize((w * scale, h * scale), Image.NEAREST)
