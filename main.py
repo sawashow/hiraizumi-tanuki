@@ -51,6 +51,8 @@ class Game:
         self.thanks = False          # いま、姫を助ける場面（THANK YOU TANUKI!）を出している
         self.thanks_t = 0
         self.roll = False            # いま、エンドロール（平泉の道を歩く場面）を出している
+        self.summary = False         # いま、エンドロールのあとの総括（面ごとのタイムと、通しのタイム）を出している
+        self.summary_t = 0
         self.ending_screen = False   # いま、エンディング画面を出している（いまは使っていない。エンドロールのあとは、ロゴ画面へ戻る）
         self.logo_again = False      # 真なら、メインループが、ロゴ画面を出し直す（エンドロールのあと）
         self.ending_t = 0
@@ -117,6 +119,9 @@ class Game:
         self._set_stage(stage_i)
         self.lives = self.L["lives"]
         self.score = 0
+        self.run_times = []         # 今回の遊びで、クリアした面のタイム（フレーム数。面の順）
+        self.total_rec = None       # 4面を通して遊んだとき: 通しの記録 (いまのベスト, 今回で更新したか)
+        self.summary = False
         self._begin_stage()
 
     def advance(self):
@@ -287,7 +292,7 @@ class Game:
     @property
     def can_pause(self):
         """ポーズできるのは、面を遊んでいる間だけ（スタート画面・語り・地図・寸劇・結果・やられた画面では、できない）"""
-        return not (self.title or self.story or self.map_on or self.thanks or self.roll or self.ending_screen or self.cleared
+        return not (self.title or self.story or self.map_on or self.thanks or self.roll or self.summary or self.ending_screen or self.cleared
                     or self.ending or self.player.hp <= 0)
 
     def _step_pause(self, held, pressed):
@@ -365,6 +370,9 @@ class Game:
                 self.ending_screen = False
                 self.reset()
                 self._enter_title(self.use_title)
+            return
+        if self.summary:    # エンドロールのあとの総括
+            self._step_summary(set(pressed))
             return
         if self.roll:       # エンドロール
             self._step_roll(set(pressed))
@@ -882,7 +890,7 @@ class Game:
             p.update({"right"}, self.stage.width + 120, self.terrain)
             if p.px - self.cam_x >= C.BASE_W + E["exit"]:
                 self.cleared = True
-                self.rec = records.submit(self.level, self.stage.name, self.frames)     # ベストと比べて、速ければ残す（難しさごと・面ごと）
+                self._record_clear()
                 self.sfx.append(C.SFX["clear"])
         else:
             p.update(set(), self.stage.width, self.terrain)
@@ -1013,7 +1021,7 @@ class Game:
         始まりの語りの間は、語りの曲（無ければ、無音）。ゲームが始まると、1面の曲。
         ボスが降ってくるまでは静かにして、着地したときに、ボスの曲を始める"""
         story = C.BGM_STORY if self.story_bgm else None
-        if self.ending_screen or self.thanks or self.roll:
+        if self.ending_screen or self.thanks or self.roll or self.summary:
             return self._song(C.BGM_ENDING) or story
         if self.title:
             return self.disco_song or self._song(C.BGM_TITLE)
@@ -1044,6 +1052,9 @@ class Game:
         self._font = font
         if self.thanks:
             self._draw_thanks(screen, font)
+            return
+        if self.summary:
+            self._draw_summary(screen, font)
             return
         if self.roll:
             self._draw_roll(screen)
@@ -1627,11 +1638,61 @@ class Game:
         return self.roll_t * R["scroll"] >= h + R["window"][1] - R["window"][0]
 
     def _end_roll(self):
-        # エンドロールが終わったら、リセットして、起動したときと同じ、ロゴ画面からやり直す（絵は出さない）
+        # エンドロールが終わったら: 4面を通して遊んだ回は、総括（タイム）を出す。そのあと（通して遊んでいないときは、すぐ）ロゴ画面へ
         self.roll = False
+        if self.total_rec:
+            self.summary, self.summary_t = True, 0
+        else:
+            self._back_to_logo()
+
+    def _back_to_logo(self):
+        """リセットして、起動したときと同じ、ロゴ画面からやり直す（絵は出さない）"""
         self.reset()
         self._enter_title(self.use_title)
         self.logo_again = True
+
+    def _record_clear(self):
+        """面をクリアしたとき: タイムをベストと比べて、速ければ残す（難しさごと・面ごと）。最後の面なら、通しのタイムも"""
+        self.rec = records.submit(self.level, self.stage.name, self.frames)
+        self.run_times.append(self.frames)
+        if self.stage_i == len(STAGES) - 1 and len(self.run_times) == len(STAGES):      # 最初の面から通して遊んだ回だけ
+            self.total_rec = records.submit(self.level, records.TOTAL, sum(self.run_times))
+
+    def _step_summary(self, pressed):
+        self.summary_t += 1
+        if {"restart", "attack", "jump"} & pressed and self.summary_t >= C.SUMMARY["wait"]:
+            self.summary = False
+            self._back_to_logo()
+
+    def _draw_summary(self, screen, font):
+        """エンドロールのあとの総括: 面ごとのタイム → 通しのタイムとベスト。1行ずつ、順に出る"""
+        S, t, cx = C.SUMMARY, self.summary_t, C.BASE_W // 2
+        gold = (255, 236, 150)
+        screen.fill((11, 13, 31))
+        best, new = self.total_rec
+        def put(text, x, y, color=C.TEXT, right=False):
+            img = font.render(text, False, color)
+            screen.blit(img, (x - img.get_width() if right else x, y))
+        put("RESULT", cx - font.size("RESULT")[0] // 2, 28, gold)
+        put("LEVEL  " + self.L["label"], cx - font.size("LEVEL  " + self.L["label"])[0] // 2, 46, (176, 176, 190))
+        left, right = cx - 120, cx + 120
+        for i, frames in enumerate(self.run_times):      # 面ごと
+            if t >= S["row"] * (i + 1):
+                put(C.MENU["label"]["m%d" % i], left, 72 + i * 18)
+                put(records.fmt(frames), right, 72 + i * 18, right=True)
+        y = 72 + len(self.run_times) * 18 + 6
+        n = len(self.run_times) + 1
+        if t >= S["row"] * n:
+            pygame.draw.line(screen, (110, 110, 130), (left, y - 3), (right, y - 3))
+            put("TOTAL", left, y, gold)
+            put(records.fmt(sum(self.run_times)), right, y, gold, right=True)
+        if t >= S["row"] * (n + 1):
+            put("BEST", left, y + 18)
+            put(records.fmt(best), right, y + 18, right=True)
+            if new and (t // 20) % 2 == 0:
+                put("NEW RECORD!", cx - font.size("NEW RECORD!")[0] // 2, y + 40, gold)
+        if t >= S["wait"] and (t // 30) % 2 == 0:
+            put("PRESS ENTER", cx - font.size("PRESS ENTER")[0] // 2, y + 66)
 
     def _step_roll(self, pressed):
         R = C.ROLL

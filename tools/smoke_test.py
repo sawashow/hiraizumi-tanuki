@@ -521,6 +521,40 @@ records.PATH = os.path.join(os.path.dirname(_pth), "no_dir", "x.json")      # �
 check("記録: 保存できなくても、止まらない", records.submit("easy", "別の面", 100) == (100, True))
 records.PATH = _pth
 
+# 通し: 面をクリアするたびにタイムを集め、最後の面で、通しの記録を残す。エンドロールのあとに、総括を出す
+g = Game(title=True)
+g.title = False
+n_st = len(STAGES)
+for _i in range(n_st):
+    g._set_stage(_i)
+    g.frames = 3000 + 600 * _i
+    g._record_clear()
+_tot = sum(3000 + 600 * _i for _i in range(n_st))
+check("通し: 最後の面のクリアで、通しの記録が残る（はじめは、今回がベスト）", g.total_rec == (_tot, True) and records.best(g.level, records.TOTAL) == _tot and len(g.run_times) == n_st, str(g.total_rec))
+g._start_roll()
+g._end_roll()
+check("通し: エンドロールが終わると、総括が出る（ロゴ画面は、そのあと）", g.summary and not g.roll and not g.logo_again)
+snap(g, "summary")
+run(g, 1, (), {"restart"})
+check("通し: 総括は、出てすぐには、Enterを受け付けない", g.summary)
+run(g, C.SUMMARY["wait"])
+snap(g, "summary full")
+run(g, 1, (), {"restart"})
+check("通し: 総括のあと、ロゴ画面へ（記録の集計は、空に戻る）", not g.summary and g.title and g.logo_again and g.run_times == [] and g.total_rec is None)
+g = Game(title=True)
+g.title = False
+g._set_stage(1)
+g.frames = 1000
+g._record_clear()
+check("通し: 途中の面から始めた回は、通しの記録にならない", g.total_rec is None)
+g = Game(title=True)
+g.title = False
+for _i in range(n_st):
+    g._set_stage(_i)
+    g.frames = 9000 + 600 * _i
+    g._record_clear()
+check("通し: 遅いタイムでは、ベストは変わらない（NEW RECORD にならない）", g.total_rec == (_tot, False), str(g.total_rec))
+
 # 下＋ジャンプ: 浮き足場の上なら、すり抜けて降りる。地面の上なら、ふつうに跳ぶ
 p0 = OLD_PLATFORMS[0]
 g = fresh(px=(p0[0] + p0[1]) / 2)

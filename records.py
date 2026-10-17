@@ -8,6 +8,7 @@ import os
 import sys
 
 KEY = "hiraizumi_records_v1"
+TOTAL = "通し"       # 4面を続けて遊んだ、合計タイムの記録の名前（面の名前と同じように、level の下に残す）
 PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "records.json")     # PC 版の保存先（.gitignore）
 
 
