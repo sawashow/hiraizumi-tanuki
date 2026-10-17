@@ -599,10 +599,14 @@ ZONES2 = (
 # 1UP（面に1つ）: 築山の塔のてっぺん（強化の葉）から、右の空中へ跳ぶ寄り道。下の地面からは、高すぎて届かない
 PLATFORMS2 += ((2640, 2680, 70, "築山: 塔のてっぺんから、右へ跳んで乗る台。1UP の寄り道（下からは届かない）"),)
 ITEMS2 += (("oneup", 2660, 52),)
-STAGE2 = StageDef("毛越寺", 5000, GROUND2, PLATFORMS2, thin_dango(ITEMS2, PLATFORMS2), (2170, T - 32), SPAWNS2, C.BGM_STAGE1, C.BGM_BOSS,
+# 隠し部屋: 築山の塔（2520〜2600）の根元。地面から、塔の左の壁を斬って崩す。最初の面で、隠し部屋があることを教える
+# （中身は、おにぎり・三方手裏剣・団子2つ。団子は、間引き（thin_dango）を通さずに足す）
+CAVES2 = ((2520, 2592, T - 48, T, "築山: 塔の根元の左の壁を、斬って崩す隠し部屋。最初の面で、隠し部屋を教える"),)
+CAVE_ITEMS2 = (("onigiri", 2532, T - 14), ("triple", 2548, T - 14), ("dango", 2566, T - 14), ("dango", 2582, T - 14))
+STAGE2 = StageDef("毛越寺", 5000, GROUND2, PLATFORMS2, thin_dango(ITEMS2, PLATFORMS2) + CAVE_ITEMS2, (2170, T - 32), SPAWNS2, C.BGM_STAGE1, C.BGM_BOSS,
                   lanterns=(("triple", 300), ("onigiri", 2310), ("onigiri", 4370)),   # 石灯籠: 入口（強化）・中間地点の先（回復）・ボスの前（回復）
                   sky="stage2/bg_sky.png", mid="stage2/bg_mid.png", tiles="stage2/",
-                  number=1, stele_x=130, zones=ZONES2, thought=("wanko",), movers=MOVERS2,
+                  number=1, stele_x=130, zones=ZONES2, thought=("wanko",), movers=MOVERS2, caves=CAVES2,
                   boss_hp=0.8)   # 最初の面（教える面）: ボスは、体力を8割に   # ボスは、1面の泰衡（遊ぶ順で決まる）。絵が無いあいだは、1面の絵で代わりにする
 # ---------------------------------------------------------------- 2面（高館）
 # 義経堂のある高台。北上川と衣川を見下ろす崖の道。夏の昼。高低差が大きく、遠くから撃たれる面（敵の絵・弓兵は、まだ無いので、いまは既存の敵）
