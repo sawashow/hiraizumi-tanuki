@@ -171,8 +171,7 @@ class Game:
 
     def _step_map(self, pressed):
         self.map_t += 1
-        walk = math.ceil(self.map_len / C.MAP_WALK_SPEED)
-        if (self.map_t >= C.MAP_SKIP_WAIT and {"restart", "attack", "jump"} & pressed) or self.map_t >= C.MAP_WAIT + walk + C.MAP_HOLD:
+        if self.map_t >= C.MAP_SKIP_WAIT and {"restart", "attack", "jump"} & pressed:     # 押すまで待つ（歩いている途中で押すと、飛ばせる）
             self.map_on = False
 
     def _begin_stage(self):
@@ -1838,6 +1837,9 @@ class Game:
             screen.blit(strip, (0, by))
             label.set_alpha(int(255 * u))
             screen.blit(label, ((C.BASE_W - label.get_width()) // 2, by + 5))
+            if u >= 1 and (self.map_t // 30) % 2 == 0:      # 着いたら、「PRESS START」が点滅（押すまで待つ）
+                hint = self.a.title_prompt
+                screen.blit(hint, ((C.BASE_W - hint.get_width()) // 2, by - hint.get_height() - 4))
         if self.map_t < 16:      # 出だしは、暗い画面から、すっと明るくなる
             fade = pygame.Surface((C.BASE_W, C.BASE_H))
             fade.set_alpha(255 - self.map_t * 16)
