@@ -223,7 +223,7 @@ CLEAR_COUNT = 60                # SCORE が 0 から最終値まで増える長�
 ONLINE = dict(url="https://script.google.com/macros/s/AKfycbywGsCGq8k-gIqMnEdnqAeI0wDOPlsDbPTMGaTjxVz1ropGrz_K517NyXV2nE0-_W8D5Q/exec")    # 順位表のサーバー（server/gas。ブラウザ版だけ）。空にすると、順位表は使わない
 # 順位表への送信が断られたとき、画面に出す理由（サーバーの返事の error → 文字）。知らない理由は、FAILED
 SEND_ERRORS = {"too fast": "TOO FAST", "no token": "NO TOKEN", "frames out of range": "OUT OF RANGE", "network": "NO NETWORK", "bad request": "SERVER BUSY", "bad name": "BAD NAME"}
-SUMMARY = dict(row=20, wait=170, chars="ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", send_wait=900)   # エンドロールのあとの総括: row＝次の行が出るまでのフレーム数 / wait＝操作を受け付けるまで / chars＝イニシャルに使える文字 / send_wait＝送ったあと、返事を待つ長さ
+SUMMARY = dict(row=20, wait=170, chars="ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", send_wait=900, repeat_at=18, repeat_every=5)   # エンドロールのあとの総括: row＝次の行が出るまでのフレーム数 / wait＝操作を受け付けるまで / chars＝イニシャルに使える文字 / send_wait＝送ったあと、返事を待つ長さ / repeat_at・repeat_every＝上下を押し続けたとき、連続で進み始めるまでと、進む間隔（フレーム）
 CLEAR_WAIT = CLEAR_SCORE_AT + CLEAR_COUNT + 80   # クリアしてから、Enter を受け付けるまでのフレーム数（FOOD・TIME・BEST が出たあと）
 # ボスを倒したあとの寸劇: ボスが決まった場所へ吹っ飛ぶ → タヌキ侍が決まった場所へ歩く → 間 → 倒れたボスがひとこと → 光になって消える → タヌキ侍が返す → 右へ駆け抜ける → 結果
 #   skip: せりふを、キーで送れるようになるまでのフレーム数（字が出ている途中なら、まず全部出す）。type: 字を1文字出すフレーム数。exit: 画面の外へ、どこまで走るか

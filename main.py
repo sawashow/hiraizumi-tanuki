@@ -56,6 +56,8 @@ class Game:
         self.summary_t = 0
         self.sum_mode = "done"      # 総括の状態: name（イニシャルを入れている）/ send（送って、返事を待っている）/ done（終わり。Enter でロゴ画面へ）
         self.sum_msg = ""           # 送った結果の文字（RANK 3 など）
+        self.touch_on = False       # スマホのタッチで遊んでいるか（メインループが、毎回入れる。イニシャルを、キーボードで入れるため）
+        self._ud_hold = 0           # 上下を押し続けているフレーム数（イニシャルの文字を、連続で進める）
         self.name_chars, self.name_i, self.send_t = list("AAA"), 0, 0     # 入れているイニシャルと、選んでいる位置（0〜2 = 文字 / 3 = OK / 4 = SKIP）
         self.ending_screen = False   # いま、エンディング画面を出している（いまは使っていない。エンドロールのあとは、ロゴ画面へ戻る）
         self.logo_again = False      # 真なら、メインループが、ロゴ画面を出し直す（エンドロールのあと）
@@ -1714,11 +1716,20 @@ class Game:
         lr = ("right" in held) - ("left" in held)
         ud = ("down" in held) - ("up" in held)
         step_lr, step_ud = (lr if lr != self._lr else 0), (ud if ud != self._ud else 0)     # 押した瞬間だけ
+        self._ud_hold = self._ud_hold + 1 if ud and ud == self._ud else 0
+        if self._ud_hold >= S["repeat_at"] and (self._ud_hold - S["repeat_at"]) % S["repeat_every"] == 0:
+            step_ud = ud        # 押し続けると、文字が連続で進む
         self._lr, self._ud = lr, ud
         decide = bool({"restart", "attack"} & pressed) or ("jump" in pressed and "up" not in held)
         if self.summary_t < S["wait"]:
             return
         if self.sum_mode == "name":     # イニシャル: 上下で文字、左右で位置。決定で、次へ（OK で送る・SKIP でやめる）
+            if decide and self.touch_on and self.name_i < 3:       # スマホ: ブラウザの入力欄（キーボード）で、3文字を打つ
+                typed = "".join(c for c in (online.ask_name("".join(self.name_chars)) or "").upper() if c in S["chars"])[:3]
+                if len(typed) == 3:
+                    self.name_chars, self.name_i = list(typed), 3
+                    self.sfx.append(C.SFX["cursor"])
+                return
             if step_ud and self.name_i < 3:
                 chars = S["chars"]
                 c = self.name_chars[self.name_i]
@@ -1802,7 +1813,8 @@ class Game:
                     put(label, left + 56 + 3 * 18 + 12 + (k - 3) * 36, ty, gold if self.name_i == k else (176, 176, 190))
                 if self.sum_msg:
                     put(self.sum_msg, right, ty + 18, (255, 150, 150), right=True)
-                put("UP DOWN: LETTER   ENTER: NEXT", cx - font.size("UP DOWN: LETTER   ENTER: NEXT")[0] // 2, ty + 36, (176, 176, 190))
+                hint = "TAP JUMP: TYPE NAME   (OK: SEND)" if self.touch_on else "UP DOWN: LETTER   ENTER: NEXT"
+                put(hint, cx - font.size(hint)[0] // 2, ty + 36, (176, 176, 190))
             elif self.sum_mode == "send":
                 put("SENDING...", cx - font.size("SENDING...")[0] // 2, ty, gold)
             else:
@@ -2480,6 +2492,7 @@ async def main():
                 continue
         t_step = pygame.time.get_ticks()
         touch.fixed = game.stick_fixed
+        game.touch_on = touch.active
         game.step(keys_to_input(pygame.key.get_pressed()) | pad.held() | touch.held(), pressed)
         perf_step += pygame.time.get_ticks() - t_step
         audio.set_gain(game.vol_bgm / C.MENU["steps"], game.vol_sfx / C.MENU["steps"])    # 音を鳴らす前に（変えた音量で、鳴るように）

@@ -220,6 +220,11 @@ window.hzSubmit = async function (url, token, level, name, frames) {
     HZ.submit = "";
     HZ.submit = await hzPost(url, { action: "submit", token: token, level: level, name: name, frames: frames });
 };
+// スマホ用: ブラウザの入力欄（キーボード）で、イニシャルを入れてもらう。結果は HZ.name（やめたときは、空）
+window.hzAskName = function (current) {
+    const v = window.prompt("INITIALS (3 LETTERS / NUMBERS)", current);
+    HZ.name = v === null ? "" : v;
+};
 window.hzRanking = async function (url, level) {
     HZ.rank[level] = "";
     HZ.rank[level] = await hzFetch(url + "?action=ranking&level=" + encodeURIComponent(level));
