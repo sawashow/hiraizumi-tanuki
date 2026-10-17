@@ -80,10 +80,10 @@ class Game:
         self.start_t = 0         # 決定してから、始まるまでの残りフレーム
         self.menu_on = False     # スタート画面で、メニューを開いている
         self.menu_i = 0          # 選んでいる項目
-        self.menu_page = "main"  # メニューの画面（main = STORY・OPTION・EXTRA・HOW TO PLAY / option = 難しさ・音量 / extra = 名所・曲 / meisho = 名所 / disco = 曲の一覧）
+        self.menu_page = "main"  # メニューの画面（main = STORY・OPTION・EXTRA・HOW TO PLAY / option = 難しさ・音量 / extra = 名所・人物・曲 / meisho = 名所 / jinbutsu = 人物 / disco = 曲の一覧）
         self.disco_song = None   # ディスコグラフィで、いま鳴らしている曲のファイル名
         self.howto = False       # 操作説明を出している
-        self.meisho = None       # 名所の説明を出している面の番号（0〜。出していなければ None）
+        self.meisho = None       # 出している、名所・人物の説明の絵（出していなければ None）
         self._fade_cache = {}    # 崖の縁の、中景の入れ替えに使う、濃さの帯（幅ごとに作る）
         self._roll_fade = None   # エンドロールの、左の枠の右の端を暗くぼかす帯
         self.story = False       # いま、始まりの語りを流している
@@ -497,7 +497,7 @@ class Game:
         ud = ("down" in held) - ("up" in held)
         step_lr, step_ud = (lr if lr != self._lr else 0), (ud if ud != self._ud else 0)   # 押した瞬間だけ
         self._lr, self._ud = lr, ud
-        if self.howto or self.meisho is not None:      # 操作説明・名所の説明: 決定で、メニューに戻る
+        if self.howto or self.meisho is not None:      # 操作説明・名所や人物の説明: 決定で、メニューに戻る
             if decide:
                 self.howto, self.meisho = False, None
                 self.sfx.append(C.SFX["decide"])
@@ -534,11 +534,12 @@ class Game:
             if decide and row == "option":
                 self.menu_page, self.menu_i = "option", 0
                 self.sfx.append(C.SFX["decide"])
-            elif decide and row in ("extra", "disco", "meisho"):
+            elif decide and row in ("extra", "disco", "meisho", "jinbutsu"):
                 self.menu_page, self.menu_i = row, 0
                 self.sfx.append(C.SFX["decide"])
-            elif decide and self.menu_page == "meisho" and row != "back" and int(row[1:]) < len(self.a.meisho):    # 名所を選んで決定: 説明を出す
-                self.meisho = int(row[1:])
+            elif (decide and self.menu_page in ("meisho", "jinbutsu") and row != "back"
+                  and int(row[1:]) < len(self.a.meisho if self.menu_page == "meisho" else self.a.jinbutsu)):    # 名所・人物を選んで決定: 説明を出す
+                self.meisho = (self.a.meisho if self.menu_page == "meisho" else self.a.jinbutsu)[int(row[1:])]
                 self.sfx.append(C.SFX["decide"])
                 return
             elif decide and self.menu_page == "disco" and row != "back":     # 曲を選んで決定: その曲を鳴らす（もう一度で、止める）
@@ -546,7 +547,7 @@ class Game:
                 self.disco_song = None if self.disco_song == song else song
             elif decide and row == "back":
                 # 戻る先: 名所・曲の一覧は EXTRA へ、それ以外は最初のメニューへ（来た項目を選んだまま）
-                came, page = self.menu_page, "extra" if self.menu_page in ("disco", "meisho") else "main"
+                came, page = self.menu_page, "extra" if self.menu_page in ("disco", "meisho", "jinbutsu") else "main"
                 self.menu_page, self.menu_i, self.disco_song = page, C.MENU["pages"][page].index(came), None
                 self.sfx.append(C.SFX["decide"])
             elif decide and row == "howto" and self.a.howto:
@@ -1873,7 +1874,7 @@ class Game:
             img = self.a.howto
             screen.blit(img, ((C.BASE_W - img.get_width()) // 2, (C.BASE_H - img.get_height()) // 2))
         elif self.meisho is not None:
-            img = self.a.meisho[self.meisho]
+            img = self.meisho
             screen.blit(img, ((C.BASE_W - img.get_width()) // 2, (C.BASE_H - img.get_height()) // 2))
         elif self.menu_on and font:
             self._draw_menu(screen, font)
@@ -1900,7 +1901,7 @@ class Game:
         rows = M["pages"][self.menu_page]
         gap = M["row"] if self.menu_page == "main" else M["row_option"]
         top = M["y"] - max(0, len(rows) - 4) * gap       # 行が多いページは、上へ伸ばす（画面の下に出ないように）
-        if self.menu_page in ("extra", "disco", "meisho"):
+        if self.menu_page in ("extra", "disco", "meisho", "jinbutsu"):
             head = "- %s -" % M["label"][self.menu_page]
             text(head, M["cx"] - font.size(head)[0] // 2, top - M["head"], (214, 168, 72))
         for n, row in enumerate(rows):
