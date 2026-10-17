@@ -615,6 +615,40 @@ run(g, C.SUMMARY["wait"])
 for _ in range(4):
     run(g, 1, (), {"restart"})
 check("送信: 送れない（合図が無いなど）ときは、OFFLINE を出して、続けられる", g.sum_mode == "done" and g.sum_msg == "OFFLINE", g.sum_msg)
+# スマホ: イニシャルを、キーボード（入力欄）で入れる。PC・コントローラ: 上下の長押しで、文字が連続で進む
+_typed = ["tnk"]
+_real_ask = online.ask_name
+online.ask_name = lambda cur: _typed[0]
+online.enabled = lambda url: True
+g = Game(title=True)
+g.title = False
+g.run_times, g.total_rec = [3000, 3100, 3200, 3300], (12600, True)
+g._begin_summary()
+g.touch_on = True
+run(g, C.SUMMARY["wait"])
+run(g, 1, (), {"restart"})
+check("スマホ: 決定で、入力欄が開き、小文字でも、3文字がそのまま入る（OK の位置へ進む）", g.name_chars == list("TNK") and g.name_i == 3, "".join(g.name_chars))
+_typed[0] = "a!"
+g.name_i = 0
+run(g, 1, (), {"restart"})
+check("スマホ: 3文字にならない入力（短い・記号）は、無視する", g.name_chars == list("TNK") and g.name_i == 0, "".join(g.name_chars))
+_typed[0] = "いろは"
+run(g, 1, (), {"restart"})
+check("スマホ: 日本語の入力は、無視する", g.name_chars == list("TNK"))
+_typed[0] = None
+run(g, 1, (), {"restart"})
+check("スマホ: 入力をやめても（None）、いまの文字のまま", g.name_chars == list("TNK") and g.sum_mode == "name")
+online.ask_name = _real_ask
+records.set_name("AAA")
+g = Game(title=True)
+g.title = False
+g.run_times, g.total_rec = [3000, 3100, 3200, 3300], (12600, True)
+g._begin_summary()
+run(g, C.SUMMARY["wait"])
+run(g, 1, {"up"})
+check("イニシャル: 押した瞬間は、1文字だけ進む", g.name_chars[0] == "B")
+run(g, C.SUMMARY["repeat_at"] + C.SUMMARY["repeat_every"] * 3, {"up"})
+check("イニシャル: 上を押し続けると、文字が連続で進む", g.name_chars[0] != "B" and g.name_chars[0] != "C", g.name_chars[0])
 online.enabled, online.submit, online.submit_result = _real
 records.set_name("AAA")
 g = Game(title=True)

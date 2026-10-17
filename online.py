@@ -64,6 +64,17 @@ def submit_result():
         return None
 
 
+def ask_name(current):
+    """スマホ用: ブラウザの入力欄で、イニシャルを入れてもらう。入れた文字をそのまま返す（やめたとき・できないときは None）。形を整えるのは、呼んだ側"""
+    if sys.platform != "emscripten":
+        return None
+    try:
+        _win().hzAskName(current)
+        return str(_win().HZ.name)
+    except Exception:
+        return None
+
+
 def fetch_ranking(url, level):
     if enabled(url):
         _call("hzRanking", url, level)
