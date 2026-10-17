@@ -1,5 +1,6 @@
 <!doctype html>
-<!-- Day8 成果発表の1枚スライド。画像は相対パス（../assets/images/）。このファイルは、リポジトリの中で開くこと。
+<!-- Day8 成果発表の1枚スライド。画像は相対パス（slide_parade.png と ../assets/images/）。このファイルは、リポジトリの中で開くこと。
+     キャラクターの行列の絵は、tools/make_slide_parade.py で作る。
      映すときは、ブラウザで開いて F11（全画面）。PDF は Ctrl+P（横向き・余白なし・背景のグラフィックを印刷）。
      文字は、いちばん小さいものでも 28pt（約38px）以上 -->
 <html lang="ja">
@@ -11,50 +12,38 @@
   @page { size: 1280px 720px; margin: 0; }
   * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   :root {
-    --night: #0b0e1f;          /* 平泉の夜 */
-    --ink: #f3ead6;            /* 文字（和紙の白） */
-    --gold: #e9b949;           /* 金色堂の金（強い色は、これだけ） */
+    --paper: #fbf7ee;          /* 和紙の白 */
+    --ink: #231e19;            /* 墨 */
+    --shu: #c33f26;            /* 朱（強い色は、これだけ。ロゴの赤・鳥居の朱に合わせる） */
     --mincho: "Yu Mincho", "YuMincho", "Hiragino Mincho ProN", "Noto Serif JP", serif;
     --gothic: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", "Meiryo", sans-serif;
   }
-  html, body { margin: 0; background: #1b1d26; }
+  html, body { margin: 0; background: #d8d4cb; }
   body { font-family: var(--gothic); color: var(--ink); }
   .deck { max-width: 1280px; margin: 0 auto; padding: 24px 0; }
-  .slide {
-    position: relative; width: 100%; max-width: 1280px; aspect-ratio: 16 / 9; overflow: hidden;
-    background: var(--night) url("../assets/images/stage_map.png") right center / auto 100% no-repeat;
-    image-rendering: pixelated;
+  .slide { position: relative; width: 100%; max-width: 1280px; aspect-ratio: 16 / 9; overflow: hidden; background: var(--paper); }
+  .top { position: absolute; left: 64px; top: 30px; right: 200px; }
+  .row { display: grid; grid-template-columns: 112px 1fr; align-items: baseline; }
+  .row + .row { margin-top: 10px; }
+  .label { font-family: var(--mincho); font-size: 38px; font-weight: 700; color: var(--shu); margin: 0; letter-spacing: 0.08em; }
+  .who { font-size: 44px; font-weight: 700; margin: 0; }
+  .scene { font-size: 40px; line-height: 1.32; margin: 0; }
+  /* キャラクターの行列（右へ行進。先頭のタヌキ侍が、横断歩道を渡る） */
+  .parade { position: absolute; left: 64px; top: 198px; width: 1152px; height: 252px; image-rendering: pixelated; }
+  .bottom { position: absolute; left: 64px; right: 64px; top: 462px; }
+  .logo { display: block; height: 96px; image-rendering: pixelated; margin-left: -4px; }
+  .catch { font-family: var(--mincho); font-size: 40px; font-weight: 700; line-height: 1.32; margin: 4px 0 0; }
+  .catch em { font-style: normal; color: var(--shu); }
+  .by { position: absolute; right: 64px; bottom: 36px; margin: 0; font-size: 38px; }
+  /* 右上: 作者の願い。朱印のように、縦書きの「交通安全」 */
+  .wish { position: absolute; right: 56px; top: 30px; display: flex; gap: 10px; align-items: flex-start; }
+  .wish .note { writing-mode: vertical-rl; font-family: var(--mincho); font-size: 38px; font-weight: 700; margin: 0; letter-spacing: 0.08em; }
+  .wish .seal {
+    writing-mode: vertical-rl; font-family: var(--mincho); font-size: 54px; font-weight: 800; color: var(--shu);
+    border: 4px solid var(--shu); padding: 10px 4px; margin: 0; letter-spacing: 0.06em; line-height: 1;
   }
-  /* 文字を置く左側だけ、夜の色で落とす（右は、地図の道筋を見せる） */
-  .slide::before {
-    content: ""; position: absolute; inset: 0;
-    background: linear-gradient(90deg, rgba(11, 14, 31, 0.96) 0%, rgba(11, 14, 31, 0.9) 58%, rgba(11, 14, 31, 0.4) 82%, rgba(11, 14, 31, 0.05) 100%);
-  }
-  .body { position: relative; padding: 30px 64px 0; width: 1080px; }
-  .label { font-family: var(--mincho); font-size: 38px; font-weight: 700; color: var(--gold); margin: 0; letter-spacing: 0.12em; }
-  .who { font-size: 44px; font-weight: 700; margin: 0 0 12px; }
-  .scene { font-size: 40px; line-height: 1.36; margin: 0; }
-  .app { margin-top: 18px; }
-  .logo { display: block; height: 124px; image-rendering: pixelated; margin-left: -4px; }
-  .catch { font-family: var(--mincho); font-size: 40px; font-weight: 700; line-height: 1.36; margin: 6px 0 0; }
-  .catch em { font-style: normal; color: var(--gold); }
-  /* いちばん下: 横断歩道。手を挙げたタヌキ侍が、渡っている */
-  .road {
-    position: absolute; left: 0; right: 0; bottom: 0; height: 104px;
-    background: #23262f; border-top: 3px solid #3a3e4a;
-    display: flex; align-items: center; padding: 0 64px 0 260px; gap: 28px;
-  }
-  .road::before {    /* 横断歩道の白線 */
-    content: ""; position: absolute; left: 64px; top: 10px; bottom: 10px; width: 168px;
-    background: repeating-linear-gradient(90deg, #e9e6dc 0 16px, transparent 16px 32px);
-    opacity: 0.85;
-  }
-  .tanuki { position: absolute; left: 112px; bottom: 18px; height: 96px; image-rendering: pixelated; }
-  .wish { font-family: var(--mincho); font-size: 38px; font-weight: 700; margin: 0; white-space: nowrap; }
-  .wish b { color: var(--gold); letter-spacing: 0.1em; }
-  .by { margin: 0 0 0 auto; font-size: 38px; white-space: nowrap; }
   @media print {
-    html, body { background: var(--night); }
+    html, body { background: var(--paper); }
     .deck { padding: 0; max-width: none; }
     .slide { width: 1280px; height: 720px; }
   }
@@ -63,21 +52,26 @@
 <body>
 <div class="deck">
   <section class="slide">
-    <div class="body">
-      <p class="label">誰の</p>
-      <p class="who">平泉を歩いて回る、歴史が苦手な人</p>
-      <p class="label">場面</p>
-      <p class="scene">中尊寺の月見坂で、藤原四代の話を聞いたのに、<br>名前も順番も、まったく頭に入らなかった</p>
-      <div class="app">
-        <img class="logo" src="../assets/images/title_logo.png" alt="平泉タヌキ侍">
-        <p class="catch">遊んでいるうちに、平泉の<em>名所</em>と<em>藤原四代</em>が、<br>順番どおりに覚えられるゲーム</p>
+    <div class="top">
+      <div class="row">
+        <p class="label">誰の</p>
+        <p class="who">平泉を歩いて回る、歴史が苦手な人</p>
+      </div>
+      <div class="row">
+        <p class="label">場面</p>
+        <p class="scene">中尊寺の月見坂で、藤原四代の話を聞いたのに、<br>名前も順番も、まったく頭に入らなかった</p>
       </div>
     </div>
-    <div class="road">
-      <img class="tanuki" src="../assets/images/roll_tanuki_raise_2.png" alt="">
-      <p class="wish">夜道のタヌキと、道ゆく人へ ― <b>交通安全</b></p>
-      <p class="by">澤田 昌平</p>
+    <div class="wish">
+      <p class="note">作者の願い</p>
+      <p class="seal">交通安全</p>
     </div>
+    <img class="parade" src="slide_parade.png" alt="藤原四代のボスと敵たちを先頭のタヌキ侍が率いて、横断歩道を渡る行列">
+    <div class="bottom">
+      <img class="logo" src="../assets/images/title_logo.png" alt="平泉タヌキ侍">
+      <p class="catch">遊んでいるうちに、平泉の<em>名所</em>と<em>藤原四代</em>が、<br>順番どおりに覚えられるゲーム</p>
+    </div>
+    <p class="by">澤田 昌平</p>
   </section>
 </div>
 </body>
