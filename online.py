@@ -69,10 +69,18 @@ def fetch_ranking(url, level):
         _call("hzRanking", url, level)
 
 
-def ranking(level):
-    """順位表の上位（まだ・失敗なら None）: [{name, frames}, ...]"""
+def ranking_state(level):
+    """順位表の状態: ("pending", None) = まだ返事が無い / ("ok", [{name, frames}, ...]) / ("fail", None) = 取れなかった"""
     try:
         d = _read(getattr(_win().HZ.rank, level))
     except Exception:
-        return None
-    return d.get("rows") if d and d.get("ok") else None
+        return "pending", None
+    if d is None:
+        return "pending", None
+    return ("ok", d.get("rows") or []) if d.get("ok") else ("fail", None)
+
+
+def ranking(level):
+    """順位表の上位（まだ・失敗なら None）: [{name, frames}, ...]"""
+    state, rows = ranking_state(level)
+    return rows if state == "ok" else None
