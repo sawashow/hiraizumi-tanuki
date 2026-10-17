@@ -59,6 +59,7 @@ LINES = (
     ("", "Crimson Temple Breach"),
     ("", "Seven Blades High"),
     ("", "Steps Into the Morning Sun"),
+    ("", "Sunset at the Temple Gate"),
     None,
     ("見出し", "プログラム"),
     ("", "Claude"),

@@ -92,6 +92,7 @@ Google Drive（s.sawada@ponpoco-works.com）に置いてあります。元絵を
 - ボス戦の曲: 「Crimson Temple Breach」（`assets/audio/bgm_boss.ogg`）
 - スーパータヌキの曲: 「Seven Blades High」（`assets/audio/bgm_super.ogg`）
 - 地図の曲: 「Steps Into the Morning Sun」（`assets/audio/bgm_map.ogg`）
+- エンディングの曲: 「Sunset at the Temple Gate」（`assets/audio/bgm_ending.ogg`）
 
 効果音は、`tools/make_sfx.py` で、計算して作っています。
 ただし、ロゴ画面の音（`assets/audio/sfx_logo.ogg`）は、「Springin’ Sound Stock」の素材「チェレスタグリッサンド1」を、切り出して使っています。
