@@ -485,9 +485,13 @@ ZONES1 = (
 # 1UP（面に1つ）: 杉の大木の塔のてっぺん（強化の葉）から、右の空中へ跳ぶ寄り道。下の地面からは、高すぎて届かない
 PLATFORMS1 += ((1610, 1650, 62, "杉の大木: 塔のてっぺんから、右へ跳んで乗る台。1UP の寄り道（下からは届かない。烏が来る中で跳ぶ）"),)
 ITEMS1 += (("oneup", 1630, 44),)
-STAGE1 = StageDef("月見坂", W1, GROUND1, PLATFORMS1, thin_dango(ITEMS1, PLATFORMS1), (4650, T), SPAWNS1B, C.BGM_STAGE1, C.BGM_BOSS,
+# 隠し部屋: 杉の大木の塔（1500〜1580）の根元。地面から、塔の左の壁を斬って崩す。
+# 中身は、ぜいたくに（三方手裏剣・おにぎり・団子2つ）。団子は、間引き（thin_dango）を通さずに足す
+CAVES1 = ((1500, 1572, T - 48, T, "杉の大木: 塔の根元の左の壁を、斬って崩す隠し部屋。三方手裏剣・おにぎり・団子"),)
+CAVE_ITEMS1 = (("triple", 1512, T - 14), ("onigiri", 1528, T - 14), ("dango", 1546, T - 14), ("dango", 1562, T - 14))
+STAGE1 = StageDef("月見坂", W1, GROUND1, PLATFORMS1, thin_dango(ITEMS1, PLATFORMS1) + CAVE_ITEMS1, (4650, T), SPAWNS1B, C.BGM_STAGE1, C.BGM_BOSS,
                   lanterns=(("triple", 300), ("onigiri", 4750), ("onigiri", 6880)),   # 石灯籠: 入口（強化）・中間地点の先（回復）・ボスの前（回復）
-                  number=3, stele_x=140, movers=MOVERS1,
+                  number=3, stele_x=140, movers=MOVERS1, caves=CAVES1,
                   boss_title="enemies/boss2_title.png", boss_name="enemies/boss2_name.png",
                   talk_boss="talk_boss2.png", talk_tanuki="talk_tanuki2.png",
                   boss_kind="boss2", boss_pattern=C.BOSS2_GALE_PATTERN, zones=ZONES1, thought=("jajamen", "senbei", "anko"),
@@ -940,12 +944,18 @@ ZONES4 = (
 # 1UP（面に1つ）: 経蔵の塔のてっぺん（おにぎり）から、右の空中へ跳ぶ寄り道。下の床からは、高すぎて届かない
 PLATFORMS4 += ((3345, 3395, 450, "経蔵: 塔のてっぺんから、右へ跳んで乗る台。1UP の寄り道（下からは届かない）"),)
 ITEMS4 += (("oneup", 3370, 432),)
-STAGE4 = StageDef("金色堂", W4, GROUND4, PLATFORMS4, thin_dango(ITEMS4, PLATFORMS4), (6950 + S4, _B4 - 16), SPAWNS4, C.BGM_STAGE1, C.BGM_BOSS,
+# 隠し部屋: 最後の登り（清衡の直前）の、二段目の壁（9940〜）の根元。一段目の床から、右の壁を斬って崩す
+# （いちばん高い壁の根元は、光の柱が落ちる所なので、避けた）。
+# 最後のボスの前の、ぜいたくなごほうび（金の葉・三方手裏剣・おにぎり2つ・団子2つ）。位置は、ずらしたあとの座標
+CAVES4 = ((9940, 10042, 466, 514, "最後の登り: 二段目の壁の根元を、斬って崩す隠し部屋。清衡の前の、ぜいたくなごほうび"),)
+CAVE_ITEMS4 = (("leaf", 9954, 500), ("triple", 9970, 500), ("onigiri", 9986, 500), ("onigiri", 10002, 500),
+               ("dango", 10018, 500), ("dango", 10032, 500))
+STAGE4 = StageDef("金色堂", W4, GROUND4, PLATFORMS4, thin_dango(ITEMS4, PLATFORMS4) + CAVE_ITEMS4, (6950 + S4, _B4 - 16), SPAWNS4, C.BGM_STAGE1, C.BGM_BOSS,
                   lanterns=_shift4((("triple", 280), ("onigiri", 7090), ("onigiri", 8370)), 1),   # 石灯籠: 入口（強化）・中間地点の先（回復）・ボスの前（回復）
                   sky="stage4/bg_sky.png", mid="stage4/bg_mid.png", tiles="stage4/",
                   boss_title="enemies/boss4_title.png", boss_name="enemies/boss4_name.png",
                   talk_boss="talk_boss4.png", talk_tanuki="talk_tanuki4.png", number=4, stele_x=130,
-                  boss_kind="boss4", thought=("onigiri", "mochi", "dango", "hittsumi"), pit=(30, 20, 8), haze=20, gates=GATES4, zones=ZONES4, gilt=True, climb=CLIMB4, mid_follow=0, fill_rows=(3, 0), movers=MOVERS4,
+                  boss_kind="boss4", thought=("onigiri", "mochi", "dango", "hittsumi"), pit=(30, 20, 8), haze=20, gates=GATES4, zones=ZONES4, gilt=True, climb=CLIMB4, mid_follow=0, fill_rows=(3, 0), movers=MOVERS4, caves=CAVES4,
                   # 光の橋: 幅400の切れ目を、消える光の足場3つと、真ん中の消えない足場1つで渡る。
                   # 光は、左から右へ、60 フレームずつ遅れて点く（波のように進む）。となりどうしが、70 フレーム、一緒に点いている
                   blinks=_shift4(((6540, 6620, _B4 - 30, 0, "光の橋: 1つ目の消える足場。点いたのを見て乗る"), (6660, 6740, _B4 - 32, 140, "光の橋: 真ん中の消える足場。となりと70フレーム重なって点く"), (6780, 6860, _B4 - 30, 80, "光の橋: 3つ目の消える足場。渡りきると鳥居")), 0, 1),
