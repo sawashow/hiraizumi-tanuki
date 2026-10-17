@@ -95,6 +95,7 @@ class Game:
         self.howto = False       # 操作説明を出している
         self.records_on = False  # ベストタイムの一覧（EXTRA の RECORDS）を出している
         self.rec_view = self.level   # その一覧で、見ている難しさ
+        self.rec_can_save = True     # 記録を保存できる環境か（RECORDS を開くとき、調べる）
         self.rec_tab = 0         # その一覧で、見ているもの（0 = 自分の記録 / 1 = みんなの順位。順位は、ブラウザ版だけ）
         self.rank_t = 0          # みんなの順位を頼んでから、数えたフレーム数（返事が来ないとき、諦めるため）
         self.meisho = None       # 出している、名所・人物の説明の絵（出していなければ None）
@@ -595,6 +596,7 @@ class Game:
                 self.sfx.append(C.SFX["decide"])
             elif decide and row == "records":
                 self.records_on, self.rec_view, self.rec_tab = True, self.level, 0
+                self.rec_can_save = records.can_save()
                 self.sfx.append(C.SFX["decide"])
                 return
             elif decide and row == "howto" and self.a.howto:
@@ -2127,6 +2129,8 @@ class Game:
         put("TOTAL", left, y, gold)
         put(records.fmt(records.best(self.rec_view, records.TOTAL)), right, y, gold, right_=True)
         put("PRESS ENTER", cx - font.size("PRESS ENTER")[0] // 2, y + 40, grey)
+        if not self.rec_can_save:
+            put("CAN'T SAVE HERE (PRIVATE MODE?)", cx - font.size("CAN'T SAVE HERE (PRIVATE MODE?)")[0] // 2, 244, (255, 150, 150))
         if online.enabled(C.ONLINE["url"]):
             put("UP DOWN: MINE / ONLINE", cx - font.size("UP DOWN: MINE / ONLINE")[0] // 2, y + 58, grey)
 

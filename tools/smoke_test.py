@@ -695,6 +695,13 @@ check("RECORDS: 決定で閉じる（順位を見ている途中でも）", not 
 online.enabled, online.fetch_ranking, online.ranking_state = _real2
 check("通信: PC 版の順位の状態は、いつも「まだ」", online.ranking_state("easy") == ("pending", None) and online.ranking("easy") is None)
 
+# 記録の保存データは、英数字だけ（日本語のまま、ブラウザへ渡すと、文字が化ける）
+records.submit("easy", "毛越寺", 5000)
+records.submit("easy", records.TOTAL, 20000)
+check("記録: 保存データは、英数字だけ（日本語の面の名前でも）", open(records.PATH, "rb").read().isascii())
+check("記録: 英数字にしても、日本語の名前で、読み戻せる", records.best("easy", "毛越寺") == 5000 and records.best("easy", records.TOTAL) == 20000)
+check("記録: PC 版では、保存できる", records.can_save())
+
 # 通し: 面をクリアするたびにタイムを集め、最後の面で、通しの記録を残す。エンドロールのあとに、総括を出す
 g = Game(title=True)
 g.title = False
