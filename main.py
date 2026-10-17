@@ -45,6 +45,8 @@ class Game:
         self.use_map = title     # ステージ選択の地図を出す（始まりと、面をクリアしたあと）
         self.paused = False          # ポーズ中（P キー・START）
         self.pause_t = 0
+        self.pause_i = 0             # ポーズ画面で選んでいる項目（C.PAUSE_ROWS の番号）
+        self._pause_ud = 0           # ポーズ画面の上下（押した瞬間だけ、選びなおす）
         self.thanks = False          # いま、姫を助ける場面（THANK YOU TANUKI!）を出している
         self.thanks_t = 0
         self.roll = False            # いま、エンドロール（平泉の道を歩く場面）を出している
@@ -283,6 +285,22 @@ class Game:
         return not (self.title or self.story or self.map_on or self.thanks or self.roll or self.ending_screen or self.cleared
                     or self.ending or self.player.hp <= 0)
 
+    def _step_pause(self, held, pressed):
+        """ポーズ画面: 上下で CONTINUE（再開）/ TITLE（スタート画面へ戻る）を選び、決定で決める。P キー・START は、そのまま再開"""
+        self.pause_t += 1
+        ud = ("down" in held) - ("up" in held)
+        if ud and ud != self._pause_ud:
+            self.pause_i = (self.pause_i + ud) % len(C.PAUSE_ROWS)
+            self.sfx.append(C.SFX["cursor"])
+        self._pause_ud = ud
+        if not ({"restart", "attack"} & pressed or ("jump" in pressed and "up" not in held)):     # 上キー（ジャンプと同じ）は、決定にしない
+            return
+        self.paused = False
+        self.sfx.append(C.SFX["decide"])
+        if C.PAUSE_ROWS[self.pause_i] == "title":       # スタート画面へ（その面の進み具合は、残らない）
+            self.reset()
+            self._enter_title(True)
+
     def _pick_items(self, p):
         """アイテムを拾う（step から呼ぶ）。"""
         for it in self.items:
@@ -316,11 +334,11 @@ class Game:
             self.paused = False
         if ("pause" in pressed and (self.paused or self.can_pause)) or ("pause_on" in pressed and self.can_pause and not self.paused):
             self.paused = not self.paused
-            self.pause_t = 0
+            self.pause_t, self.pause_i, self._pause_ud = 0, 0, 0
             self.sfx.append(C.SFX["select"])
             return
         if self.paused:
-            self.pause_t += 1
+            self._step_pause(held, set(pressed))
             return
         p = self.player
         if self.map_on:     # ステージ選択の地図: 駒が歩いて、着いたら、少し待つ。Enter で飛ばせる
@@ -1068,15 +1086,18 @@ class Game:
             self._draw_pause(screen, font)
 
     def _draw_pause(self, screen, font):
-        """ポーズ: 画面を暗くして、真ん中に「PAUSE」。下に、再開のしかた（点滅）"""
+        """ポーズ: 画面を暗くして、真ん中に「PAUSE」。下に、CONTINUE / TITLE"""
         dim = pygame.Surface((C.BASE_W, C.BASE_H))
         dim.set_alpha(120)
         screen.blit(dim, (0, 0))
-        for text, y, scale, blink in (("PAUSE", C.BASE_H // 2 - 24, 2, False), ("P KEY / START BUTTON", C.BASE_H // 2 + 14, 1, True)):
-            if blink and (self.pause_t // 30) % 2:      # 再開のしかたは、点滅。「PAUSE」は、出したまま
-                continue
-            for color, off in ((C.BLACK, scale), (C.WHITE if blink else (255, 236, 150), 0)):
-                img = font.render(text, False, color)
+        gold, grey = (255, 236, 150), (176, 176, 190)
+        rows = [("PAUSE", C.BASE_H // 2 - 34, 2, gold)]
+        for n, row in enumerate(C.PAUSE_ROWS):      # 選んでいる行は、金色で、左右に印
+            label = C.PAUSE_LABEL[row]
+            rows.append((("> %s <" % label) if n == self.pause_i else label, C.BASE_H // 2 + 4 + n * 18, 1, gold if n == self.pause_i else grey))
+        for text, y, scale, color in rows:
+            for c, off in ((C.BLACK, scale), (color, 0)):
+                img = font.render(text, False, c)
                 if scale > 1:
                     img = pygame.transform.scale(img, (img.get_width() * scale, img.get_height() * scale))
                 screen.blit(img, (C.BASE_W // 2 - img.get_width() // 2 + off, y + off))

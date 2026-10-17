@@ -459,6 +459,9 @@ MENU = dict(cx=150, y=196, row=18, row_option=15, head=18, gap=10, steps=5,
                        disco=tuple("t%d" % i for i in range(len(DISCO))) + ("back",)),
             label=dict(story="STORY", option="OPTION", extra="EXTRA", meisho="MEISHO", m0="MOTSUJI", m1="TAKADACHI", m2="TSUKIMIZAKA", m3="KONJIKIDO", disco="DISCOGRAPHY", howto="HOW TO PLAY", level="LEVEL", music="MUSIC", sound="SOUND", back="BACK",
                        **{"t%d" % i: name for i, (_, name) in enumerate(DISCO)}))
+# ポーズ画面の項目: CONTINUE（再開）/ TITLE（スタート画面へ戻る。その面の進み具合は、残らない）
+PAUSE_ROWS = ("continue", "title")
+PAUSE_LABEL = {"continue": "CONTINUE", "title": "TITLE"}
 RESPAWN_AT = 215        # 倒れてから、中間地点で再開するまでのフレーム数（残機が残っているとき）
 RESPAWN_CLEAR = 160     # 再開した場所から、この距離までの敵は置かない（再開してすぐ、ぶつからないように）
 CHECKPOINT_W = 24       # 中間地点（鳥居）に触れる範囲の幅
