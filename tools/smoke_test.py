@@ -590,7 +590,7 @@ for _ in range(3):
 run(g, 1, (), {"restart"})
 _reply[0] = {"ok": False, "error": "too fast"}
 run(g, 1)
-check("送信: サーバーに断られたら、FAILED を出して、続けられる", g.sum_mode == "done" and g.sum_msg == "FAILED")
+check("送信: サーバーに断られたら、FAILED と理由を出して、続けられる", g.sum_mode == "done" and g.sum_msg == "FAILED  TOO FAST", g.sum_msg)
 g = Game(title=True)
 g.title = False
 g.run_times, g.total_rec = [3000, 3100, 3200, 3300], (12600, True)
