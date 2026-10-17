@@ -3,39 +3,58 @@
 読み書きに失敗しても（保存できない環境でも）、ゲームは止めない（記録が残らないだけ）。
 時間は、ゲーム内のフレーム数（1秒 = 60）で持つ。
 """
+import base64
 import json
 import os
 import sys
 
-KEY = "hiraizumi_records_v1"
+KEY = "hiraizumi_records_v2"       # v1 は、日本語が化けた古いデータ（読まない）
+status = "ok"       # 最後の保存・読み込みの結果（"ok" 以外は、RECORDS に出す。原因を見つけるため）
 NAME_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"     # イニシャルに使える文字
 TOTAL = "通し"       # 4面を続けて遊んだ、合計タイムの記録の名前（面の名前と同じように、level の下に残す）
 PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "records.json")     # PC 版の保存先（.gitignore）
 
 
+def _encode(data):
+    """辞書を、英数字と - _ = だけの文字列にする（base64）。引用符・バックスラッシュ・日本語を含むと、ブラウザの保存領域へ渡す途中で、壊れるおそれがあるため"""
+    return base64.urlsafe_b64encode(json.dumps(data).encode("ascii")).decode("ascii")
+
+
+def _decode(text):
+    return json.loads(base64.urlsafe_b64decode(text.encode("ascii")).decode("ascii"))
+
+
 def _load():
+    global status
     try:
         if sys.platform == "emscripten":
             import platform
             raw = platform.window.localStorage.getItem(KEY)
-            return json.loads(str(raw)) if raw else {}
+            s = str(raw)
+            return {} if raw is None or s in ("", "null", "undefined", "None") else _decode(s)
         with open(PATH, encoding="utf-8") as f:
             return json.load(f)
-    except Exception:       # 無い・壊れている・保存領域が使えない: 記録なしとして続ける
+    except FileNotFoundError:
+        return {}
+    except Exception:       # 壊れている・保存領域が使えない: 記録なしとして続ける
+        status = "READ ERROR"
         return {}
 
 
 def _save(data):
+    global status
     try:
-        text = json.dumps(data)       # 英数字だけにする（日本語は \uXXXX の記号になる）。日本語のまま、ブラウザの保存領域へ渡すと、文字が化けて、読めなくなる
         if sys.platform == "emscripten":
             import platform
+            text = _encode(data)
             platform.window.localStorage.setItem(KEY, text)
+            status = "ok" if str(platform.window.localStorage.getItem(KEY)) == text else "WRITE MISMATCH"       # 読み戻して、確かめる
         else:
             with open(PATH, "w", encoding="utf-8") as f:
-                f.write(text)
+                f.write(json.dumps(data))
+            status = "ok"
     except Exception:
-        pass
+        status = "WRITE ERROR"
 
 
 def can_save():

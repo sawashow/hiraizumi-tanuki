@@ -2191,6 +2191,9 @@ class Game:
         put("PRESS ENTER", cx - font.size("PRESS ENTER")[0] // 2, y + 58, grey)
         if not self.rec_can_save:
             put("CAN'T SAVE HERE (PRIVATE MODE?)", cx - font.size("CAN'T SAVE HERE (PRIVATE MODE?)")[0] // 2, 244, (255, 150, 150))
+        elif records.status != "ok":        # 保存・読み込みが失敗した（原因を見つけるため、理由を出す）
+            msg = "SAVE: " + records.status
+            put(msg, cx - font.size(msg)[0] // 2, 244, (255, 150, 150))
         if online.enabled(C.ONLINE["url"]):
             put("UP DOWN: MINE / ONLINE", cx - font.size("UP DOWN: MINE / ONLINE")[0] // 2, y + 76, grey)
 
