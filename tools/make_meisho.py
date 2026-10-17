@@ -39,6 +39,39 @@ PLACES = (
 )
 
 
+# 人物（遊ぶ順。泰衡→秀衡→基衡→清衡）: (名前, 読み, 説明の行, ゲームでは)。出力は jinbutsu_1.png 〜 jinbutsu_4.png
+PEOPLE = (
+    ("藤原泰衡", "ふじわらのやすひら", (
+        "四代。1155-1189。秀衡の子。",
+        "頼朝に迫られ、父がかくまった義経を高館に攻めた。",
+        "それでも頼朝の大軍に攻められ、平泉を焼いて北へ逃げた。",
+        "逃げる途中、家臣に討たれ、首は頼朝のもとへ送られた。",
+        "その首は、のちに金色堂に納められた。",
+    ), "一の面のボス。首を失った「首無武者」。"),
+    ("藤原秀衡", "ふじわらのひでひら", (
+        "三代。1122-1187。基衡の子。",
+        "鎮守府将軍となり、奥州藤原氏の最盛期を築いた。",
+        "毛越寺を仕上げ、宇治の平等院をまねた無量光院を建てた。",
+        "頼朝に追われた源義経を、平泉にかくまった。",
+        "死の間際、義経を立てて国を守れと言い残した。",
+    ), "二の面のボス。薙刀の光波と、踏み込み突き。"),
+    ("藤原基衡", "ふじわらのもとひら", (
+        "二代。生年不明-1157。清衡の子。",
+        "父の死後、兄弟と争って、跡を継いだ。",
+        "京から仏師や職人を招き、毛越寺を造りはじめた。",
+        "極楽浄土を写した庭は、今も毛越寺に残る。",
+        "妻は、毛越寺のとなりに観自在王院を建てた。",
+    ), "三の面のボス。扇で風を起こす。"),
+    ("藤原清衡", "ふじわらのきよひら", (
+        "初代。1056-1128。",
+        "前九年・後三年の戦で、父も妻子も失った。",
+        "戦の世を終わらせ、平泉に中尊寺を建てた。",
+        "敵も味方も、戦で死んだすべての命を弔うと願った。",
+        "1124年に金色堂を建て、今もそこに眠る。",
+    ), "最後のボス。金色の光をまとい、浮かぶ。"),
+)
+
+
 def big(font, s, scale):
     """ドットのフォントを、整数倍に大きくした文字の型（にじまない）"""
     mask = Image.new("L", (12 * len(s), 14), 0)
@@ -64,10 +97,11 @@ def make(font, place, out):
     y = 18 + mask.height + 10
     d.line((LEFT, y, W - LEFT, y), fill=EDGE[:3] + (150,))
     y += 14
+    step = 22 if len(lines) <= 3 else 19      # 行が多い（人物）ときは、少し詰める
     for s in lines:
         assert font.getlength("・" + s) <= W - 2 * LEFT, s      # 1行に収まる
         d.text((LEFT, y), "・" + s, font=font, fill=WHITE)
-        y += 22
+        y += step
     y += 10
     d.text((LEFT, y), "ゲームでは", font=font, fill=GOLD)
     d.text((LEFT + 72, y), game, font=font, fill=WHITE)
@@ -81,6 +115,8 @@ def main(font_path):
     font = ImageFont.truetype(font_path, 12)
     for i, place in enumerate(PLACES, 1):
         make(font, place, os.path.join(ROOT, "assets", "images", "meisho_%d.png" % i))
+    for i, person in enumerate(PEOPLE, 1):
+        make(font, person, os.path.join(ROOT, "assets", "images", "jinbutsu_%d.png" % i))
 
 
 if __name__ == "__main__":

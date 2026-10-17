@@ -178,6 +178,8 @@ class Assets:
         self.howto = _load("howto.png") if os.path.exists(os.path.join(IMG, "howto.png")) else None     # 操作説明（メニューから開く）
         # 名所の説明（メニューの MEISHO から開く。面の順。tools/make_meisho.py で作る）
         self.meisho = [_load(f"meisho_{n}.png") for n in range(1, 5) if os.path.exists(os.path.join(IMG, f"meisho_{n}.png"))]
+        # 人物の説明（メニューの JINBUTSU から開く。遊ぶ順: 泰衡・秀衡・基衡・清衡。同じ tools/make_meisho.py で作る）
+        self.jinbutsu = [_load(f"jinbutsu_{n}.png") for n in range(1, 5) if os.path.exists(os.path.join(IMG, f"jinbutsu_{n}.png"))]
         self.title_logo = _load("title_logo.png")       # 題名「平泉 タヌキ侍」（昔のゲームのロゴ風）
         self.title_prompt = _load("title_prompt.png")   # 「PRESS START」
         # スタート画面の絵（無ければ、1面の景色で代わりにする）

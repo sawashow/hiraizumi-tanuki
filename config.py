@@ -202,7 +202,7 @@ BOSS = dict(w=36, h=76, hp=24, touch=1, speed=0.5, near=70, gravity=0.3,
             rage_walk_frames=50, rage_recover_frames=45,
             high_bottom=30, high_h=32, corner=70)   # 高い光波の下端と高さ（地面から。高さは、絵と同じ） / 壁ぎわとみなす距離
 # ボスの名前（藤原四代。1面は、四代の泰衡。設定は assets/ストーリー設定.md）。出てきたときに、
-# まず二つ名（「呪落武者」）が出て、少し遅れて、名前が出る。どちらも、上に小さく、ふりがなを付ける。
+# まず二つ名（「首無武者」）が出て、少し遅れて、名前が出る。どちらも、上に小さく、ふりがなを付ける。
 # 文字の絵は tools/make_boss_name.py で作る（名前を変えるときは、絵を作り直す）
 BOSS_TITLE = "enemies/boss_ochimusha_title.png"   # 二つ名（上に、ふりがな）
 BOSS_NAME = "enemies/boss_ochimusha_name.png"     # 名前（上に、ふりがな）
@@ -445,7 +445,7 @@ LEVEL = "normal"        # 最初に選ばれている難しさ
 LEVEL_LABEL = (150, 252)    # （前の、難しさの表示の場所。いまは、メニューの中に出す）
 # スタート画面のメニュー: 決定のキーで開く。上下で項目を選び、決定で進む。
 #   main:   STORY（始める）/ OPTION（設定の画面へ）/ EXTRA（本編と関係のない、おまけ）/ HOW TO PLAY
-#   extra:  MEISHO（名所の説明。assets/images/meisho_*.png。tools/make_meisho.py で作る）/ DISCOGRAPHY（曲）/ BACK（操作説明。assets/images/howto.png。tools/make_howto.py で作る）
+#   extra:  MEISHO（名所の説明。assets/images/meisho_*.png）/ JINBUTSU（藤原四代の説明。jinbutsu_*.png。どちらも tools/make_meisho.py で作る）/ DISCOGRAPHY（曲）/ BACK（操作説明。assets/images/howto.png。tools/make_howto.py で作る）
 #   option: LEVEL（難しさ。左右で変える）/ MUSIC・SOUND（音量。左右で変える）/ BACK（戻る）
 #   cx = 行の中心（題名と同じ。どの行も、中央ぞろえ。右の大きなタヌキ侍は、x=265 あたりから。行の幅は、200 まで）
 #   y = 1行目の上端 / row・row_option = 行の間隔 / head = 見出しを、1行目より、どれだけ上に出すか / gap = 項目名と値の間 / steps = 音量の段の数
@@ -455,10 +455,11 @@ DISCO = (("bgm_story.ogg", "Evening at the Border Post"), ("bgm_map.ogg", "Steps
          ("bgm_ending.ogg", "Sunset at the Temple Gate"))
 MENU = dict(cx=150, y=196, row=18, row_option=15, head=18, gap=10, steps=5,
             pages=dict(main=("story", "option", "extra", "howto"), option=("level", "music", "sound", "back"),
-                       extra=("meisho", "disco", "back"),
+                       extra=("meisho", "jinbutsu", "disco", "back"),
                        meisho=("m0", "m1", "m2", "m3", "back"),
+                       jinbutsu=("p0", "p1", "p2", "p3", "back"),
                        disco=tuple("t%d" % i for i in range(len(DISCO))) + ("back",)),
-            label=dict(story="STORY", option="OPTION", extra="EXTRA", meisho="MEISHO", m0="MOTSUJI", m1="TAKADACHI", m2="TSUKIMIZAKA", m3="KONJIKIDO", disco="DISCOGRAPHY", howto="HOW TO PLAY", level="LEVEL", music="MUSIC", sound="SOUND", back="BACK",
+            label=dict(story="STORY", option="OPTION", extra="EXTRA", meisho="MEISHO", m0="MOTSUJI", m1="TAKADACHI", m2="TSUKIMIZAKA", m3="KONJIKIDO", jinbutsu="JINBUTSU", p0="YASUHIRA", p1="HIDEHIRA", p2="MOTOHIRA", p3="KIYOHIRA", disco="DISCOGRAPHY", howto="HOW TO PLAY", level="LEVEL", music="MUSIC", sound="SOUND", back="BACK",
                        **{"t%d" % i: name for i, (_, name) in enumerate(DISCO)}))
 # 隠し部屋（stage.py の caves）: hits＝崩れるまでに斬る回数 / cool＝1回の振りで、何度も数えないための間 / wall＝入口の壁の厚み（刀が当たる所）
 #   crack＝ひびの色（細く。斬るたびに濃くなる）/ shine＝ひびの下に1ドットずらして引く、明るい縁（彫ったように見せる）/ lines＝ひびの線（x は壁の左端から、y は高さに対する割合）/ room・edge＝壊したあとの部屋の色と縁
