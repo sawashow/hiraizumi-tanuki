@@ -2732,6 +2732,16 @@ crouch = pygame.Rect(me.x, C.FLOOR_Y - C.CROUCH_H, 16, C.CROUCH_H)
 flat = [r_ for r_ in ring if abs(r_.vy) < 0.01]
 check("数珠の輪は、8つの玉が八方へ飛ぶ。横へ飛ぶ玉は、しゃがめば当たらない高さ",
       len(ring) == 8 and len(flat) == 2 and all(r_.rect.bottom <= crouch.top for r_ in flat), str([r_.rect.bottom for r_ in flat]))
+b4.spawned.clear()
+check("数珠の輪は、1回では終わらない（予告の輪を出して、間をおいて、もう一度）", b4.state == "ring_ready" and b4.ring_n == 1)
+for _ in range(C.RING["gap"] - 1):
+    b4.think(me, 480)
+check("2回目は、すぐには撃たない（間 gap の間は、予告だけ）", not b4.spawned)
+b4.think(me, 480)
+_ang = sorted(round(math.degrees(math.atan2(r_.vy, r_.speed * r_.dir))) % 360 for r_ in b4.spawned)
+check("2回目は、玉と玉のすき間の半分（22.5度）だけ回して撃つ（立っているだけでは、よけられない）。怒る前は2回で終わる",
+      len(b4.spawned) == 8 and all(abs((x_ - 22.5) % 45) < 1 or abs((x_ - 22.5) % 45 - 45) < 1 for x_ in _ang) and b4.state == "recover", str(_ang))
+check("怒ったあとは3回。間は、1回目の予告より短すぎない（あまり難しくしない）", C.RING["rage_shots"] == 3 and C.RING["gap"] >= 30)
 b4.hp = b4.max_hp // 2
 b4._set("walk")
 for _ in range(C.BOSS4["rage_walk_frames"] + 1):

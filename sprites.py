@@ -1730,6 +1730,7 @@ class Boss4(Boss):
         self.turn = 0                        # 出した攻撃の数（攻撃の順番を決める）
         self.dest = None                     # 転移で、現れる場所
         self.roared = False                  # 体力が半分になったときの、怒りの演出を、もう見せた
+        self.ring_n = 0                      # 数珠の輪を、この技で何回撃ったか
 
     @property
     def hurt_rect(self):
@@ -1760,6 +1761,7 @@ class Boss4(Boss):
             self._set("ready")
         elif kind == "ring":
             snd("charge")
+            self.ring_n = 0         # この技で、何回目の輪か（回すたびに、角度をずらす）
             self._set("ring_ready")
         elif kind == "pillar":               # 主人公の足元と、その左右に、少しずつ遅らせて落とす
             L = C.PILLAR
@@ -1828,16 +1830,19 @@ class Boss4(Boss):
             if self.st >= P["cast_frames"] + gap * (len(heights) - 1):
                 self.volley += 1
                 self._set("recover")
-        elif s == "ring_ready":                # まわりに、玉の輪が出る（予告）。終わりに、八方へ飛ぶ
-            if self.st >= P["ring_ready"]:
-                R = C.RING
+        elif s == "ring_ready":                # まわりに、玉の輪が出る（予告）。終わりに、八方へ飛ぶ。
+            # 何回か続けて撃つ。1回ごとに、玉と玉のすき間の半分だけ回す（前のすき間に、次の玉が来る。立っているだけでは、よけられない）。
+            # 2回目からも、予告の輪が出てから撃つ（間 gap）
+            R = C.RING
+            if self.st >= (P["ring_ready"] if self.ring_n == 0 else R["gap"]):
                 sp = R["rage_speed" if self.rage else "speed"]
+                snd("ring")
                 for k in range(R["count"]):
-                    a = 2 * math.pi * k / R["count"]
-                    snd("ring")
+                    a = self._ring_angle(k)
                     self.spawned.append(Bead(self.cx + math.cos(a) * R["radius"], self.cy + math.sin(a) * R["radius"], 1, self.a,
                                              math.cos(a) * sp, vy=math.sin(a) * sp, floor=self._ground(), reach=R["range"], ring=True))
-                self._set("recover")
+                self.ring_n += 1
+                self._set("ring_ready" if self.ring_n < R["rage_shots" if self.rage else "shots"] else "recover")
         elif s == "pillar_ready":              # 手を上げている間に、柱が落ちる
             if self.st >= P["pillar_frames"]:
                 self._set("recover")
@@ -1854,6 +1859,11 @@ class Boss4(Boss):
         elif s == "recover":
             if self.st >= P["rage_recover_frames" if self.rage else "recover_frames"]:
                 self._set("walk")
+
+    def _ring_angle(self, k):
+        """数珠の輪の、k 番目の玉の向き。何回目の輪かで、すき間の半分ずつ回す"""
+        n = C.RING["count"]
+        return 2 * math.pi * (k + 0.5 * self.ring_n) / n
 
     def _halo(self, surface, x, y):
         """後光: 回る光の筋と、輪。予告の間は、明るく大きく。体力が半分になると、赤く、大きい"""
@@ -1911,11 +1921,11 @@ class Boss4(Boss):
                 rr = 2 + (1 if (self.t // 5 + k) % 2 else 0)
                 pygame.draw.circle(surface, (150, 96, 8), (x, y), rr + 1)
                 pygame.draw.circle(surface, (255, 244, 170), (x, y), rr)
-        elif self.state == "ring_ready":    # 予告: まわりに、玉の輪。飛ぶ向きへ、短い筋
+        elif self.state == "ring_ready":    # 予告: まわりに、玉の輪。飛ぶ向きへ、短い筋（次に撃つ角度で）
             R = C.RING
-            grow = R["radius"] * self.st / P["ring_ready"]
+            grow = R["radius"] * min(1.0, self.st / (P["ring_ready"] if self.ring_n == 0 else R["gap"]))
             for k in range(R["count"]):
-                a = 2 * math.pi * k / R["count"]
+                a = self._ring_angle(k)
                 x, y = r.centerx + math.cos(a) * grow, r.centery + math.sin(a) * grow
                 if (self.t // 4) % 2:
                     pygame.draw.line(surface, (255, 244, 170), (x, y), (x + math.cos(a) * 9, y + math.sin(a) * 9), 1)
