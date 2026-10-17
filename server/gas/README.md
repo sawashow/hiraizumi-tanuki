@@ -27,24 +27,22 @@
    clasp open-script
    ```
    エディタが開く。上のメニューの関数の選択で `setup` を選んで「実行」→ 権限の確認が出たら許可する（記録のシート `scores` も、ここでできる）。
-5. Web アプリとして公開する
-   ```
-   clasp deploy --description "v1"
-   clasp deployments
-   ```
-   出てきた **デプロイ ID**（`AKfycb…`）から、URL ができる: `https://script.google.com/macros/s/<デプロイ ID>/exec`
-6. 動作を確かめる（ブラウザで、次の URL を開く。`{"ok":true,"rows":[]}` が出れば成功）
+5. Web アプリとして公開する（**エディタで行う。`clasp deploy` は使わない**: Web アプリではなく「ライブラリ」として作られて、URL が 404 になる）
+   - `clasp open-script` でエディタを開き、右上の「デプロイ」→「新しいデプロイ」→ 歯車で「ウェブアプリ」。
+   - 次のユーザーとして実行: **自分** / アクセスできるユーザー: **全員** → 「デプロイ」。
+   - 出てきた **ウェブアプリの URL**（`https://script.google.com/macros/s/<デプロイ ID>/exec`）を、`config.py` の `ONLINE` に書く。
+6. 動作を確かめる（ブラウザで、次の URL を開く。`{"ok":true,"rows":[]}` が出れば成功。失敗したら、数秒おいて、もう一度）
    ```
    https://script.google.com/macros/s/<デプロイ ID>/exec?action=ranking&level=easy
    ```
 
 ## 直したとき（URL は、変えない）
 
-```
-clasp push
-clasp deploy -i <デプロイ ID> --description "v2"
-```
-`-i` を付けると、同じ URL のまま、中身だけが入れ替わる（付けないと、新しい URL ができる）。
+1. `clasp push`（コードを送る）
+2. エディタ（`clasp open-script`）で、「デプロイ」→「デプロイを管理」→ 鉛筆 → バージョンを「新バージョン」→「デプロイ」。
+
+**`clasp deploy`（`-i` 付きも）は、使わない。** Web アプリの設定が外れて、「ライブラリ」になり、URL が 404 を返す（2026-10-18 に、2回起きた）。
+なお、起動直後の最初の呼び出しが、一時的に失敗することがある（`bad request` や 404）。ゲーム側は、通信の失敗を、最大3回くり返す。
 
 ## 確認
 
