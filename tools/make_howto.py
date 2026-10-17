@@ -18,6 +18,7 @@ ROWS = (
     ("移動", "← →", "十字キー・スティック"),
     ("ジャンプ", "Space・↑", "A（×）　長く押すと高く"),
     ("しゃがむ", "↓", "下"),
+    ("降りる", "↓＋Space", "下＋A　足場から下へ"),
     ("刀", "Z", "X（□）"),
     ("手裏剣", "X", "B・Y（○・△）"),
     ("ポーズ", "P", "START（OPTIONS）"),
@@ -53,11 +54,11 @@ def main(font_path, out):
     for row in ROWS:
         for x, s, color in zip(COLS, row, (GOLD, WHITE, WHITE)):
             d.text((x, y), s, font=font, fill=color)
-        y += 17
-    y += 6
+        y += 16
+    y += 4
     for s in NOTES:
         d.text((COLS[0], y), s, font=font, fill=GREY)
-        y += 15
+        y += 14
     back = "決定のキーで、もどる"
     d.text(((W - int(font.getlength(back))) // 2, H - 22), back, font=font, fill=GOLD)
     img.save(out)
