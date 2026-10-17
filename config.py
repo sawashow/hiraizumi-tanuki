@@ -459,6 +459,11 @@ MENU = dict(cx=150, y=196, row=18, row_option=15, head=18, gap=10, steps=5,
                        disco=tuple("t%d" % i for i in range(len(DISCO))) + ("back",)),
             label=dict(story="STORY", option="OPTION", extra="EXTRA", meisho="MEISHO", m0="MOTSUJI", m1="TAKADACHI", m2="TSUKIMIZAKA", m3="KONJIKIDO", disco="DISCOGRAPHY", howto="HOW TO PLAY", level="LEVEL", music="MUSIC", sound="SOUND", back="BACK",
                        **{"t%d" % i: name for i, (_, name) in enumerate(DISCO)}))
+# 隠し部屋（stage.py の caves）: hits＝崩れるまでに斬る回数 / cool＝1回の振りで、何度も数えないための間 / wall＝入口の壁の厚み（刀が当たる所）
+#   crack＝ひびの色（細く。斬るたびに濃くなる）/ shine＝ひびの下に1ドットずらして引く、明るい縁（彫ったように見せる）/ lines＝ひびの線（x は壁の左端から、y は高さに対する割合）/ room・edge＝壊したあとの部屋の色と縁
+SECRET = dict(hits=3, cool=14, wall=14, crack=(10, 7, 4, 200), shine=(240, 220, 185, 130), room=(30, 24, 20), edge=(14, 10, 8),
+              lines=(((3, 0.18), (6, 0.34), (4, 0.52), (8, 0.7)), ((6, 0.34), (11, 0.42)), ((4, 0.52), (1, 0.66), (5, 0.86)),
+                     ((8, 0.7), (12, 0.8)), ((2, 0.1), (5, 0.2))))
 ONEUP_MSG = 90          # 1UP を取ったとき、頭の上に「1UP!」を出すフレーム数（上へ、ゆっくり昇る）
 # ポーズ画面の項目: CONTINUE（再開）/ TITLE（スタート画面へ戻る。その面の進み具合は、残らない）
 PAUSE_ROWS = ("continue", "title")

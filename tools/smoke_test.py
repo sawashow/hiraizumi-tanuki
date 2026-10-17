@@ -2153,6 +2153,33 @@ _tg = Game(title=False)
 _tg.touch_level()
 check("遊んでいる途中（スタート画面の外）では、変えない", _tg.level == C.LEVEL)
 
+# 1UP と、高館の隠し部屋
+import stage as _stg  # noqa: E402
+check("1UP は、どの面にも1つずつ置いてある", all(sum(1 for i in st.items if i[0] == "oneup") == 1 for st in PROD_STAGES))
+_saved_stages = list(STAGES)
+STAGES[:] = PROD_STAGES     # 本物の面で確かめる（終わったら、戻す）
+_hg = Game()
+_hg.reset(STAGES.index(_stg.STAGE3))
+_cv = _hg.terrain.caves[0]
+_hg._start(_cv[0] - 20, float(_cv[3]))
+_hg.enemies = []
+run(_hg, 20, {"right"})
+check("隠し部屋: 壊す前は、ただの岩の壁（入れない）", _hg.player.px <= _cv[0] - C.PLAYER_W / 2 + 0.01 and not _hg.terrain.caves_open)
+for _k in range(C.SECRET["hits"]):
+    run(_hg, 1, (), {"attack"})
+    run(_hg, 25)
+check("隠し部屋: 刀で決まった回数斬ると、壁が崩れる", _hg.terrain.caves_open == {0})
+_lv = _hg.lives
+run(_hg, 60, {"right"})
+check("隠し部屋: 中に入れて、奥が壁。強化2つと 1UP が取れる（残機が1つ増える）",
+      _cv[1] - C.PLAYER_W / 2 - 1 <= _hg.player.px <= _cv[1] - C.PLAYER_W / 2 + 0.01 and _hg.lives == _lv + 1 and _hg.player.power and _hg.player.triple)
+run(_hg, 1, (), {"jump"})
+_top = min((run(_hg, 1, {"jump"}) or _hg.player.py) for _ in range(30))
+check("隠し部屋: 跳んでも、天井に頭がつかえる", _top - C.PLAYER_H >= _cv[2] - 0.01, str(_top))
+run(_hg, 80, {"left"})
+check("隠し部屋: 入口から出られる", _hg.player.px < _cv[0])
+STAGES[:] = _saved_stages
+
 # ---------------------------------------------------------------- 18. コントローラ
 import pygame as _pg  # noqa: E402
 import gamepad  # noqa: E402

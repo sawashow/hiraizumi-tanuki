@@ -96,8 +96,12 @@ ITEMS = (
 class Terrain:
     FOOT = 6   # 足元の判定の、中心から左右への幅（端に少しかかっていれば立てる）
 
-    def __init__(self, ground=GROUND, platforms=PLATFORMS, climb=None, blinks=(), movers=()):
+    def __init__(self, ground=GROUND, platforms=PLATFORMS, climb=None, blinks=(), movers=(), caves=()):
         self.ground = [tuple(g) for g in ground]
+        # 隠し部屋: (左端, 右端, 天井, 床)。地面の中の空洞。入口（左端）は、壊せる壁でふさがれていて、壊すまでは、ただの岩。
+        # 壊したあとは、床に立てて、天井に頭がつかえ、奥（右端）が壁になる
+        self.caves = [tuple(c[:4]) for c in caves]
+        self.caves_open = set()     # 壊して開いた隠し部屋（番号）
         self.platforms = [tuple(p) for p in platforms]
         # 動く足場: (左端 ax, 上面 ay, 左端 bx, 上面 by, 幅, ずれ[, 往復のフレーム数])。A と B の間を往復する。横にも縦にも斜めにも動ける
         self.movers = [tuple(m) for m in movers]
@@ -154,6 +158,26 @@ class Terrain:
                 return x0 - p0, top - ptop
         return None
 
+    def open_cave(self, i):
+        self.caves_open.add(i)
+
+    def _open_caves(self):
+        return [self.caves[i] for i in sorted(self.caves_open)]
+
+    def cave_body(self, px, py, half):
+        """体（足元 py・左右 half）が、開いた隠し部屋の高さの中にいれば、その部屋。いなければ None"""
+        for x0, x1, ceil, floor in self._open_caves():
+            if x0 - half < px < x1 + half and ceil + C.CROUCH_H - 1 <= py <= floor + 0.5:
+                return x0, x1, ceil, floor
+        return None
+
+    def ceiling(self, px, top_prev, top_new):
+        """上へ動く頭が、このフレームで、隠し部屋の天井にぶつかれば、天井の高さ。なければ None"""
+        for x0, x1, ceil, floor in self._open_caves():
+            if x0 - self.FOOT < px < x1 + self.FOOT and top_new < ceil <= top_prev + 1 and top_prev <= floor:
+                return ceil
+        return None
+
     def height_at(self, x):
         """x にある地面の上面の高さ（一番高いもの）。地面がなければ None"""
         tops = [top for a, b, top in self.ground if a <= x < b]
@@ -169,7 +193,7 @@ class Terrain:
         ground_only: 浮き足場を数えない（下＋ジャンプで、足場をすり抜けて降りている間）"""
         x0, x1 = px - self.FOOT, px + self.FOOT
         best = None
-        for a, b, top in self.ground:
+        for a, b, top in self.ground + [(c[0], c[1], c[3]) for c in self._open_caves()]:     # 隠し部屋の床も、地面
             if a < x1 and x0 < b and prev_bottom <= top + 1 and new_bottom >= top:
                 if best is None or top < best[0]:
                     best = (top, True)
@@ -184,6 +208,9 @@ class Terrain:
         足元が、区間の上面より下にあるときだけ、その区間は壁になる（上を越えれば、壁ではない）。
         壁の中に入り込んでいたら、外へ押し出す"""
         px = new_px
+        cave = self.cave_body(new_px, py, half)
+        if cave:        # 隠し部屋の中: 入口（左）は開いていて、奥（右）だけが壁
+            return min(px, cave[1] - half)
         for a, b, top in self.ground:
             if top >= py - 0.5:
                 continue
@@ -255,9 +282,11 @@ class StageDef:
     def __init__(self, name, width, ground, platforms, items, checkpoint, spawns, bgm, bgm_boss,
                  sky="bg_sky.png", mid="bg_mid.png", tiles="", boss_x=None,
                  boss_title=C.BOSS_TITLE, boss_name=C.BOSS_NAME, boss_pattern=C.BOSS_PATTERN,
-                 talk_boss=C.TALK_BOSS, talk_tanuki=C.TALK_TANUKI, number=1, stele_x=150, boss_kind="boss", pit=(8, 6, 18), gates=(), lanterns=(), zones=(), gilt=False, haze=None, winds=(), traps=(), thought=(), pit_deep=None, climb=None, blinks=(), mid_follow=None, fill_rows=(), movers=(), boss_hp=1.0):
+                 talk_boss=C.TALK_BOSS, talk_tanuki=C.TALK_TANUKI, number=1, stele_x=150, boss_kind="boss", pit=(8, 6, 18), gates=(), lanterns=(), zones=(), gilt=False, haze=None, winds=(), traps=(), thought=(), pit_deep=None, climb=None, blinks=(), mid_follow=None, fill_rows=(), movers=(), boss_hp=1.0, caves=()):
         self.name, self.width = name, width
         self.boss_hp = boss_hp      # この面のボスの体力の倍率（難しさの倍率に、さらに掛ける）
+        caves, self.cave_notes = split_intent(caves)
+        self.caves = tuple(caves)   # 隠し部屋: (左端, 右端, 天井, 床)。Terrain の caves を見よ
         # 行の末尾の意図は、切り分けて *_notes に持つ（遊びには使わない。設計の管理用）
         platforms, self.platform_notes = split_intent(platforms)
         spawns, self.spawn_notes = split_intent(spawns)
@@ -325,7 +354,7 @@ class StageDef:
         return sum(1 for k, _, _ in self.items if k == "dango")
 
     def terrain(self):
-        return Terrain(self.ground, self.platforms, self.climb, self.blinks, self.movers)
+        return Terrain(self.ground, self.platforms, self.climb, self.blinks, self.movers, self.caves)
 
     @property
     def footholds(self):
@@ -713,13 +742,17 @@ ZONES3 = (
     (4400, 5140, "頂上", "組み合わせ", 5, "落ち武者・烏・弓兵・天狗を混ぜた山場を、さばききる"),
     (5140, 5520, "ボス前", "休む", 1, "昇降機で切れ目の向こうの岸へ上がり、石灯籠で回復する"),
 )
+# 隠し部屋（崖登りの垂直の壁の、右の岩の中）: 折り返しの2段目（4125〜4175）から、右の壁を斬って崩すと入れる。
+# 中に、強化2つ（金の葉・三方手裏剣）と、この面の 1UP。入口の岩には、見る人が見れば分かるくらいの、ひび
+CAVES3 = ((4180, 4272, _B3 - 322 - 48, _B3 - 322, "崖登り: 折り返しの2段目の右の壁を、斬って崩す隠し部屋。強化2つと 1UP"),)
+ITEMS3 += (("leaf", 4204, _B3 - 322 - 14), ("triple", 4228, _B3 - 322 - 14), ("oneup", 4254, _B3 - 322 - 14))
 STAGE3 = StageDef("高館", W3, GROUND3, PLATFORMS3, thin_dango(ITEMS3, PLATFORMS3), (3340, _B3 - 16), SPAWNS3, C.BGM_STAGE1, C.BGM_BOSS,
                   lanterns=(("triple", 300), ("onigiri", 3392), ("onigiri", 5400)),   # 石灯籠: 入口（強化）・中間地点の先（回復）・ボスの前（回復）
                   sky="stage3/bg_sky.png", mid="stage3/bg_mid.png", tiles="stage3/",
                   boss_title="enemies/boss3_title.png", boss_name="enemies/boss3_name.png",
                   talk_boss="talk_boss3.png", talk_tanuki="talk_tanuki3.png", number=2, stele_x=130,
                   boss_kind="boss3", boss_pattern=C.BOSS3_PATTERN,   # ボスは遊ぶ順で決まる（代をさかのぼる: 1面:四代・泰衡 2面:三代・秀衡 3面:二代・基衡 4面:初代・清衡）
-                  zones=ZONES3, thought=("kushi", "reimen"), climb=CLIMB3, movers=MOVERS3,
+                  zones=ZONES3, thought=("kushi", "reimen"), climb=CLIMB3, movers=MOVERS3, caves=CAVES3,
                   pit=(150, 186, 208), pit_deep=(84, 130, 170), haze=36)
 # 崖の切れ目の下は、青く霞んだ谷。昼の景色に、暗い穴は合わない。高い崖の上にいる感じを出す。
 # 前は、白（226, 240, 246）で、もやの高さ 100。穴のふちが、いちばん明るくなって、下から光が出ているように見えた。
