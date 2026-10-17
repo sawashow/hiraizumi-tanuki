@@ -1037,9 +1037,10 @@ for _ in range(C.RESPAWN_AT + 5):
 check("やられて再開すると、団子は、始まりの数に戻る（無いまま再開しない）", g.player.hp > 0 and g.player.ammo == A["start"])
 check("団子を全部取っても、残機は増えない（団子は、集める物ではなく、使う物になった）", g.lives == 2)
 few = [(st.name, st.dango_total) for st in PROD_STAGES]
-check("本番の面の団子は、足場の上にだけ、1つずつ（地面には置かない）。1面に 30個まで",
+check("本番の面の団子は、足場の上にだけ、1つずつ（地面には置かない。隠し部屋の中は、ごほうびなので別）。1面に 30個まで",
       all(n <= 30 for _, n in few) and all(sum(p[0] <= x <= p[1] and 0 < p[2] - y <= 60 for p in st.platforms) == 1
-                                            for st in PROD_STAGES for k, x, y in st.items if k == "dango"), str(few))
+                                            for st in PROD_STAGES for k, x, y in st.items if k == "dango"
+                                            and not any(c[0] <= x <= c[1] and c[2] <= y <= c[3] for c in st.caves)), str(few))
 
 
 def _purpose(st, p):
@@ -2189,6 +2190,21 @@ _top = min((run(_hg, 1, {"jump"}) or _hg.player.py) for _ in range(30))
 check("隠し部屋: 跳んでも、天井に頭がつかえる", _top - C.PLAYER_H >= _cv[2] - 0.01, str(_top))
 run(_hg, 80, {"left"})
 check("隠し部屋: 入口から出られる", _hg.player.px < _cv[0])
+for _st in (_stg.STAGE1, _stg.STAGE4):     # ほかの面の隠し部屋も、斬って崩して、中の物を全部取れる
+    _hg = Game()
+    _hg.reset(STAGES.index(_st))
+    _cv = _hg.terrain.caves[0]
+    _hg._start(_cv[0] - 20, float(_cv[3]))
+    _hg.enemies = []
+    run(_hg, 20, {"right"})
+    _shut = _hg.player.px <= _cv[0] - C.PLAYER_W / 2 + 0.01
+    for _k in range(C.SECRET["hits"]):
+        run(_hg, 1, (), {"attack"})
+        run(_hg, 25)
+    _inside = [i for i, it in enumerate(_st.items) if _cv[0] <= it[1] <= _cv[1] and _cv[2] <= it[2] <= _cv[3]]
+    run(_hg, 80, {"right"})
+    check("隠し部屋（%s）: 壊す前は入れず、斬ると崩れて、中の物（%d個）を全部取れる" % (_st.name, len(_inside)),
+          _shut and _hg.terrain.caves_open == {0} and len(_inside) >= 4 and set(_inside) <= _hg.taken, str(sorted(_hg.taken & set(_inside))))
 STAGES[:] = _saved_stages
 
 # ---------------------------------------------------------------- 18. コントローラ
