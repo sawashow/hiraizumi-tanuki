@@ -22,3 +22,6 @@ AI_CONTEXT.md
 
 # 遊んだ記録（面ごとのベストタイム。PC 版の保存先）
 records.json
+
+# 順位表のサーバー（GAS）の、スクリプトの ID（clasp create で、できる）
+server/gas/.clasp.json
