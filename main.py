@@ -96,6 +96,8 @@ class Game:
         self.records_on = False  # ベストタイムの一覧（EXTRA の RECORDS）を出している
         self.rec_view = self.level   # その一覧で、見ている難しさ
         self.rec_can_save = True     # 記録を保存できる環境か（RECORDS を開くとき、調べる）
+        self._rec_key = None     # 一覧に出している記録を、読み込んだ難しさ（保存領域の読み込みは、毎コマではなく、開くとき・難しさを替えたときだけ）
+        self._rec_data = {}
         self.rec_tab = 0         # その一覧で、見ているもの（0 = 自分の記録 / 1 = みんなの順位。順位は、ブラウザ版だけ）
         self.rank_t = 0          # みんなの順位を頼んでから、数えたフレーム数（返事が来ないとき、諦めるため）
         self.meisho = None       # 出している、名所・人物の説明の絵（出していなければ None）
@@ -610,7 +612,7 @@ class Game:
                 self.menu_page, self.menu_i, self.disco_song = page, C.MENU["pages"][page].index(came), None
                 self.sfx.append(C.SFX["decide"])
             elif decide and row == "records":
-                self.records_on, self.rec_view, self.rec_tab = True, self.level, 0
+                self.records_on, self.rec_view, self.rec_tab, self._rec_key = True, self.level, 0, None
                 self.rec_can_save = records.can_save()
                 self.sfx.append(C.SFX["decide"])
                 return
@@ -2150,6 +2152,11 @@ class Game:
         i = order.index(self.rec_view)
         lv = ("< " if i > 0 else "  ") + C.LEVELS[self.rec_view]["label"] + (" >" if i < len(order) - 1 else "  ")
         put(lv, cx - font.size(lv)[0] // 2, 46, grey)
+        if self._rec_key != self.rec_view:      # 記録を読み直す（保存領域を読むのは、重いので、毎コマはしない）
+            self._rec_key = self.rec_view
+            self._rec_data = {st.name: records.best(self.rec_view, st.name) for st in STAGES}
+            self._rec_data[records.TOTAL] = records.best(self.rec_view, records.TOTAL)
+            self._rec_data[records.SCORE] = records.best_score(self.rec_view)
         if self.rec_tab:        # みんなの順位（上位）
             state, rows = online.ranking_state(self.rec_view)
             if state == "pending" and self.rank_t > C.SUMMARY["send_wait"]:
@@ -2169,12 +2176,12 @@ class Game:
             return
         for k, st in enumerate(STAGES):
             put(C.MENU["label"]["m%d" % k], left, 72 + k * 18)
-            put(records.fmt(records.best(self.rec_view, st.name)), right, 72 + k * 18, right_=True)
+            put(records.fmt(self._rec_data[st.name]), right, 72 + k * 18, right_=True)
         y = 72 + len(STAGES) * 18 + 6
         pygame.draw.line(screen, (110, 110, 130), (left, y - 3), (right, y - 3))
         put("TOTAL", left, y, gold)
-        put(records.fmt(records.best(self.rec_view, records.TOTAL)), right, y, gold, right_=True)
-        sc = records.best_score(self.rec_view)
+        put(records.fmt(self._rec_data[records.TOTAL]), right, y, gold, right_=True)
+        sc = self._rec_data[records.SCORE]
         put("SCORE", left, y + 18)
         put("%06d" % sc if sc else "------", right, y + 18, right_=True)
         put("PRESS ENTER", cx - font.size("PRESS ENTER")[0] // 2, y + 58, grey)
