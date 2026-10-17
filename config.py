@@ -171,7 +171,7 @@ ENEMY_ART = {
     "tachiojo": dict(w=42, h=88, ax=16, ay=88, mode="bottom"),   # いつも左向き（絵を反転して出す）。体の中心は、薙刀のぶん、枠の左寄り
     "boss3": dict(w=116, h=115, ax=58, ay=114, mode="bottom"),   # 秀衡（枠の下端の1ドットは、縁取り）
     "boss4": dict(w=112, h=89, ax=60, ay=89, mode="bottom"),    # 清衡（蓮の台座の下端が、枠の下端。横は、台座の中心）
-    "boss": dict(w=144, h=107, ax=72, ay=107, mode="bottom"),   # 泰衡（足元が、枠の下端）
+    "boss": dict(w=108, h=109, ax=54, ay=109, mode="bottom"),   # 泰衡（首無武者。足元が、枠の下端）
     "boss2": dict(w=120, h=77, ax=60, ay=77, mode="bottom"),    # 基衡: 霧の下端が、地面より3ドット下に来る
 }
 # 基衡のコマ（assets/images/enemies/boss2_名前.png。左向き。tools/make_boss2.py が作る）
