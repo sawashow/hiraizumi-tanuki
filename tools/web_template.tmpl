@@ -44,7 +44,8 @@ async def custom_site():
                 zip_ref.extractall(appdir.as_posix())
     else:
         import tarfile
-        async with platform.fopen("{{cookiecutter.archive}}.tar.gz", "rb") as archive:
+        # ?v= は、公開ごとの版の番号（Actions が __BUILD__ をコミット番号に置き換える）。ブラウザが、古い本体をキャッシュから使わないように
+        async with platform.fopen("{{cookiecutter.archive}}.tar.gz?v=__BUILD__", "rb") as archive:
             tar = tarfile.open(fileobj=archive, mode="r:gz")
             tar.extractall(path=appdir.as_posix(), filter='tar')
             tar.close()

@@ -44,6 +44,9 @@ jobs:
           cp assets/images/favicon.png _site/      # タヌキ侍の顔（tools/make_favicon.py で作る）
           cp docs/CNAME _site/
           touch _site/.nojekyll
+          # 本体の読み込みに、版の番号を付ける（公開直後に、ブラウザが古い本体を使わないように）。置き換わらなければ、失敗にする
+          sed -i "s/__BUILD__/${GITHUB_SHA::8}/" _site/index.html
+          grep -c "tar.gz?v=${GITHUB_SHA::8}" _site/index.html
           ls -l _site
       - uses: actions/upload-pages-artifact@v3
         with:
