@@ -101,3 +101,9 @@ Google Drive に置いてあります。元絵を増やしたら、Drive にも�
 「無念…」などの文字の絵は、ドット風フォント DotGothic16（SIL Open Font License 1.1）で書き出したものです。
 フォントのファイル自体は、ゲームにもリポジトリにも含めていません。
 https://github.com/fontworks-fonts/DotGothic16
+
+## ライセンス
+
+- **プログラム**（`*.py`・`tools/`・`server/`・`.github/` など）: MIT License（`LICENSE`）。自由に使ってかまいません。
+- **素材**（`assets/` の絵・曲・効果音・文章、`docs/` の絵）: © Ponpoco Works。転載・再配布・ほかの作品での利用はお断りします。
+- ロゴ画面の音は、Springin’ Sound Stock の素材です。同社の利用規約に従います（素材だけを取り出して使うことはできません）。
