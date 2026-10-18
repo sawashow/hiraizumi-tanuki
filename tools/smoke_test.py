@@ -2615,13 +2615,14 @@ STAGES[:] = _saved_stages
 import pygame as _pg  # noqa: E402
 import gamepad  # noqa: E402
 
-pad = gamepad.Pad()
-check("コントローラが無くても、起動できる（何も押していない扱い）", not pad.connected and pad.held() == set())
-
-
 def ev(kind, **kw):
     return _pg.event.Event(getattr(_pg, kind), **kw)
 
+
+pad = gamepad.Pad()
+for _iid in list(pad.pads) + list(pad.fallback):     # つないであるコントローラは、抜いた扱いにする（つないだままでも、テストが通るように）
+    pad.handle(ev("CONTROLLERDEVICEREMOVED", instance_id=_iid))
+check("コントローラが無くても（抜いても）、起動できる（何も押していない扱い）", not pad.connected and pad.held() == set())
 
 if pad.sdl:
     A, B, X, Y = _pg.CONTROLLER_BUTTON_A, _pg.CONTROLLER_BUTTON_B, _pg.CONTROLLER_BUTTON_X, _pg.CONTROLLER_BUTTON_Y
