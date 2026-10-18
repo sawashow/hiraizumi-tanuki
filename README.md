@@ -8,6 +8,7 @@
 
 **応援する**: 気に入っていただけたら、投げ銭で応援していただけると、次のステージや新しいゲームを作る励みになります。
 - Ko-fi: https://ko-fi.com/ponpocoworks
+- OFUSE（日本円で、手紙を添えて送れます）: https://ofuse.me/ponpocoworks
 
 ## 操作
 
