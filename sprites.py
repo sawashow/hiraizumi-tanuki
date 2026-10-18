@@ -196,7 +196,6 @@ class Assets:
                 d = math.hypot((xx + 0.5) / vw - 0.5, (yy + 0.5) / vh - 0.5) / 0.7071   # 中心 0 → 角 1
                 vig.set_at((xx, yy), (6, 4, 14, round(C.MAP_VIGNETTE * max(0.0, d - 0.45) / 0.55)))
         self.map_vignette = pygame.transform.smoothscale(vig, (C.BASE_W, C.BASE_H))
-        self.ending_image = _load(C.ENDING_IMAGE).convert() if os.path.exists(os.path.join(IMG, C.ENDING_IMAGE)) else None
         self.story = _load("story_intro.png")           # 始まりの語り（縦に長い1枚）
         trail = _sword_trail()
         self.sword_trail = {True: trail, False: pygame.transform.flip(trail, True, False)}   # True=右向き

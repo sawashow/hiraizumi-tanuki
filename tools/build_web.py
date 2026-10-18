@@ -23,7 +23,7 @@ for name in ("main.py", "config.py", "sprites.py", "stage.py", "audio.py", "game
 src_images = os.path.join(ROOT, "assets", "images")
 for dirpath, _, files in os.walk(src_images):
     for f in files:
-        if f.endswith(".png") and "sheet" not in f and f != "ending.png":   # 確認用の一覧画像は入れない。ending.png は、いまは使わない（エンドロールのあと、絵は出さない）
+        if f.endswith(".png") and "sheet" not in f:   # 確認用の一覧画像は入れない
             rel = os.path.relpath(dirpath, src_images)
             dst = os.path.join(OUT, "assets", "images", rel)
             os.makedirs(dst, exist_ok=True)

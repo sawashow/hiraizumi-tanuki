@@ -59,9 +59,7 @@ class Game:
         self.touch_on = False       # スマホのタッチで遊んでいるか（メインループが、毎回入れる。イニシャルを、キーボードで入れるため）
         self._ud_hold = 0           # 上下を押し続けているフレーム数（イニシャルの文字を、連続で進める）
         self.name_chars, self.name_i, self.send_t = list("AAA"), 0, 0     # 入れているイニシャルと、選んでいる位置（0〜2 = 文字 / 3 = OK / 4 = SKIP）
-        self.ending_screen = False   # いま、エンディング画面を出している（いまは使っていない。エンドロールのあとは、ロゴ画面へ戻る）
         self.logo_again = False      # 真なら、メインループが、ロゴ画面を出し直す（エンドロールのあと）
-        self.ending_t = 0
         self.map_on = False      # いま、地図を出している
         self.map_t = 0
         self.map_to = 1          # 着く場所（面の番号）
@@ -313,7 +311,7 @@ class Game:
     @property
     def can_pause(self):
         """ポーズできるのは、面を遊んでいる間だけ（スタート画面・語り・地図・寸劇・結果・やられた画面では、できない）"""
-        return not (self.title or self.story or self.map_on or self.thanks or self.roll or self.summary or self.ending_screen or self.cleared
+        return not (self.title or self.story or self.map_on or self.thanks or self.roll or self.summary or self.cleared
                     or self.ending or self.player.hp <= 0)
 
     def _step_pause(self, held, pressed):
@@ -384,13 +382,6 @@ class Game:
             return
         if self.title:      # スタート画面: 止めておく。Enter（刀・ジャンプのキーでも）で、刀の音が鳴って始まる
             self._step_title(held, pressed)
-            return
-        if self.ending_screen:   # エンディング: 暗い所から明るくなる。しばらくして、Enter で、スタート画面へ戻る
-            self.ending_t += 1
-            if {"restart", "attack", "jump"} & set(pressed) and self.ending_t >= C.ENDING_SCREEN["wait"]:
-                self.ending_screen = False
-                self.reset()
-                self._enter_title(self.use_title)
             return
         if self.summary:    # エンドロールのあとの総括
             self._step_summary(held, set(pressed))
@@ -1077,7 +1068,7 @@ class Game:
         始まりの語りの間は、語りの曲（無ければ、無音）。ゲームが始まると、1面の曲。
         ボスが降ってくるまでは静かにして、着地したときに、ボスの曲を始める"""
         story = C.BGM_STORY if self.story_bgm else None
-        if self.ending_screen or self.thanks or self.roll or self.summary:
+        if self.thanks or self.roll or self.summary:
             return self._song(C.BGM_ENDING) or story
         if self.title:
             return self.disco_song or self._song(C.BGM_TITLE)
@@ -1114,9 +1105,6 @@ class Game:
             return
         if self.roll:
             self._draw_roll(screen)
-            return
-        if self.ending_screen:
-            self._draw_ending_screen(screen)
             return
         if self.map_on:
             self._draw_map(screen)
@@ -2033,18 +2021,6 @@ class Game:
             fade = pygame.Surface((C.BASE_W, C.BASE_H))
             fade.set_alpha(255 - 255 * t // 40)
             full.blit(fade, (0, 0))
-
-    def _draw_ending_screen(self, screen):
-        """エンディング: 暗い所から、ゆっくり明るくなる。しばらくして、「PRESS START」が点滅する"""
-        E = C.ENDING_SCREEN
-        screen.blit(self.a.ending_image, (0, 0))
-        if self.ending_t < E["fade"]:
-            fade = pygame.Surface((C.BASE_W, C.BASE_H))
-            fade.set_alpha(255 - 255 * self.ending_t // E["fade"])
-            screen.blit(fade, (0, 0))
-        elif self.ending_t >= E["wait"] and ((self.ending_t - E["wait"]) // 30) % 2 == 0:
-            hint = self.a.title_prompt
-            screen.blit(hint, (C.BASE_W - hint.get_width() - 8, 6))
 
     def _draw_map(self, screen):
         """ステージ選択の地図。道の上に、マリオワールドのような点線を引く（通った所は金、これからは白、まだ無い面は暗い）。

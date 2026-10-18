@@ -23,7 +23,7 @@ from PIL import Image
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "assets", "images")
 SHEETS = ("player_sheet.png", "shuriken_sheet.png", "boss4_sheet.png")    # 確認用のシート（ゲームは読まない）
-STILLS = ("title.png", "ending.png", "stage_map.png")                     # 画面いっぱいの一枚絵
+STILLS = ("title.png", "stage_map.png")                 # 画面いっぱいの一枚絵
 GLOW = ("wave", "slash")                                                   # 光（輪郭なし。ぼかしてよい）
 CHAR_LINE, CHAR_COLORS = 0.70, 16
 BG_BLOCK, BG_COLORS = 0.15, 32

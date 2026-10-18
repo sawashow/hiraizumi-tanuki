@@ -1995,7 +1995,7 @@ _saved = list(STAGES)
 STAGES[:] = [STAGES[0]]   # 最後の面をクリアしたときの動き（1面だけの設定にする）
 run(g, 1, (), {"restart"})
 STAGES[:] = _saved
-check("最後の面のクリアのあと、Enterで、姫を助ける場面（THANK YOU TANUKI!）が出る", g.thanks and not g.ending_screen and not g.title)
+check("最後の面のクリアのあと、Enterで、姫を助ける場面（THANK YOU TANUKI!）が出る", g.thanks and not g.title)
 run(g, g._thanks_at("arrive") - 4)
 snap(g, "thanks walk")
 check("タヌキ侍が歩いてくる間は、まだ文は出ない", g._thanks_shown() == 0 and g.thanks)
@@ -2007,7 +2007,7 @@ run(g, C.THANKS["wait"] + 1)
 snap(g, "thanks")
 run(g, 1, (), {"restart"})
 RL = C.ROLL
-check("もう一度押すと、エンドロールが始まる（エンディングの絵は、まだ）", g.roll and not g.thanks and not g.ending_screen and g.roll_state == "walk")
+check("もう一度押すと、エンドロールが始まる", g.roll and not g.thanks and g.roll_state == "walk")
 check("エンドロールの文字の絵がある", g.a.credits is not None)
 run(g, 5, (), {"restart"})
 check("エンドロールは、始まってすぐは、飛ばせない", g.roll)
@@ -2040,14 +2040,14 @@ for _ in range(20000):
     if not g.roll:
         break
 check("文字が流れきると、ロゴ画面からやり直す（絵は出さない）。スタート画面に戻り、雷も最初から数え直す",
-      not g.roll and not g.ending_screen and g.logo_again and g.title and not g.story and not g.cleared
+      not g.roll and g.logo_again and g.title and not g.story and not g.cleared
       and g.player.px == 60 and g.score == 0 and g.title_t == 0 and g.thunder_n == 0, "渡った回数 %d" % g.roll_n)
 gr = Game(title=True)
 gr.title = False
 gr._start_roll()
 run(gr, RL["skip"] + 1)
 run(gr, 1, (), {"restart"})
-check("エンドロールは、決定のキーで飛ばせる（ロゴ画面からやり直す）", not gr.roll and not gr.ending_screen and gr.title and gr.logo_again)
+check("エンドロールは、決定のキーで飛ばせる（ロゴ画面からやり直す）", not gr.roll and gr.title and gr.logo_again)
 # ---------------------------------------------------------------- 17. 回復・落とし物・強化3種類・中間地点の演出
 class FixedRng:
     """くじを、決まった値にする"""
