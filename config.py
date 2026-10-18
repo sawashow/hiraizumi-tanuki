@@ -431,7 +431,7 @@ WATER_TICKS = 30      # 水面が、もう1コマに切り替わるまでのフ�
 #   level＝タッチで遊ぶ人に、最初に選んでおく難しさ（スタート画面で、まだ難しさを変えていなければ。あとで自分で変えられる）
 #   fix_y＝「固定」のスティックの、中心の高さ（窓の高さに対する割合。横は hint_x。指がこの中心の左右・下にあるかで、向きを決める）
 #   arc＝右のボタンの、帯の真ん中からの横のずれ（帯の幅に掛ける。上から手裏剣・刀・ジャンプ。親指の弧に沿って、下ほど内側）／vibrate＝押したときの振動（ミリ秒。Android のみ）
-TOUCH = dict(side=0.17, cuts=(0.30, 0.52, 0.72), pause_r=0.045, stick_dead=0.03, stick_down=0.07, stick_max=0.04, ring=0.10, ring_alpha=150, hint_alpha=140, hint_x=0.20, band_alpha=40, arc=(0.0, 0.0, -0.12), fix_y=0.66, vibrate=12, coyote=8, jump_buffer=12, level="easy",
+TOUCH = dict(side=0.17, cuts=(0.30, 0.52, 0.72), pause_r=0.045, stick_dead=0.03, stick_down=0.07, stick_max=0.04, ring=0.10, ring_alpha=150, hint_alpha=140, hint_x=0.20, band_alpha=40, arc=(0.0, 0.0, -0.12), fix_y=0.72, vibrate=12, coyote=8, jump_buffer=12, level="easy",
              color=(110, 110, 130), lit=(255, 236, 150), mark=(200, 200, 215))
 LOGO = dict(file="ponpoco_logo.png", bg=(255, 255, 255), fade=30, hold=120, after=50, width=0.35)   # after: ロゴが消えたあと、白いまま待つ（余韻）
 
