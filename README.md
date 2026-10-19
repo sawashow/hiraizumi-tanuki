@@ -4,6 +4,7 @@
 刀で斬り、木の葉手裏剣を投げて進みます。
 
 **ブラウザで遊ぶ**: https://hiraizumi-tanuki.ponpoco-works.com/
+（itch.io でも遊べます: https://ponpocoworks.itch.io/hiraizumi-tanuki ）
 （初回は実行環境の読み込みに 20〜30 秒かかります。開いたら、画面を一度クリックして始めます）
 
 **応援する**: 気に入っていただけたら、投げ銭で応援していただけると、次のステージや新しいゲームを作る励みになります。
