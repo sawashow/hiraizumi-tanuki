@@ -423,15 +423,9 @@ WATER_DEPTH = 8       # 穴の上端から、水面までの深さ
 WATER_TICKS = 30      # 水面が、もう1コマに切り替わるまでのフレーム数
 
 # 起動したときの、会社のロゴ画面（splash.py）。fade: 現れる・消えるのフレーム数 / hold: 止まっているフレーム数 / width: 窓の幅に対するロゴの幅
-# スマホのタッチ操作（touch.py）。大きさは、窓の高さに掛ける。
-#   side＝左右の帯の幅（ゲームの絵は、残りに16:9で出す。親指が、帯と絵の端にまたがる幅）／pause_r＝ポーズの丸の半径／cuts＝右半分の帯の境目（上から: ポーズの隅の下端・手裏剣と刀・刀とジャンプ）
-#   stick_dead＝歩き出す、指のずれ／stick_down＝しゃがむ、指の下へのずれ／stick_max＝スティックの中心が、指についてくる距離
-#   coyote・jump_buffer＝タッチのときだけ、ジャンプを受け付ける時間を、長くする（COYOTE・JUMP_BUFFER の代わり）
-#   ring＝指の所に出す輪の半径／hint_x＝指を置いていないときの、左の目印の位置（窓の幅に対する割合。端ではなく内側へ、指を誘う）／ring_alpha・hint_alpha＝輪の濃さ（指を置いたとき・置いていないときの目印）／band_alpha＝押している帯の明るさ
-#   level＝タッチで遊ぶ人に、最初に選んでおく難しさ（スタート画面で、まだ難しさを変えていなければ。あとで自分で変えられる）
-#   fix_y＝「固定」のスティックの、中心の高さ（窓の高さに対する割合。横は hint_x。指がこの中心の左右・下にあるかで、向きを決める）
-#   arc＝右のボタンの、帯の真ん中からの横のずれ（帯の幅に掛ける。上から手裏剣・刀・ジャンプ。親指の弧に沿って、下ほど内側）／vibrate＝押したときの振動（ミリ秒。Android のみ）
-TOUCH = dict(side=0.17, cuts=(0.30, 0.52, 0.72), pause_r=0.045, stick_dead=0.03, stick_down=0.07, stick_max=0.04, ring=0.10, ring_alpha=150, hint_alpha=140, hint_x=0.20, band_alpha=40, arc=(0.0, 0.0, -0.12), fix_y=0.72, vibrate=12, coyote=8, jump_buffer=12, level="easy",
+# スマホのタッチ操作（touch.py）。大きさは、窓の高さに掛ける: side＝左右の帯の幅（ゲームの絵は、残りに16:9で出す）・dpad＝十字キーの半径・button＝ボタンの半径・reach＝押したとみなす範囲（見た目の半径に掛ける。帯からはみ出して、ゲームの絵の端でも効く）
+#   vibrate＝押したときの振動（ミリ秒。Android のみ）／coyote・jump_buffer＝タッチのときだけ、ジャンプを受け付ける時間を、長くする／level＝タッチで遊ぶ人に、最初に選んでおく難しさ
+TOUCH = dict(side=0.33, dpad=0.155, button=0.085, reach=1.5, vibrate=12, coyote=8, jump_buffer=12, level="easy",
              color=(110, 110, 130), lit=(255, 236, 150), mark=(200, 200, 215))
 LOGO = dict(file="ponpoco_logo.png", bg=(255, 255, 255), fade=30, hold=120, after=50, width=0.35)   # after: ロゴが消えたあと、白いまま待つ（余韻）
 
