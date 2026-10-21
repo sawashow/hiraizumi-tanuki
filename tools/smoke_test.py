@@ -467,46 +467,29 @@ check("足場から向こう岸へ渡れる（落ちない）", g.player.hp == C
       "x=%.0f HP=%d" % (g.player.px, g.player.hp))
 snap(g, "on platform")
 
-# スマホのタッチ: 左半分＝触った所が中心のスティック／右半分＝高さで選ぶ帯（上から、手裏剣・刀・ジャンプ）
+
+# スマホのタッチ: 左右の帯のボタン。押した瞬間（handle）と、押している方向（held）に変わる
 from touch import Touch  # noqa: E402
 _tc, _sz = Touch(), (844, 390)
-def _finger(kind, x, y, fid=1):
-    return _tc.handle(pygame.event.Event(kind, x=x / _sz[0], y=y / _sz[1], finger_id=fid, touch_id=0, dx=0, dy=0), _sz)
-_bd = Touch.bands(_sz[1])
-_mid = {k: (a + b) / 2 for k, (a, b) in _bd.items()}
-check("タッチ: 触るまでは、目印を出さない", not _tc.active)
-_p = _finger(pygame.FINGERDOWN, 700, _mid["jump"], 1)
-check("タッチ: 右半分の下の帯で、ジャンプ（決定も）", _p == {"jump", "restart"} and _tc.active, str(_p))
-_p = _finger(pygame.FINGERMOTION, 600, _mid["attack"], 1)
-check("タッチ: ジャンプから上へ滑らせると、刀が出る（ジャンプは離す）", _p == {"attack", "jump_release"}, str(_p))
-_finger(pygame.FINGERUP, 600, _mid["attack"], 1)
-check("タッチ: 手元を見ずに、高さだけで選べる（右半分の、ゲームの絵の上でも効く）", _finger(pygame.FINGERDOWN, 500, _mid["throw"], 4) == {"throw"})
-_finger(pygame.FINGERUP, 500, _mid["throw"], 4)
-_finger(pygame.FINGERDOWN, 200, 250, 2)
-check("タッチ: 左半分は、触っただけでは、歩かない", _tc.held() == set())
-_finger(pygame.FINGERMOTION, 230, 250, 2)
-check("タッチ: 指を右へずらすと、右へ歩く", _tc.held() == {"right"}, str(_tc.held()))
-_finger(pygame.FINGERMOTION, 300, 250, 2)
-_finger(pygame.FINGERMOTION, 270, 250, 2)
-check("タッチ: 中心が指についてくるので、少し（30ドット）戻すだけで、向きが変わる（左）", _tc.held() == {"left"}, str(_tc.held()))
-_finger(pygame.FINGERMOTION, 270, 290, 2)
-check("タッチ: 歩いている指を、下へ滑らせると、しゃがむ", "down" in _tc.held(), str(_tc.held()))
-_finger(pygame.FINGERUP, 270, 290, 2)
+_bs = Touch.buttons(*_sz)
+def _finger(kind, name, fid=1, dx=0, dy=0):
+    x, y, r = _bs[name]
+    return _tc.handle(pygame.event.Event(kind, x=(x + dx) / _sz[0], y=(y + dy) / _sz[1], finger_id=fid, touch_id=0, dx=0, dy=0), _sz)
+check("タッチ: 触るまでは、ボタンを出さない", not _tc.active)
+_p = _finger(pygame.FINGERDOWN, "jump", 1)
+check("タッチ: ジャンプのボタンで、ジャンプ（決定も）", _p == {"jump", "restart"} and _tc.active, str(_p))
+check("タッチ: ジャンプを離すと、jump_release", _finger(pygame.FINGERUP, "jump", 1) == {"jump_release"})
+_finger(pygame.FINGERDOWN, "dpad", 2, dx=_bs["dpad"][2] * 0.6)
+check("タッチ: 十字キーの右で、右を押している", _tc.held() == {"right"}, str(_tc.held()))
+_finger(pygame.FINGERMOTION, "dpad", 2, dy=_bs["dpad"][2] * 0.6)
+check("タッチ: 十字キーは、指を滑らせると、向きが変わる（下）", _tc.held() == {"down"}, str(_tc.held()))
+check("タッチ: 歩きながら、刀を振れる（2本の指）", _finger(pygame.FINGERDOWN, "attack", 3) == {"attack"} and _tc.held() == {"down"})
+_finger(pygame.FINGERUP, "dpad", 2)
 check("タッチ: 指を離すと、方向も離す", _tc.held() == set())
-
-# 固定のスティック: 中心は決まった位置。指が、その左右・下にあるかで、向きが決まる（触った所は、関係ない）
-_tc = Touch()
-_tc.fixed = True
-_cx, _cy = Touch.center(*_sz)
-_finger(pygame.FINGERDOWN, _cx - 60, _cy, 7)
-check("タッチ（固定）: 中心の左に触ると、すぐ左へ歩く", _tc.held() == {"left"}, str(_tc.held()))
-_finger(pygame.FINGERMOTION, _cx + 60, _cy, 7)
-check("タッチ（固定）: 指を中心の右へ動かすと、右へ歩く。中心は、指についてこない", _tc.held() == {"right"} and _tc.fingers[7].ox == _cx, str(_tc.held()))
-_finger(pygame.FINGERMOTION, _cx, _cy + 80, 7)
-check("タッチ（固定）: 中心の下で、しゃがむ", _tc.held() == {"down"}, str(_tc.held()))
-_finger(pygame.FINGERMOTION, _cx, _cy, 7)
-check("タッチ（固定）: 中心に戻すと、止まる", _tc.held() == set(), str(_tc.held()))
-_finger(pygame.FINGERUP, _cx, _cy, 7)
+_r = Touch.game_rect(*_sz)
+_xs = [b[0] - b[2] for k, b in _bs.items() if k != "dpad"] + [_bs["dpad"][0] + _bs["dpad"][2]]
+check("タッチ: ボタンは、ゲームの絵に重ならない（左右の帯の中）",
+      _bs["dpad"][0] + _bs["dpad"][2] <= _r.left and all(b[0] - b[2] >= _r.right for k, b in _bs.items() if k != "dpad"), str(_r))
 
 # 記録: 難しさごと・面ごとに、ベストだけ残す
 _r = lambda: records.PATH
