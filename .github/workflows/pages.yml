@@ -41,7 +41,8 @@ jobs:
         run: |
           mkdir _site
           cp web/build/web/index.html web/build/web/web.tar.gz _site/
-          cp assets/images/favicon.png _site/      # タヌキ侍の顔（tools/make_favicon.py で作る）
+          cp assets/audio/bgm_ending.ogg _site/      # 後読みの曲（config.BGM_LATE。本体には入れず、起動のあとに取りに行く）
+          cp assets/images/favicon.png _site/     # タヌキ侍の顔（tools/make_favicon.py で作る）
           cp docs/CNAME _site/
           touch _site/.nojekyll
           # 本体の読み込みに、版の番号を付ける（公開直後に、ブラウザが古い本体を使わないように）。置き換わらなければ、失敗にする

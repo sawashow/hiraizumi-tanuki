@@ -292,6 +292,7 @@ BGM_SUPER = "bgm_super.ogg"    # スーパータヌキの間（勢いのある�
 # 場面ごとの曲（ファイルを assets/audio に置けば、鳴る。無ければ、右に書いた、いまの曲で代わりにする）
 BGM_MAP = "bgm_map.ogg"            # ステージ選択の地図。曲名は「Steps Into the Morning Sun」（前後の無音を切ってある。無ければ、語りの曲）
 BGM_TITLE = "bgm_title.ogg"        # スタート画面（無ければ、無音。雷の音だけ）
+BGM_LATE = ("bgm_ending.ogg",)   # ブラウザ版で、本体（web.tar.gz）に入れず、起動のあとに別ファイルで取りに行く曲（起動を速くする。届くまでは、無い曲として扱う）
 BGM_ENDING = "bgm_ending.ogg"      # エンディング・エンドロール。曲名は「Sunset at the Temple Gate」（終わりの無音を切ってある。無ければ、語りの曲）
 BGM_STAGE_N = "bgm_stage%d.ogg"    # 面ごとの曲（%d は、遊ぶ順の番号 1〜4。無ければ、その面に決めてある曲 = 1面の曲）
 BGM_BOSS_N = "bgm_boss%d.ogg"      # 面ごとの、ボスの曲（無ければ、ボスの曲）

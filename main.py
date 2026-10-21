@@ -2462,6 +2462,9 @@ async def main():
         game._start(bx, float(game.terrain.height_at(bx)))
         game.enemies = []
     audio = Audio()
+    if sys.platform == "emscripten" and C.BGM_LATE:      # 後読みの曲を、裏で取りに行く。届いたら「曲がある」と覚え直す
+        from audio import fetch_late
+        asyncio.create_task(fetch_late(C.BGM_LATE, lambda n: game._songs.pop(n, None)))
     audio.preload(sorted(f for f in os.listdir(AUDIO_DIR) if f.startswith("sfx_")))    # 効果音は先に読んでおく
     pad = Pad()   # コントローラ（挿すと、すぐ使える）
     touch = Touch()   # スマホのタッチ（一度触ると、左右の帯にボタンが出る）

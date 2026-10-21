@@ -10,6 +10,26 @@ DIR = os.path.join(os.path.dirname(__file__), "assets", "audio")
 pygame.mixer.pre_init(44100, -16, 2, 2048)    # 出力の溜め（バッファ）を大きく: ブラウザ版で、音がぶつぶつ切れるのを減らす（pygame.init より前に効かせる）
 
 
+async def fetch_late(names, done):
+    """ブラウザ版だけ: 本体に入れなかった曲を、起動のあとに取りに行く（C.BGM_LATE）。届いたら done(名前) を呼ぶ。失敗しても、ゲームは止めない"""
+    import asyncio
+    import platform
+    for name in names:
+        path = os.path.join(DIR, name)
+        if os.path.exists(path):
+            continue
+        try:
+            async with platform.fopen(name, "rb") as f:     # アドレスは、ページからの相対（公開物の index.html と同じ場所）
+                data = f.read()
+            with open(path + ".part", "wb") as out:
+                out.write(data)
+            os.replace(path + ".part", path)     # 書き終えてから名前を付ける（途中のファイルを、曲として読ませない）
+            done(name)
+        except Exception:
+            pass     # 取れなければ、その曲は無いまま（語りの曲で代わる）
+        await asyncio.sleep(0)
+
+
 class Audio:
     def __init__(self):
         self.ok = False

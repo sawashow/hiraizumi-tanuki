@@ -12,6 +12,7 @@
 """
 import os
 import shutil
+import sys
 
 ROOT = os.path.join(os.path.dirname(__file__), "..")
 OUT = os.path.join(ROOT, "web")
@@ -28,7 +29,10 @@ for dirpath, _, files in os.walk(src_images):
             dst = os.path.join(OUT, "assets", "images", rel)
             os.makedirs(dst, exist_ok=True)
             shutil.copy(os.path.join(dirpath, f), dst)
-shutil.copytree(os.path.join(ROOT, "assets", "audio"), os.path.join(OUT, "assets", "audio"))   # BGM（ogg）
+sys.path.insert(0, ROOT)
+import config as C
+shutil.copytree(os.path.join(ROOT, "assets", "audio"), os.path.join(OUT, "assets", "audio"),
+                ignore=shutil.ignore_patterns(*C.BGM_LATE))   # BGM（ogg）。後読みの曲（C.BGM_LATE）は、本体に入れない
 n = sum(len(fs) for _, _, fs in os.walk(os.path.join(OUT, "assets", "images")))
 size = sum(os.path.getsize(os.path.join(dp, f)) for dp, _, fs in os.walk(OUT) for f in fs)
 print("画像 %d 枚、合計 %.0f KB" % (n, size / 1024))
