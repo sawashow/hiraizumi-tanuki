@@ -41,7 +41,10 @@ jobs:
         run: |
           mkdir _site
           cp web/build/web/index.html web/build/web/web.tar.gz _site/
-          cp assets/audio/bgm_ending.ogg _site/      # 後読みの曲（config.BGM_LATE。本体には入れず、起動のあとに取りに行く）
+          # 後読みの曲（config.BGM_LATE）。本体には入れず、起動のあとに取りに行く。一覧は config.py を読む（書き忘れを防ぐ）。1曲でも欠けたら失敗にする
+          for f in $(python -c "import config; print(' '.join(config.BGM_LATE))"); do
+            cp "assets/audio/$f" _site/
+          done
           cp assets/images/favicon.png _site/     # タヌキ侍の顔（tools/make_favicon.py で作る）
           cp docs/CNAME _site/
           touch _site/.nojekyll
