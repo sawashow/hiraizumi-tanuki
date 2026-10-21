@@ -2469,9 +2469,7 @@ async def main():
         game._start(bx, float(game.terrain.height_at(bx)))
         game.enemies = []
     audio = Audio()
-    if sys.platform == "emscripten" and C.BGM_LATE:      # 後読みの曲を、裏で取りに行く。届いたら「曲がある」と覚え直す
-        from audio import fetch_late
-        asyncio.create_task(fetch_late(C.BGM_LATE, lambda n: game._songs.pop(n, None)))
+    late_pending = sys.platform == "emscripten" and bool(C.BGM_LATE)     # 後読みの曲を取りに行くのは、ロゴ画面が終わってから（起動の邪魔をしない）
     audio.preload(sorted(f for f in os.listdir(AUDIO_DIR) if f.startswith("sfx_")))    # 効果音は先に読んでおく
     pad = Pad()   # コントローラ（挿すと、すぐ使える）
     touch = Touch()   # スマホのタッチ（一度触ると、左右の帯にボタンが出る）
@@ -2553,6 +2551,10 @@ async def main():
                 clock.tick(C.FPS)
                 await asyncio.sleep(0)
                 continue
+        if late_pending:        # ロゴ画面のあと、一度だけ: 後読みの曲を、裏で取りに行く。届いたら「曲がある」と覚え直す
+            late_pending = False
+            from audio import fetch_late
+            asyncio.create_task(fetch_late(C.BGM_LATE, lambda n: game._songs.pop(n, None)))
         t_step = pygame.time.get_ticks()
         touch.fixed = game.stick_fixed
         game.touch_on = touch.active
