@@ -55,6 +55,21 @@ jobs:
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site
+      # itch.io にも、同じ版を上げる（itch.io の遊ぶ場所は、web.tar.gz ではなく web.apk を読むため、詰め替えた zip を作る）。
+      # 以降の手順は、失敗しても本番（GitHub Pages）の公開を止めない。API キー（Secrets の BUTLER_API_KEY）が無ければ、飛ばす
+      - name: itch.io 用の zip を作る
+        continue-on-error: true
+        run: python tools/make_itch_zip.py _site itch.zip
+      - name: itch.io へ上げる（butler）
+        continue-on-error: true
+        env:
+          BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
+        run: |
+          if [ -z "$BUTLER_API_KEY" ]; then echo "BUTLER_API_KEY が未登録のため、itch.io への送信は飛ばす"; exit 0; fi
+          curl -fsSL -o butler.zip https://broth.itch.zone/butler/linux-amd64/LATEST/archive/default
+          unzip -q butler.zip -d butler
+          chmod +x butler/butler
+          butler/butler push itch.zip ponpocoworks/hiraizumi-tanuki:html5 --userversion "${GITHUB_SHA::8}"
 
   deploy:
     needs: build
