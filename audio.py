@@ -47,12 +47,15 @@ class Audio:
     def play_bgm(self, name):
         if not self.ok or self.playing == name:
             return
+        path = os.path.join(DIR, name)
+        if not os.path.exists(path):
+            return      # まだ届いていない曲（ブラウザ版の後読み）。鳴らさないだけで、音は止めない
         try:
-            pygame.mixer.music.load(os.path.join(DIR, name))
+            pygame.mixer.music.load(path)
             pygame.mixer.music.set_volume(C.BGM_VOLUMES.get(name, C.BGM_VOLUME) * self.gain[0])
             pygame.mixer.music.play(-1)
             self.playing = name
-        except (pygame.error, FileNotFoundError):
+        except pygame.error:
             self.ok = False
 
     def keep_playing(self):

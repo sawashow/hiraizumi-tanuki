@@ -75,7 +75,6 @@ class Game:
         self.vol_bgm = self.vol_sfx = C.MENU["steps"]    # 曲と効果音の音量（0〜steps。スタート画面のメニューで変える）
         self.stick_fixed = True      # スマホの左のスティックを、決まった位置に固定するか（OPTION の STICK。True = 固定 / False = 触った所が中心）
         self.story_bgm = os.path.exists(os.path.join(AUDIO_DIR, C.BGM_STORY))   # 語りの曲があるか
-        self.super_bgm = os.path.exists(os.path.join(AUDIO_DIR, C.BGM_SUPER))   # スーパータヌキの曲があるか
         self._enter_title(title)
         self.reset()
 
@@ -599,7 +598,10 @@ class Game:
                 return
             elif decide and self.menu_page == "disco" and row != "back":     # 曲を選んで決定: その曲を鳴らす（もう一度で、止める）
                 song = C.DISCO[int(row[1:])][0]
-                self.disco_song = None if self.disco_song == song else song
+                if self.disco_song == song:
+                    self.disco_song = None
+                elif self._song(song):      # まだ届いていない曲（ブラウザ版の後読み）は、鳴らさない
+                    self.disco_song = song
             elif decide and row == "back":
                 # 戻る先: 名所・曲の一覧は EXTRA へ、それ以外は最初のメニューへ（来た項目を選んだまま）
                 came, page = self.menu_page, "extra" if self.menu_page in ("disco", "meisho", "jinbutsu") else "main"
@@ -1083,10 +1085,15 @@ class Game:
         n = self.stage.number
         if self.boss_on:
             mid = self.boss.midway
-            return self._song(C.BGM_MIDBOSS if mid else C.BGM_BOSS_N % n) or self.stage.bgm_boss
+            return self._song(C.BGM_MIDBOSS if mid else C.BGM_BOSS_N % n) or self._song(self.stage.bgm_boss) or story
         if self.player.super_t and self.super_bgm:
             return C.BGM_SUPER
-        return self._song(C.BGM_STAGE_N % n) or self.stage.bgm
+        return self._song(C.BGM_STAGE_N % n) or self._song(self.stage.bgm) or story     # 曲がまだ届いていなければ語りの曲（届いたら、替わる）
+
+    @property
+    def super_bgm(self):
+        """スーパータヌキの曲があるか（ブラウザ版では、後から届く）"""
+        return self._song(C.BGM_SUPER) is not None
 
     def _song(self, name):
         """曲のファイルがあれば、その名前。無ければ None（あるかどうかは、一度だけ調べる）"""
